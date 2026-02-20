@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <title>Tactile Experiment Assistant</title>
+    <style>
+        body { font-family: sans-serif; display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; margin: 0; background-color: #f0f2f5; }
+        #container { background: white; padding: 30px; border-radius: 15px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); text-align: center; width: 400px; }
+        #timer { font-size: 48px; font-weight: bold; color: #1a73e8; margin: 20px 0; }
+        #status { font-size: 20px; color: #5f6368; height: 30px; }
+        .progress-bar { width: 100%; height: 10px; background: #e8eaed; border-radius: 5px; overflow: hidden; margin-bottom: 20px; }
+        #progress { width: 0%; height: 100%; background: #34a853; transition: width 0.1s linear; }
+        button { padding: 12px 24px; font-size: 16px; cursor: pointer; background: #1a73e8; color: white; border: none; border-radius: 5px; transition: 0.2s; }
+        button:hover { background: #174ea6; }
+        button:disabled { background: #dadce0; cursor: not-allowed; }
+        #input-section { display: none; margin-top: 20px; border-top: 1px solid #eee; padding-top: 20px; }
+        input { padding: 10px; width: 60px; font-size: 18px; text-align: center; border: 1px solid #ddd; border-radius: 5px; margin-right: 10px; }
+        #log { margin-top: 20px; text-align: left; font-size: 14px; max-height: 150px; overflow-y: auto; background: #fafafa; padding: 10px; border-radius: 5px; }
+    </style>
+</head>
+<body>
+
+<div id="container">
+    <h2>Tactile Experiment</h2>
+    <div id="status">실험 시작 대기 중...</div>
+    <div id="timer">20.00s</div>
+    <div class="progress-bar"><div id="progress"></div></div>
+    
+    <button id="startBtn" onclick="startExperiment()">실험 시작 (Start Trial)</button>
+
+    <div id="input-section">
+        <p>피험자가 보고한 횟수를 입력하세요:</p>
+        <input type="number" id="responseCount" placeholder="0">
+        <button onclick="saveResult()">결과 저장 (Save)</button>
+    </div>
+
+    <div id="log"><strong>실험 기록 (History):</strong><br></div>
+</div>
+
+<script>
+    let timeLeft = 20.0;
+    let timerInterval;
+    const timerDisplay = document.getElementById('timer');
+    const statusDisplay = document.getElementById('status');
+    const progressDisplay = document.getElementById('progress');
+    const startBtn = document.getElementById('startBtn');
+    const inputSection = document.getElementById('input-section');
+    const logSection = document.getElementById('log');
+
+    function startExperiment() {
+        timeLeft = 20.0;
+        startBtn.disabled = true;
+        inputSection.style.display = 'none';
+        statusDisplay.innerText = "자극 가하는 중 (Stimulating...)";
+        statusDisplay.style.color = "#d93025";
+
+        timerInterval = setInterval(() => {
+            timeLeft -= 0.01;
+            if (timeLeft <= 0) {
+                clearInterval(timerInterval);
+                finishTrial();
+            }
+            updateDisplay();
+        }, 10);
+    }
+
+    function updateDisplay() {
+        timerDisplay.innerText = Math.max(0, timeLeft).toFixed(2) + "s";
+        progressDisplay.style.width = ((20 - timeLeft) / 20 * 100) + "%";
+    }
+
+    function finishTrial() {
+        timerDisplay.innerText = "0.00s";
+        statusDisplay.innerText = "종료! 횟수를 입력하세요.";
+        statusDisplay.style.color = "#34a853";
+        inputSection.style.display = 'block';
+    }
+
+    function saveResult() {
+        const count = document.getElementById('responseCount').value;
+        const now = new Date().toLocaleTimeString();
+        logSection.innerHTML += `[${now}] 보고된 횟수: ${count}회<br>`;
+        
+        // 초기화
+        document.getElementById('responseCount').value = "";
+        inputSection.style.display = 'none';
+        startBtn.disabled = false;
+        statusDisplay.innerText = "다음 실험 대기 중...";
+        progressDisplay.style.width = "0%";
+        timerDisplay.innerText = "20.00s";
+    }
+</script>
+
+</body>
+</html>
