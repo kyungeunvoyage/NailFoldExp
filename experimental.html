@@ -2,10 +2,10 @@
 <html lang="ko">
 <head>
     <meta charset="UTF-8">
-    <title>촉각 역치 실험 어시스턴트</title>
+    <title>촉각 역치 실험 어시스턴트 (Condition Split)</title>
     <style>
         body { font-family: 'Segoe UI', sans-serif; display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 100vh; margin: 0; background-color: #f4f7f6; }
-        #container { background: white; padding: 30px; border-radius: 20px; box-shadow: 0 10px 30px rgba(0,0,0,0.1); text-align: center; width: 500px; }
+        #container { background: white; padding: 30px; border-radius: 20px; box-shadow: 0 10px 30px rgba(0,0,0,0.1); text-align: center; width: 520px; }
         .setup-info { display: flex; justify-content: space-around; margin-bottom: 20px; background: #e3f2fd; padding: 15px; border-radius: 10px; font-weight: bold; }
         #target-display { background: #fff9c4; border: 2px dashed #fbc02d; padding: 20px; border-radius: 10px; margin-bottom: 20px; }
         #target-number { font-size: 50px; color: #d32f2f; font-weight: bold; }
@@ -16,26 +16,31 @@
         @keyframes blink { 0% { opacity: 0; } 50% { opacity: 1; } 100% { opacity: 0; } }
         button { padding: 15px; font-size: 16px; cursor: pointer; border: none; border-radius: 8px; transition: 0.2s; width: 100%; font-weight: bold; margin-top: 10px; }
         #startBtn { background: #1a73e8; color: white; }
+        #popBtn { background: #9c27b0; color: white; margin-bottom: 10px; }
         #saveBtn { background: #34a853; color: white; }
         #downloadBtn { background: #5f6368; color: white; margin-top: 20px; }
         #input-section { display: none; margin-top: 20px; border-top: 2px solid #f1f3f4; padding-top: 20px; }
         input { padding: 12px; width: 100px; font-size: 20px; text-align: center; border: 2px solid #ddd; border-radius: 8px; margin-bottom: 10px; }
         #log-container { margin-top: 25px; text-align: left; font-size: 12px; max-height: 200px; overflow-y: auto; background: #fafafa; padding: 10px; border: 1px solid #eee; }
+        .condition-badge { padding: 5px 10px; border-radius: 5px; color: white; font-size: 0.9rem; }
+        .badge-air { background-color: #03a9f4; }
+        .badge-active { background-color: #f44336; }
     </style>
 </head>
 <body>
 
 <div id="container">
-    <h2 id="condition-title">Condition 1: In-air</h2>
+    <button id="popBtn" onclick="openSubjectWindow()">1. 피험자용 창 열기 (Subject Window)</button>
+    <h2 id="condition-title">Condition: Ready</h2>
     
     <div class="setup-info">
-        <div>구역: <span id="current-area">-</span></div>
-        <div>강도: <span id="current-force">-</span></div>
-        <div>시행: <span id="trial-count">0</span> / 32</div>
+        <div>Area: <span id="current-area">-</span></div>
+        <div>Force: <span id="current-force">-</span></div>
+        <div>Trial: <span id="trial-count">0</span> / 32</div>
     </div>
 
     <div id="target-display">
-        <div style="font-size: 14px; color: #666;">실험자 가이드: 이번 자극 횟수</div>
+        <div style="font-size: 14px; color: #666;">Target Indentations (Admin Only)</div>
         <div id="target-number">?</div>
     </div>
     
@@ -44,12 +49,12 @@
         <div id="flash"></div>
     </div>
     
-    <button id="startBtn" onclick="startTrial()">시행 시작 (Start)</button>
+    <button id="startBtn" onclick="startTrial()">2. 시행 시작 (Start)</button>
 
     <div id="input-section">
-        <div style="margin-bottom: 10px;">피험자 응답 입력</div>
-        <input type="number" id="subjectResponse" placeholder="횟수" autofocus> <br>
-        <button id="saveBtn" onclick="logData()">데이터 저장 (Next)</button>
+        <div style="margin-bottom: 10px; font-weight: bold;">Enter Subject's Response</div>
+        <input type="number" id="subjectResponse" placeholder="#" autofocus> <br>
+        <button id="saveBtn" onclick="logData()">Save & Next</button>
     </div>
 
     <div id="log-container">
@@ -57,11 +62,11 @@
         <div id="logContent"></div>
     </div>
 
-    <button id="downloadBtn" onclick="downloadCSV()">CSV 결과 다운로드</button>
+    <button id="downloadBtn" onclick="downloadCSV()">Download Results (CSV)</button>
 </div>
 
 <script>
-    // 실험 설정
+    let subjectWindow = null;
     const areas = ['A', 'B', 'C', 'D'];
     const forces = ['6g', '10g', '26g', '60g'];
     let trials = [];
@@ -71,22 +76,59 @@
     let timeLeft = 20;
     let currentTarget = 0;
 
-    // 1. 모든 조합 생성 (16쌍 x 2개 컨디션 = 32개)
+    function openSubjectWindow() {
+        subjectWindow = window.open("", "SubjectWindow", "width=800,height=600");
+        subjectWindow.document.write(`
+            <html>
+            <head>
+                <title>Subject Display</title>
+                <style>
+                    body { margin: 0; display: flex; align-items: center; justify-content: center; height: 100vh; font-family: sans-serif; transition: background-color 0.5s; background-color: #333; }
+                    h1 { color: white; font-size: 3.5rem; text-align: center; line-height: 1.4; padding: 20px; }
+                </style>
+            </head>
+            <body>
+                <h1 id="msg">Waiting for the experiment to start...</h1>
+                <script>
+                    function updateState(state) {
+                        const body = document.body;
+                        const msg = document.getElementById('msg');
+                        if (state === 'start') {
+                            body.style.backgroundColor = '#2ecc71';
+                            msg.innerText = 'Concentrate on the stimulus...';
+                        } else if (state === 'end') {
+                            body.style.backgroundColor = '#e74c3c';
+                            msg.innerText = 'How many indentations were there?';
+                        } else {
+                            body.style.backgroundColor = '#333';
+                            msg.innerText = 'Prepare for the next trial.';
+                        }
+                    }
+                <\/script>
+            </body>
+            </html>
+        `);
+    }
+
     function setupTrials() {
         let condition1 = [];
         let condition2 = [];
         
-        areas.forEach(a => {
-            forces.forEach(f => {
-                condition1.push({ condition: "1 (In-air)", area: a, force: f });
-                condition2.push({ condition: "2 (Active)", area: a, force: f });
-            });
-        });
-
-        // 각 컨디션 내에서 랜덤하게 섞기
+        // Build 16 combinations for In-air
+        areas.forEach(a => forces.forEach(f => {
+            condition1.push({ condition: "In-air", area: a, force: f });
+        }));
+        // Randomize Condition 1
         condition1.sort(() => Math.random() - 0.5);
+
+        // Build 16 combinations for Active
+        areas.forEach(a => forces.forEach(f => {
+            condition2.push({ condition: "Active", area: a, force: f });
+        }));
+        // Randomize Condition 2
         condition2.sort(() => Math.random() - 0.5);
-        
+
+        // Combine them: First 16 are In-air, Next 16 are Active
         trials = [...condition1, ...condition2];
         updateTrialInfo();
     }
@@ -94,19 +136,28 @@
     function updateTrialInfo() {
         if (currentTrialIdx < trials.length) {
             const t = trials[currentTrialIdx];
-            document.getElementById('condition-title').innerText = `Condition ${t.condition}`;
+            const titleEl = document.getElementById('condition-title');
+            titleEl.innerText = `Condition: ${t.condition}`;
+            titleEl.className = t.condition === "In-air" ? "badge-air" : "badge-active";
+            
             document.getElementById('current-area').innerText = t.area;
             document.getElementById('current-force').innerText = t.force;
             document.getElementById('trial-count').innerText = currentTrialIdx + 1;
         } else {
-            document.getElementById('status').innerText = "모든 실험 종료!";
+            document.getElementById('condition-title').innerText = "All Trials Completed!";
             document.getElementById('startBtn').disabled = true;
         }
     }
 
     function startTrial() {
-        currentTarget = Math.floor(Math.random() * 4) + 5; // 5~8 랜덤
+        if (!subjectWindow || subjectWindow.closed) {
+            alert("Please open the Subject Window first!");
+            return;
+        }
+
+        currentTarget = Math.floor(Math.random() * 4) + 5;
         document.getElementById('target-number').innerText = currentTarget;
+        subjectWindow.updateState('start');
 
         timeLeft = 20;
         document.getElementById('startBtn').disabled = true;
@@ -123,6 +174,7 @@
             }
             if (timeLeft <= 0) {
                 clearInterval(timerInterval);
+                subjectWindow.updateState('end');
                 document.getElementById('input-section').style.display = 'block';
                 document.getElementById('subjectResponse').focus();
             }
@@ -135,7 +187,7 @@
         if (response === "") return;
 
         const t = trials[currentTrialIdx];
-        const result = {
+        experimentalData.push({
             Trial: currentTrialIdx + 1,
             Condition: t.condition,
             Area: t.area,
@@ -143,23 +195,27 @@
             Target: currentTarget,
             Response: response,
             Correct: currentTarget == response ? 1 : 0
-        };
+        });
 
-        experimentalData.push(result);
-        
         const entry = document.createElement('div');
-        entry.innerText = `[Trial ${result.Trial}] ${t.area}-${t.force} | 정답: ${currentTarget}, 응답: ${response}`;
+        entry.innerHTML = `<b>[#${currentTrialIdx + 1}]</b> ${t.condition} | ${t.area}-${t.force} | Target: ${currentTarget}, Ans: ${response} <span style="color:${currentTarget == response ? 'green':'red'}">${currentTarget == response ? '✓':'✗'}</span>`;
         document.getElementById('logContent').prepend(entry);
 
-        // 상태 초기화
         document.getElementById('subjectResponse').value = "";
         document.getElementById('input-section').style.display = 'none';
         document.getElementById('startBtn').disabled = false;
         document.getElementById('progress').style.width = "0%";
         document.getElementById('target-number').innerText = "?";
         
+        subjectWindow.updateState('ready');
+        
         currentTrialIdx++;
         updateTrialInfo();
+
+        // Condition 전환 알림 (16번 종료 후)
+        if (currentTrialIdx === 16) {
+            alert("In-air condition finished. Please prepare for the ACTIVE (Touch) condition.");
+        }
     }
 
     function downloadCSV() {
@@ -171,7 +227,7 @@
         const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
         const link = document.createElement("a");
         link.href = URL.createObjectURL(blob);
-        link.download = "experiment_data.csv";
+        link.download = `Tactile_Exp_Results_${new Date().getTime()}.csv`;
         link.click();
     }
 
