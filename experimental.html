@@ -2,10 +2,16 @@
 <html lang="ko">
 <head>
     <meta charset="UTF-8">
-    <title>촉각 역치 실험 어시스턴트 (Condition Split)</title>
+    <title>촉각 역치 실험 어시스턴트 (Subject ID 포함)</title>
     <style>
         body { font-family: 'Segoe UI', sans-serif; display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 100vh; margin: 0; background-color: #f4f7f6; }
         #container { background: white; padding: 30px; border-radius: 20px; box-shadow: 0 10px 30px rgba(0,0,0,0.1); text-align: center; width: 520px; }
+        
+        /* 피험자 정보 입력 섹션 */
+        .subject-info-box { background: #fff; border: 2px solid #1a73e8; padding: 15px; border-radius: 10px; margin-bottom: 20px; display: flex; align-items: center; justify-content: center; gap: 10px; }
+        .subject-info-box label { font-weight: bold; color: #1a73e8; }
+        .subject-info-box input { padding: 8px; width: 100px; border: 1px solid #ccc; border-radius: 5px; font-size: 1rem; text-align: center; }
+
         .setup-info { display: flex; justify-content: space-around; margin-bottom: 20px; background: #e3f2fd; padding: 15px; border-radius: 10px; font-weight: bold; }
         #target-display { background: #fff9c4; border: 2px dashed #fbc02d; padding: 20px; border-radius: 10px; margin-bottom: 20px; }
         #target-number { font-size: 50px; color: #d32f2f; font-weight: bold; }
@@ -14,13 +20,15 @@
         #flash { width: 100%; height: 100%; position: absolute; top: 0; left: 0; background: rgba(255,255,255,0.6); opacity: 0; pointer-events: none; }
         .flash-active { animation: blink 0.15s; }
         @keyframes blink { 0% { opacity: 0; } 50% { opacity: 1; } 100% { opacity: 0; } }
+        
         button { padding: 15px; font-size: 16px; cursor: pointer; border: none; border-radius: 8px; transition: 0.2s; width: 100%; font-weight: bold; margin-top: 10px; }
         #startBtn { background: #1a73e8; color: white; }
         #popBtn { background: #9c27b0; color: white; margin-bottom: 10px; }
         #saveBtn { background: #34a853; color: white; }
         #downloadBtn { background: #5f6368; color: white; margin-top: 20px; }
+        
         #input-section { display: none; margin-top: 20px; border-top: 2px solid #f1f3f4; padding-top: 20px; }
-        input { padding: 12px; width: 100px; font-size: 20px; text-align: center; border: 2px solid #ddd; border-radius: 8px; margin-bottom: 10px; }
+        input.subject-input { padding: 12px; width: 100px; font-size: 20px; text-align: center; border: 2px solid #ddd; border-radius: 8px; margin-bottom: 10px; }
         #log-container { margin-top: 25px; text-align: left; font-size: 12px; max-height: 200px; overflow-y: auto; background: #fafafa; padding: 10px; border: 1px solid #eee; }
         .condition-badge { padding: 5px 10px; border-radius: 5px; color: white; font-size: 0.9rem; }
         .badge-air { background-color: #03a9f4; }
@@ -31,6 +39,12 @@
 
 <div id="container">
     <button id="popBtn" onclick="openSubjectWindow()">1. 피험자용 창 열기 (Subject Window)</button>
+    
+    <div class="subject-info-box">
+        <label for="subjectId">Subject ID:</label>
+        <input type="text" id="subjectId" placeholder="e.g. S01" value="S01">
+    </div>
+
     <h2 id="condition-title">Condition: Ready</h2>
     
     <div class="setup-info">
@@ -53,7 +67,7 @@
 
     <div id="input-section">
         <div style="margin-bottom: 10px; font-weight: bold;">Enter Subject's Response</div>
-        <input type="number" id="subjectResponse" placeholder="#" autofocus> <br>
+        <input type="number" id="subjectResponse" class="subject-input" placeholder="#" autofocus> <br>
         <button id="saveBtn" onclick="logData()">Save & Next</button>
     </div>
 
@@ -84,7 +98,7 @@
                 <title>Subject Display</title>
                 <style>
                     body { margin: 0; display: flex; align-items: center; justify-content: center; height: 100vh; font-family: sans-serif; transition: background-color 0.5s; background-color: #333; }
-                    h1 { color: white; font-size: 3.5rem; text-align: center; line-height: 1.4; padding: 20px; }
+                    h1 { color: white; font-size: 3.5rem; text-align: center; line-height: 1.4; padding: 40px; }
                 </style>
             </head>
             <body>
@@ -113,22 +127,14 @@
     function setupTrials() {
         let condition1 = [];
         let condition2 = [];
-        
-        // Build 16 combinations for In-air
         areas.forEach(a => forces.forEach(f => {
             condition1.push({ condition: "In-air", area: a, force: f });
         }));
-        // Randomize Condition 1
         condition1.sort(() => Math.random() - 0.5);
-
-        // Build 16 combinations for Active
         areas.forEach(a => forces.forEach(f => {
             condition2.push({ condition: "Active", area: a, force: f });
         }));
-        // Randomize Condition 2
         condition2.sort(() => Math.random() - 0.5);
-
-        // Combine them: First 16 are In-air, Next 16 are Active
         trials = [...condition1, ...condition2];
         updateTrialInfo();
     }
@@ -139,7 +145,6 @@
             const titleEl = document.getElementById('condition-title');
             titleEl.innerText = `Condition: ${t.condition}`;
             titleEl.className = t.condition === "In-air" ? "badge-air" : "badge-active";
-            
             document.getElementById('current-area').innerText = t.area;
             document.getElementById('current-force').innerText = t.force;
             document.getElementById('trial-count').innerText = currentTrialIdx + 1;
@@ -152,6 +157,11 @@
     function startTrial() {
         if (!subjectWindow || subjectWindow.closed) {
             alert("Please open the Subject Window first!");
+            return;
+        }
+        // 피험자 번호 확인
+        if (document.getElementById('subjectId').value.trim() === "") {
+            alert("Please enter Subject ID first!");
             return;
         }
 
@@ -184,10 +194,12 @@
 
     function logData() {
         const response = document.getElementById('subjectResponse').value;
+        const subId = document.getElementById('subjectId').value.trim();
         if (response === "") return;
 
         const t = trials[currentTrialIdx];
         experimentalData.push({
+            SubjectID: subId,
             Trial: currentTrialIdx + 1,
             Condition: t.condition,
             Area: t.area,
@@ -208,11 +220,9 @@
         document.getElementById('target-number').innerText = "?";
         
         subjectWindow.updateState('ready');
-        
         currentTrialIdx++;
         updateTrialInfo();
 
-        // Condition 전환 알림 (16번 종료 후)
         if (currentTrialIdx === 16) {
             alert("In-air condition finished. Please prepare for the ACTIVE (Touch) condition.");
         }
@@ -220,14 +230,19 @@
 
     function downloadCSV() {
         if (experimentalData.length === 0) return;
-        let csv = "\uFEFFTrial,Condition,Area,Force,Target,Response,IsCorrect\n";
+        const subId = document.getElementById('subjectId').value.trim() || "Unknown";
+        const dateStr = new Date().toISOString().slice(0,10).replace(/-/g, ""); // YYYYMMDD
+        
+        let csv = "\uFEFFSubjectID,Trial,Condition,Area,Force,Target,Response,IsCorrect\n";
         experimentalData.forEach(r => {
-            csv += `${r.Trial},${r.Condition},${r.Area},${r.Force},${r.Target},${r.Response},${r.Correct}\n`;
+            csv += `${r.SubjectID},${r.Trial},${r.Condition},${r.Area},${r.Force},${r.Target},${r.Response},${r.Correct}\n`;
         });
+        
         const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
         const link = document.createElement("a");
         link.href = URL.createObjectURL(blob);
-        link.download = `Tactile_Exp_Results_${new Date().getTime()}.csv`;
+        // 파일명 예: Tactile_Exp_S01_20260225.csv
+        link.download = `Tactile_Exp_${subId}_${dateStr}.csv`;
         link.click();
     }
 
