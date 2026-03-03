@@ -42,7 +42,7 @@
     <div class="setup-info">
         <div>Area: <span id="current-area">-</span></div>
         <div>Force: <span id="current-force">-</span></div>
-        <div>Trial: <span id="trial-count">0</span> / 16</div>
+        <div>Trial: <span id="trial-count">0</span> / 15</div>
     </div>
     <div id="target-display">
         <div style="font-size: 14px; color: #666;">Target (Admin Only)</div>
@@ -90,7 +90,7 @@
                 <script>function updateState(state, text) {
                     const b = document.body; const m = document.getElementById('msg');
                     if(state==='start'){ b.style.backgroundColor='#2ecc71'; m.innerText='Concentrate...'; }
-                    else if(state==='end'){ b.style.backgroundColor='#e74c3c'; m.innerText='How many?'; }
+                    else if(state==='end'){ b.style.backgroundColor='#e74c3c'; m.innerText='How many Indentations were there?'; }
                     else { b.style.backgroundColor='#333'; m.innerText= text || 'Ready'; }
                 }<\/script>
             </body></html>
@@ -116,7 +116,7 @@
     function updateTrialInfo() {
         const currentSet = (currentCondition === 1) ? condition1 : condition2;
         
-        if (currentIdxInSet < 16) {
+        if (currentIdxInSet < 15) {
             const t = currentSet[currentIdxInSet];
             document.getElementById('condition-title').innerText = "Condition: " + t.condition;
             document.getElementById('condition-title').className = (currentCondition === 1) ? "badge-air" : "badge-active";
@@ -189,7 +189,7 @@ function logData() {
         
         currentIdxInSet++;
         updateTrialInfo();
-        if (currentIdxInSet < 16) document.getElementById('startBtn').disabled = false;
+        if (currentIdxInSet < 15) document.getElementById('startBtn').disabled = false;
     }
     function proceedToNextCondition() {
         currentCondition = 2; // Active로 전환
