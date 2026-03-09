@@ -2,7 +2,7 @@
 <html lang="ko">
 <head>
     <meta charset="UTF-8">
-    <title>Nail Precision Guide Tool</title>
+    <title>Nail Precision Guide Tool - Full Grid</title>
     <style>
         body { font-family: 'Segoe UI', sans-serif; display: flex; flex-direction: column; align-items: center; background: #f0f2f5; margin: 0; padding: 20px; }
         .container { background: white; padding: 20px; border-radius: 12px; box-shadow: 0 4px 20px rgba(0,0,0,0.1); text-align: center; }
@@ -11,7 +11,7 @@
         button { padding: 12px 20px; border: none; border-radius: 8px; cursor: pointer; font-weight: bold; transition: 0.2s; }
         .btn-v { background: #e74c3c; color: white; } 
         .btn-h { background: #3498db; color: white; } 
-        .btn-outline { background: #8e44ad; color: white; } /* 보라색 버튼 추가 */
+        .btn-outline { background: #8e44ad; color: white; } 
         .btn-stim { background: #ff4757; color: white; box-shadow: 0 4px 10px rgba(255, 71, 87, 0.3); }
         .btn-reset { background: #95a5a6; color: white; }
         button:hover { opacity: 0.8; transform: translateY(-1px); }
@@ -22,17 +22,17 @@
 <body>
 
 <div class="container">
-    <h2>Nail Grid Analysis Tool</h2>
+    <h2>Nail & Finger Stimulus Point Tool</h2>
     
-    <div class="status-bar" id="status">먼저 분석할 이미지를 업로드하세요.</div>
+    <div class="status-bar" id="status">이미지를 업로드하고 가이드를 설정하세요.</div>
 
     <div class="controls">
         <input type="file" id="upload" accept="image/*">
-        <button class="btn-v" onclick="setMode('vertical')">1. 상/하 3선</button>
-        <button class="btn-h" onclick="setMode('horizontal')">2. 좌/우 3선</button>
-        <button class="btn-outline" onclick="setMode('outline')">3. Outline 설정 (세로선)</button>
-        <button class="btn-stim" id="stimBtn" onclick="generateStimulusPoints()" disabled>4. Stimulus Point 생성</button>
-        <button class="btn-reset" onclick="resetCanvas()">화면 초기화</button>
+        <button class="btn-v" onclick="setMode('vertical')">1. 상/하 가이드</button>
+        <button class="btn-h" onclick="setMode('horizontal')">2. 좌/우 가이드</button>
+        <button class="btn-outline" onclick="setMode('outline')">3. Finger Outline</button>
+        <button class="btn-stim" id="stimBtn" onclick="generateStimulusPoints()" disabled>4. 모든 자극점 생성</button>
+        <button class="btn-reset" onclick="resetCanvas()">초기화</button>
     </div>
 
     <canvas id="canvas"></canvas>
@@ -50,7 +50,7 @@
     let guideLines = {
         topY: null, midY: null, bottomY: null,
         leftX: null, midX: null, rightX: null,
-        outlines: [] // 외곽선 세로 좌표들을 저장할 배열
+        outlines: [] 
     };
 
     document.getElementById('upload').addEventListener('change', (e) => {
@@ -60,7 +60,7 @@
                 canvas.width = img.width;
                 canvas.height = img.height;
                 redrawScene();
-                status.innerText = "상/하, 좌/우 가이드를 설정하고 필요 시 Outline을 클릭하세요.";
+                status.innerText = "상/하, 좌/우 가이드와 Outline을 모두 설정하세요.";
             };
             img.src = event.target.result;
         };
@@ -71,9 +71,12 @@
         if (!img.src) return;
         mode = newMode;
         points = [];
-        if(mode === 'vertical') status.innerText = "손톱의 [위쪽 끝]과 [아래쪽 끝] 클릭";
-        else if(mode === 'horizontal') status.innerText = "손톱의 [왼쪽 끝]과 [오른쪽 끝] 클릭";
-        else if(mode === 'outline') status.innerText = "손가락의 [왼쪽 외곽]과 [오른쪽 외곽]을 클릭하세요.";
+        const msg = {
+            'vertical': "손톱의 [위쪽 끝]과 [아래쪽 끝] 클릭",
+            'horizontal': "손톱의 [왼쪽 끝]과 [오른쪽 끝] 클릭",
+            'outline': "손가락의 [양쪽 외곽] 클릭 (세로선 생성)"
+        };
+        status.innerText = msg[mode];
     }
 
     canvas.onclick = (e) => {
@@ -84,11 +87,8 @@
         const y = (e.clientY - rect.top) * (canvas.height / rect.height);
 
         points.push({x, y});
-        
         ctx.fillStyle = mode === 'outline' ? "#8e44ad" : "white";
-        ctx.beginPath();
-        ctx.arc(x, y, 5, 0, Math.PI * 2);
-        ctx.fill();
+        ctx.beginPath(); ctx.arc(x, y, 5, 0, Math.PI * 2); ctx.fill();
 
         if (points.length === 2) {
             if (mode === 'vertical') {
@@ -100,9 +100,8 @@
                 guideLines.rightX = Math.max(points[0].x, points[1].x);
                 guideLines.midX = (guideLines.leftX + guideLines.rightX) / 2;
             } else if (mode === 'outline') {
-                guideLines.outlines = [points[0].x, points[1].x];
+                guideLines.outlines = [Math.min(points[0].x, points[1].x), Math.max(points[0].x, points[1].x)];
             }
-            
             renderAllGuides();
             checkReady();
             points = [];
@@ -111,16 +110,14 @@
     };
 
     function checkReady() {
-        if (guideLines.topY !== null && guideLines.leftX !== null) {
+        if (guideLines.topY !== null && guideLines.leftX !== null && guideLines.outlines.length === 2) {
             stimBtn.disabled = false;
-            status.innerText = "가이드 완료! 자극점을 생성하거나 Outline을 추가하세요.";
+            status.innerText = "준비 완료! 자극점 생성 버튼을 누르세요.";
         }
     }
 
     function renderAllGuides() {
         redrawScene();
-        
-        // 1. 세로 가이드 (상/하/중앙 가로선)
         if (guideLines.topY !== null) {
             ctx.lineWidth = 4;
             ctx.setLineDash([15, 10]); ctx.strokeStyle = "#e74c3c";
@@ -128,8 +125,6 @@
             ctx.setLineDash([]); ctx.strokeStyle = "#f1c40f";
             drawHLine(guideLines.midY);
         }
-
-        // 2. 가로 가이드 (손톱 좌/우/중앙 세로선)
         if (guideLines.leftX !== null) {
             ctx.lineWidth = 4;
             ctx.setLineDash([15, 10]); ctx.strokeStyle = "#3498db";
@@ -137,49 +132,53 @@
             ctx.setLineDash([]); ctx.strokeStyle = "#2ecc71";
             drawVLine(guideLines.midX);
         }
-
-        // 3. 손가락 외곽선 (보라색 세로 실선)
-        if (guideLines.outlines.length > 0) {
-            ctx.lineWidth = 3;
-            ctx.setLineDash([]); ctx.strokeStyle = "#8e44ad";
+        if (guideLines.outlines.length === 2) {
+            ctx.lineWidth = 3; ctx.setLineDash([]); ctx.strokeStyle = "#8e44ad";
             guideLines.outlines.forEach(x => drawVLine(x));
         }
     }
 
     function generateStimulusPoints() {
-        if (guideLines.topY === null || guideLines.leftX === null) return;
+        if (guideLines.topY === null || guideLines.leftX === null || guideLines.outlines.length < 2) {
+            alert("상하, 좌우 가이드와 Outline을 모두 설정해야 합니다.");
+            return;
+        }
 
+        // Y축 높이 계산 (상단-중간 사이, 중간-하단 사이)
         const stimY1 = (guideLines.topY + guideLines.midY) / 2;
         const stimY2 = (guideLines.midY + guideLines.bottomY) / 2;
         
-        // 자극점 위치: Outline(외곽선) 정보가 있으면 외곽선 기준으로, 없으면 기존 손톱 폭 기준 바깥으로 배치
-        let refLeft = guideLines.leftX;
-        let refRight = guideLines.rightX;
-        let offset = (refRight - refLeft) * 0.15;
+        // X축 폭 계산 (좌측-중간 사이, 중간-우측 사이)
+        const stimX1 = (guideLines.leftX + guideLines.midX) / 2;
+        const stimX2 = (guideLines.midX + guideLines.rightX) / 2;
 
-        // Outline 정보가 있을 경우 외곽선 바로 근처에 배치되도록 로직 활용 가능
-        if (guideLines.outlines.length === 2) {
-            refLeft = Math.min(...guideLines.outlines);
-            refRight = Math.max(...guideLines.outlines);
-            offset = 5; // 외곽선이 이미 바깥이므로 아주 살짝만 오프셋
-        }
+        const stimPoints = [];
+        
+        // 1. 좌/우 Outline 안쪽 자극점 (Y축 기준 높이에 위치)
+        const xOffset = (guideLines.outlines[1] - guideLines.outlines[0]) * 0.05;
+        stimPoints.push({x: guideLines.outlines[0] + xOffset, y: stimY1});
+        stimPoints.push({x: guideLines.outlines[0] + xOffset, y: stimY2});
+        stimPoints.push({x: guideLines.outlines[1] - xOffset, y: stimY1});
+        stimPoints.push({x: guideLines.outlines[1] - xOffset, y: stimY2});
 
-        const stimPoints = [
-            {x: refLeft - offset, y: stimY1},
-            {x: refLeft - offset, y: stimY2},
-            {x: refRight + offset, y: stimY1},
-            {x: refRight + offset, y: stimY2}
-        ];
+        // 2. [수정됨] 하단 경계선(bottomY) 바로 바깥(아래)에 생성되는 자극점
+        // 하단선에서 아래로 약 10~15px 정도 떨어진 지점 (이미지 크기에 따라 조정 가능)
+        const bottomOutsideY = guideLines.bottomY + 15; 
 
+        // 좌/우 가이드 라인의 1/2 지점들과 중앙선, 경계선 등에 맞춰 총 4개 배치
+        stimPoints.push({x: stimX1, y: bottomOutsideY});             // 왼쪽 1/4 지점
+        stimPoints.push({x: stimX2, y: bottomOutsideY});             // 오른쪽 1/4 지점
+        stimPoints.push({x: guideLines.leftX, y: bottomOutsideY});   // 왼쪽 경계선 지점
+        stimPoints.push({x: guideLines.rightX, y: bottomOutsideY});  // 오른쪽 경계선 지점
+
+        renderAllGuides();
         stimPoints.forEach(p => drawStimulusPoint(p.x, p.y));
-        status.innerText = "자극점이 생성되었습니다.";
+        status.innerText = "좌우 외곽선 안쪽과 하단선 바깥쪽에 자극점이 생성되었습니다.";
     }
 
     function drawStimulusPoint(x, y) {
         ctx.fillStyle = "red";
-        ctx.beginPath();
-        ctx.arc(x, y, 4, 0, Math.PI * 2); // 크기를 4로 살짝 조정
-        ctx.fill();
+        ctx.beginPath(); ctx.arc(x, y, 4, 0, Math.PI * 2); ctx.fill();
     }
 
     function drawHLine(y) { ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(canvas.width, y); ctx.stroke(); }
@@ -189,9 +188,7 @@
     function resetCanvas() {
         if(img.src) {
             guideLines = { topY: null, midY: null, bottomY: null, leftX: null, midX: null, rightX: null, outlines: [] };
-            redrawScene();
-            stimBtn.disabled = true;
-            status.innerText = "초기화되었습니다. 다시 시작하세요.";
+            redrawScene(); stimBtn.disabled = true; status.innerText = "초기화되었습니다.";
         }
     }
 </script>
