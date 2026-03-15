@@ -6,17 +6,18 @@
     <style>
         body { font-family: 'Segoe UI', sans-serif; display: flex; flex-direction: column; align-items: center; background: #f0f2f5; margin: 0; padding: 20px; }
         .container { background: white; padding: 20px; border-radius: 12px; box-shadow: 0 4px 20px rgba(0,0,0,0.1); text-align: center; }
-        canvas { border: 2px solid #ddd; cursor: crosshair; max-width: 100%; margin-top: 15px; border-radius: 4px; background-color: #eee; }
+        /* 줄자를 위한 여백 추가 */
+        .canvas-wrapper { position: relative; margin-top: 30px; display: inline-block; padding-top: 30px; padding-left: 30px; background: #eee; border-radius: 8px; }
+        canvas { border: 1px solid #ddd; cursor: crosshair; display: block; background-color: white; }
         .controls { margin-bottom: 15px; display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; }
         button { padding: 12px 20px; border: none; border-radius: 8px; cursor: pointer; font-weight: bold; transition: 0.2s; }
         .btn-v { background: #e74c3c; color: white; } 
         .btn-h { background: #3498db; color: white; } 
         .btn-dipj { background: #27ae60; color: white; }
         .btn-outline { background: #8e44ad; color: white; } 
-        .btn-stim { background: #ff4757; color: white; box-shadow: 0 4px 10px rgba(255, 71, 87, 0.3); }
+        .btn-stim { background: #ff4757; color: white; }
         .btn-reset { background: #95a5a6; color: white; }
         button:hover { opacity: 0.8; transform: translateY(-1px); }
-        button:disabled { background: #ccc; cursor: not-allowed; transform: none; box-shadow: none; }
         .status-bar { background: #34495e; color: white; padding: 10px; border-radius: 6px; margin-bottom: 10px; min-width: 450px; font-weight: 500; }
     </style>
 </head>
@@ -24,8 +25,7 @@
 
 <div class="container">
     <h2>Nail & Finger Stimulus Point Tool</h2>
-    
-    <div class="status-bar" id="status">이미지를 업로드하고 가이드들을 설정하세요.</div>
+    <div class="status-bar" id="status">이미지를 업로드하세요.</div>
 
     <div class="controls">
         <input type="file" id="upload" accept="image/*">
@@ -37,7 +37,9 @@
         <button class="btn-reset" onclick="resetCanvas()">초기화</button>
     </div>
 
-    <canvas id="canvas"></canvas>
+    <div class="canvas-wrapper">
+        <canvas id="canvas"></canvas>
+    </div>
 </div>
 
 <script>
@@ -49,49 +51,75 @@
     let mode = 'none';
     let points = [];
 
-    let guideLines = {
-        topY: null, midY: null, bottomY: null,
-        leftX: null, midX: null, rightX: null,
-        dipjY: null,
-        outlines: [] 
-    };
+    const RULER_SIZE = 30; 
+    let guideLines = { topY: null, midY: null, bottomY: null, leftX: null, midX: null, rightX: null, dipjY: null, outlines: [] };
 
     document.getElementById('upload').addEventListener('change', (e) => {
         const reader = new FileReader();
         reader.onload = (event) => {
             img.onload = () => {
-                canvas.width = img.width;
-                canvas.height = img.height;
-                redrawScene();
-                status.innerText = "가이드들을 설정하세요. (DIPJ 설정 필수)";
+                canvas.width = img.width + RULER_SIZE;
+                canvas.height = img.height + RULER_SIZE;
+                drawEverything();
+                status.innerText = `이미지 로드 완료 (${img.width}x${img.height} px)`;
             };
             img.src = event.target.result;
         };
         reader.readAsDataURL(e.target.files[0]);
     });
 
-    function setMode(newMode) {
-        if (!img.src) return;
-        mode = newMode;
-        points = [];
-        const msg = {
-            'vertical': "손톱의 [위쪽 끝]과 [아래쪽 끝] 클릭 (2점)",
-            'horizontal': "손톱의 [왼쪽 끝]과 [오른쪽 끝] 클릭 (2점)",
-            'dipj': "손가락의 [DIPJ 마디] 중앙을 클릭하세요. (1점)",
-            'outline': "손가락의 [양쪽 외곽] 클릭 (2점)"
-        };
-        status.innerText = msg[mode];
+    function drawRuler() {
+        ctx.fillStyle = "#34495e";
+        ctx.font = "10px Arial";
+        ctx.strokeStyle = "#34495e";
+        ctx.lineWidth = 1;
+        for (let x = 0; x <= img.width; x += 10) {
+            let posX = x + RULER_SIZE;
+            ctx.beginPath(); ctx.moveTo(posX, RULER_SIZE);
+            if (x % 100 === 0) { ctx.lineTo(posX, 0); ctx.fillText(x/10 + 'cm', posX + 2, 10); }
+            else if (x % 50 === 0) ctx.lineTo(posX, 10);
+            else ctx.lineTo(posX, 20);
+            ctx.stroke();
+        }
+        for (let y = 0; y <= img.height; y += 10) {
+            let posY = y + RULER_SIZE;
+            ctx.beginPath(); ctx.moveTo(RULER_SIZE, posY);
+            if (y % 100 === 0) {
+                ctx.lineTo(0, posY); ctx.save(); ctx.translate(10, posY + 2); ctx.rotate(-Math.PI / 2);
+                ctx.fillText(y/10 + 'cm', 0, 0); ctx.restore();
+            }
+            else if (y % 50 === 0) ctx.lineTo(10, posY);
+            else ctx.lineTo(20, posY);
+            ctx.stroke();
+        }
+    }
+
+    function drawEverything() {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        if (img.src) {
+            ctx.drawImage(img, RULER_SIZE, RULER_SIZE);
+            drawRuler();
+            renderAllGuides();
+        }
     }
 
     canvas.onclick = (e) => {
         if (mode === 'none' || !img.src) return;
         const rect = canvas.getBoundingClientRect();
-        const x = (e.clientX - rect.left) * (canvas.width / rect.width);
-        const y = (e.clientY - rect.top) * (canvas.height / rect.height);
+        const rawX = (e.clientX - rect.left) * (canvas.width / rect.width);
+        const rawY = (e.clientY - rect.top) * (canvas.height / rect.height);
+        if (rawX < RULER_SIZE || rawY < RULER_SIZE) return;
+
+        const x = rawX - RULER_SIZE;
+        const y = rawY - RULER_SIZE;
         points.push({x, y});
-        
-        ctx.fillStyle = (mode === 'outline') ? "#8e44ad" : (mode === 'dipj' ? "#27ae60" : "white");
-        ctx.beginPath(); ctx.arc(x, y, 3, 0, Math.PI * 2); ctx.fill();
+
+        drawEverything();
+        // 가이드 설정 중인 점 표시 (원래 스타일: 흰색/보라/초록)
+        points.forEach(p => {
+            ctx.fillStyle = (mode === 'outline') ? "#8e44ad" : (mode === 'dipj' ? "#27ae60" : "white");
+            ctx.beginPath(); ctx.arc(p.x + RULER_SIZE, p.y + RULER_SIZE, 3, 0, Math.PI * 2); ctx.fill();
+        });
 
         if (mode === 'dipj' && points.length === 1) {
             guideLines.dipjY = points[0].y;
@@ -113,8 +141,9 @@
     };
 
     function finalizeSelection() {
-        renderAllGuides();
+        drawEverything();
         checkReady();
+        if (!stimBtn.disabled) generateStimulusPoints();
         points = [];
         mode = 'none';
     }
@@ -125,81 +154,60 @@
         }
     }
 
+    function drawHLine(y) { ctx.beginPath(); ctx.moveTo(RULER_SIZE, y + RULER_SIZE); ctx.lineTo(canvas.width, y + RULER_SIZE); ctx.stroke(); }
+    function drawVLine(x) { ctx.beginPath(); ctx.moveTo(x + RULER_SIZE, RULER_SIZE); ctx.lineTo(x + RULER_SIZE, canvas.height); ctx.stroke(); }
+    
+    function drawStimulusPoint(x, y, label) {
+        ctx.fillStyle = "yellow";
+        ctx.beginPath(); ctx.arc(x + RULER_SIZE, y + RULER_SIZE, 4, 0, Math.PI * 2); ctx.fill();
+    }
+
+    function setMode(newMode) { if (!img.src) return; mode = newMode; points = []; status.innerText = "설정 위치를 클릭하세요."; }
+
     function renderAllGuides() {
-        redrawScene();
         if (guideLines.topY !== null) {
-            ctx.lineWidth = 4;
-            ctx.setLineDash([15, 10]); ctx.strokeStyle = "#e74c3c";
+            ctx.lineWidth = 4; ctx.setLineDash([15, 10]); ctx.strokeStyle = "#e74c3c";
             drawHLine(guideLines.topY); drawHLine(guideLines.bottomY);
-            ctx.setLineDash([]); ctx.strokeStyle = "#f1c40f";
-            drawHLine(guideLines.midY);
+            ctx.setLineDash([]); ctx.strokeStyle = "#f1c40f"; drawHLine(guideLines.midY);
         }
         if (guideLines.leftX !== null) {
-            ctx.lineWidth = 4;
-            ctx.setLineDash([15, 10]); ctx.strokeStyle = "#3498db";
-            drawVLine(guideLines.leftX);
-            drawVLine(guideLines.rightX);
-            ctx.setLineDash([]); ctx.strokeStyle = "#2ecc71";
-            drawVLine(guideLines.midX);
+            ctx.lineWidth = 4; ctx.setLineDash([15, 10]); ctx.strokeStyle = "#3498db";
+            drawVLine(guideLines.leftX); drawVLine(guideLines.rightX);
+            ctx.setLineDash([]); ctx.strokeStyle = "#2ecc71"; drawVLine(guideLines.midX);
         }
         if (guideLines.dipjY !== null) {
-            ctx.lineWidth = 3; ctx.setLineDash([]); ctx.strokeStyle = "#27ae60";
-            drawHLine(guideLines.dipjY);
+            ctx.lineWidth = 3; ctx.setLineDash([]); ctx.strokeStyle = "#27ae60"; drawHLine(guideLines.dipjY);
         }
         if (guideLines.outlines.length === 2) {
-            ctx.lineWidth = 3; ctx.setLineDash([]); ctx.strokeStyle = "#8e44ad";
-            guideLines.outlines.forEach(x => drawVLine(x));
+            ctx.lineWidth = 3; ctx.setLineDash([]); ctx.strokeStyle = "#8e44ad"; guideLines.outlines.forEach(x => drawVLine(x));
         }
     }
 
     function generateStimulusPoints() {
-        // Y축 높이 계산
         const stimY_upper = (guideLines.topY + guideLines.midY) / 2;
         const stimY_lower = (guideLines.midY + guideLines.bottomY) / 2;
-        
-        const dipjDistance = guideLines.dipjY - guideLines.bottomY;
-        const stimY_DE = guideLines.bottomY + (dipjDistance * 0.2);
-
-        // [수정된 X축 좌표 계산]
-        // a, b, c를 위한 왼쪽 중앙값: (좌측 외곽선 + 좌측 손톱가이드) / 2
+        const stimY_DE = guideLines.bottomY + (guideLines.dipjY - guideLines.bottomY) * 0.2;
         const stimX_leftSide = (guideLines.outlines[0] + guideLines.leftX) / 2;
-        
-        // f, g, h를 위한 오른쪽 중앙값: (우측 손톱가이드 + 우측 외곽선) / 2
         const stimX_rightSide = (guideLines.rightX + guideLines.outlines[1]) / 2;
-
-        // d, e를 위한 안쪽 중앙값 (기존 로직 유지)
         const stimX_leftInner = (guideLines.leftX + guideLines.midX) / 2;
         const stimX_rightInner = (guideLines.midX + guideLines.rightX) / 2;
 
         const stimPoints = [
-            {label: 'a', x: stimX_leftSide, y: stimY_upper},
-            {label: 'b', x: stimX_leftSide, y: stimY_lower},
-            {label: 'c', x: stimX_leftSide, y: stimY_DE},
-            {label: 'd', x: stimX_leftInner, y: stimY_DE},
-            {label: 'e', x: stimX_rightInner, y: stimY_DE},
-            {label: 'f', x: stimX_rightSide, y: stimY_DE},
-            {label: 'g', x: stimX_rightSide, y: stimY_lower},
-            {label: 'h', x: stimX_rightSide, y: stimY_upper}
+            {label: 'a', x: stimX_leftSide, y: stimY_upper}, {label: 'b', x: stimX_leftSide, y: stimY_lower},
+            {label: 'c', x: stimX_leftSide, y: stimY_DE}, {label: 'd', x: stimX_leftInner, y: stimY_DE},
+            {label: 'e', x: stimX_rightInner, y: stimY_DE}, {label: 'f', x: stimX_rightSide, y: stimY_DE},
+            {label: 'g', x: stimX_rightSide, y: stimY_lower}, {label: 'h', x: stimX_rightSide, y: stimY_upper}
         ];
 
-        renderAllGuides();
+        drawEverything();
         stimPoints.forEach(p => drawStimulusPoint(p.x, p.y, p.label));
-        status.innerText = "분석 완료: 요청하신 X축 비율이 적용된 a-h 자극점이 생성되었습니다.";
+        status.innerText = "자극점 생성 완료";
     }
-
-    function drawStimulusPoint(x, y, label) {
-        ctx.fillStyle = "red";
-        ctx.beginPath(); ctx.arc(x, y, 4, 0, Math.PI * 2); ctx.fill();
-    }
-
-    function drawHLine(y) { ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(canvas.width, y); ctx.stroke(); }
-    function drawVLine(x) { ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, canvas.height); ctx.stroke(); }
-    function redrawScene() { ctx.clearRect(0,0,canvas.width, canvas.height); ctx.drawImage(img, 0, 0); }
 
     function resetCanvas() {
         if(img.src) {
             guideLines = { topY: null, midY: null, bottomY: null, leftX: null, midX: null, rightX: null, dipjY: null, outlines: [] };
-            redrawScene(); stimBtn.disabled = true; status.innerText = "초기화되었습니다.";
+            drawEverything(); stimBtn.disabled = true; status.innerText = "초기화되었습니다.";
         }
     }
 </script>
