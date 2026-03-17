@@ -16,8 +16,8 @@
         #startBtn { background: #673ab7; color: white; }
         #ansBtn1, #ansBtn2 { background: #3f51b5; color: white; width: 48%; }
         #input-section { display: none; margin-top: 20px; }
+        #nextBtn { background: #ff9800; color: white; display: none; }
         #log-container { margin-top: 25px; text-align: left; font-size: 12px; max-height: 200px; overflow-y: auto; background: #fafafa; padding: 10px; border: 1px solid #eee; }
-        select { padding: 8px; border-radius: 5px; border: 1px solid #673ab7; font-weight: bold; }
     </style>
 </head>
 <body>
@@ -31,22 +31,15 @@
             <label>Subject ID:</label>
             <input type="text" id="subjectId" value="S01" style="padding:5px; width:60px; text-align:center;">
         </div>
-        <div>
-            <label>Condition:</label>
-            <select id="expCondition" onchange="setupExp()">
-                <option value="In-air">In-air</option>
-                <option value="On-touch">On-touch</option>
-                <option value="Hard-touch">Hard-touch</option>
-            </select>
-        </div>
     </div>
 
     <h3 id="condition-title">Condition: Ready</h3>
     
     <div class="setup-info">
+        <div>Session: <span id="current-session">1</span> / 2</div>
         <div>Ref: <span id="ref-force">-</span></div>
         <div>Comp: <span id="comp-force">-</span></div>
-        <div>Trial: <span id="trial-count">0</span> / <span id="total-trial">0</span></div>
+        <div>Trial: <span id="trial-count">0</span> / 30</div>
     </div>
 
     <div id="admin-display">
@@ -60,6 +53,7 @@
     <div class="progress-bar"><div id="progress"></div></div>
     
     <button id="startBtn" onclick="runDiscriminationTrial()">시행 시작 (Start Sequence)</button>
+    <button id="nextBtn" onclick="proceedToNextStage()">다음 단계로 진행</button>
 
     <div id="input-section">
         <div style="margin-bottom:15px; font-weight:bold;">Which stimulus was STRONGER?</div>
@@ -75,22 +69,18 @@
 
 <script>
     let subjectWindow = null;
-    
-    // 추천된 75% 정답률 타겟 페어 (VF 강도 기준)
     const pairs = [
-        {ref: '0.07g', comp: '0.16g'}, 
-        {ref: '0.16g', comp: '0.60g'},
-        {ref: '0.60g', comp: '1.40g'},
-        {ref: '1.40g', comp: '2.00g'},
-        {ref: '0.07g', comp: '0.60g'}, // 대조군
-        {ref: '0.60g', comp: '2.00g'}  // 대조군
+        {ref: '0.07g', comp: '0.16g'}, {ref: '0.16g', comp: '0.60g'},
+        {ref: '0.60g', comp: '1.40g'}, {ref: '1.40g', comp: '2.00g'},
+        {ref: '0.07g', comp: '0.60g'}, {ref: '0.60g', comp: '2.00g'}
     ];
 
-    let trialList = [];
-    let currentIdx = 0;
+    let sessionSequence = []; // 자동 진행될 컨디션 순서
+    let currentStageIdx = 0;  // sessionSequence 인덱스
+    let trialPools = {};      // 스테이지별 셔플된 데이터
+    let currentIdxInSet = 0;
     let experimentalData = [];
-    let firstStim = ""; 
-    let secondStim = "";
+    let firstStim = "", secondStim = "";
     let strongerOne = 1;
 
     function openSubjectWindow() {
@@ -103,43 +93,52 @@
     }
 
     function setupExp() {
-        const cond = document.getElementById('expCondition').value;
-        const repetitions = 5; // <--- 한 페어당 반복할 횟수 설정
+        // 세션 1: 3종 랜덤
+        let s1 = ["In-air", "On-touch", "Hard-touch"].sort(() => Math.random() - 0.5);
+        // 세션 2: 2종 랜덤
+        let s2 = ["On-touch", "Hard-touch"].sort(() => Math.random() - 0.5);
         
-        document.getElementById('condition-title').innerText = "Condition: " + cond;
-        
-        // 페어를 반복 횟수만큼 복사해서 리스트 생성
-        let fullList = [];
-        for (let i = 0; i < repetitions; i++) {
-            fullList = fullList.concat(JSON.parse(JSON.stringify(pairs)));
-        }
-        
-        // 전체 리스트 셔플
-        trialList = fullList.sort(() => Math.random() - 0.5);
-        
-        document.getElementById('total-trial').innerText = trialList.length;
-        currentIdx = 0;
-        experimentalData = [];
-        document.getElementById('logContent').innerHTML = "";
-        document.getElementById('startBtn').disabled = false;
+        sessionSequence = s1.concat(s2);
+
+        // 각 스테이지별 30회(6쌍 x 5회 반복) 셔플 데이터 생성
+        sessionSequence.forEach((condName, idx) => {
+            let fullList = [];
+            for (let i = 0; i < 5; i++) {
+                fullList = fullList.concat(JSON.parse(JSON.stringify(pairs)));
+            }
+            trialPools[idx] = fullList.sort(() => Math.random() - 0.5);
+        });
         updateUI();
     }
 
     function updateUI() {
-        if(currentIdx < trialList.length) {
-            const t = trialList[currentIdx];
+        const condTitle = document.getElementById('condition-title');
+        if (currentStageIdx >= sessionSequence.length) {
+            condTitle.innerText = "All Finished!";
+            document.getElementById('startBtn').disabled = true;
+            return;
+        }
+
+        const sessionNum = (currentStageIdx < 3) ? 1 : 2;
+        const currentPool = trialPools[currentStageIdx];
+        const t = currentPool[currentIdxInSet];
+
+        if (currentIdxInSet < 30) {
+            condTitle.innerText = "Condition: " + sessionSequence[currentStageIdx];
             document.getElementById('ref-force').innerText = t.ref;
             document.getElementById('comp-force').innerText = t.comp;
-            document.getElementById('trial-count').innerText = currentIdx + 1;
+            document.getElementById('trial-count').innerText = currentIdxInSet + 1;
+            document.getElementById('current-session').innerText = sessionNum;
         } else {
-            document.getElementById('condition-title').innerText = "All Finished!";
-            document.getElementById('startBtn').disabled = true;
+            condTitle.innerText = sessionSequence[currentStageIdx] + " (S" + sessionNum + ") Finished!";
+            document.getElementById('startBtn').style.display = 'none';
+            document.getElementById('nextBtn').style.display = 'block';
         }
     }
 
     async function runDiscriminationTrial() {
         if(!subjectWindow) return alert("Open Window First");
-        const t = trialList[currentIdx];
+        const t = trialPools[currentStageIdx][currentIdxInSet];
         
         const isRefFirst = Math.random() > 0.5;
         firstStim = isRefFirst ? t.ref : t.comp;
@@ -173,44 +172,48 @@
     }
 
     function logResponse(choice) {
-        const cond = document.getElementById('expCondition').value;
-        const subId = document.getElementById('subjectId').value;
-        const t = trialList[currentIdx];
+        const cond = sessionSequence[currentStageIdx];
+        const t = trialPools[currentStageIdx][currentIdxInSet];
         const isCorrect = (choice === strongerOne);
         
         experimentalData.push({
-            Subject: subId,
+            Subject: document.getElementById('subjectId').value,
+            Session: (currentStageIdx < 3 ? 1 : 2),
             Condition: cond,
-            Trial: currentIdx + 1, 
-            Ref: t.ref, 
-            Comp: t.comp, 
-            First: firstStim, 
-            Second: secondStim, 
-            Choice: choice, 
-            Correct: isCorrect
+            Trial: currentIdxInSet + 1, 
+            Ref: t.ref, Comp: t.comp, First: firstStim, Second: secondStim, Choice: choice, Correct: isCorrect
         });
 
         const log = document.createElement('div');
-        log.innerHTML = `[${cond}] Trial ${currentIdx+1}: ${isCorrect ? '✓':'✗'} (Ref:${t.ref}, Comp:${t.comp})`;
+        log.innerHTML = `[${cond}] Trial ${currentIdxInSet+1}: ${isCorrect ? '✓':'✗'}`;
         document.getElementById('logContent').prepend(log);
 
         document.getElementById('input-section').style.display = 'none';
         document.getElementById('startBtn').disabled = false;
         document.getElementById('progress').style.width = "0%";
-        currentIdx++;
+        currentIdxInSet++;
+        updateUI();
+    }
+
+    function proceedToNextStage() {
+        currentStageIdx++;
+        currentIdxInSet = 0;
+        document.getElementById('nextBtn').style.display = 'none';
+        document.getElementById('startBtn').style.display = 'block';
+        document.getElementById('startBtn').disabled = false;
         updateUI();
     }
 
     function downloadCSV() {
         const subId = document.getElementById('subjectId').value;
-        let csv = "\uFEFFSubject,Condition,Trial,Reference,Comparison,FirstStim,SecondStim,UserChoice,IsCorrect\n";
+        let csv = "\uFEFFSubject,Session,Condition,Trial,Reference,Comparison,FirstStim,SecondStim,UserChoice,IsCorrect\n";
         experimentalData.forEach(r => {
-            csv += `${r.Subject},${r.Condition},${r.Trial},${r.Ref},${r.Comp},${r.First},${r.Second},${r.Choice},${r.Correct}\n`;
+            csv += `${r.Subject},${r.Session},${r.Condition},${r.Trial},${r.Ref},${r.Comp},${r.First},${r.Second},${r.Choice},${r.Correct}\n`;
         });
         const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
         const a = document.createElement("a");
         a.href = URL.createObjectURL(blob);
-        a.download = `Discrimination_${subId}.csv`;
+        a.download = `Discrimination_Result_${subId}.csv`;
         a.click();
     }
     setupExp();

@@ -15,6 +15,7 @@
         #startBtn { background: #2e7d32; color: white; }
         #ans-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; margin-top: 20px; display: none; }
         .ans-btn { background: #1976d2; color: white; }
+        #nextBtn { background: #ff9800; color: white; display: none; }
         #log-container { margin-top: 25px; text-align: left; font-size: 12px; max-height: 150px; overflow-y: auto; background: #fafafa; padding: 10px; border: 1px solid #eee; }
     </style>
 </head>
@@ -32,8 +33,9 @@
     <h3 id="condition-title">Condition: Ready</h3>
     
     <div class="setup-info">
+        <div>Session: <span id="current-session">1</span> / 2</div>
         <div>Target Area: <span id="target-area">-</span></div>
-        <div>Trial: <span id="trial-count">0</span> / <span id="total-trials">0</span></div>
+        <div>Trial: <span id="trial-count">0</span> / 12</div>
     </div>
 
     <div id="admin-display">
@@ -44,6 +46,7 @@
     <div class="progress-bar"><div id="progress"></div></div>
     
     <button id="startBtn" onclick="runSpatialTrial()">자극 시작 (Start Stimulus)</button>
+    <button id="nextBtn" onclick="proceedToNextStage()">다음 단계로 진행</button>
 
     <div id="ans-grid">
         <div style="grid-column: span 3; font-weight: bold; margin-bottom: 10px;">어느 구역이 자극되었습니까?</div>
@@ -59,9 +62,12 @@
 <script>
     let subjectWindow = null;
     const areas = ['A', 'B', 'C'];
-    const repetitions = 4; // 구역당 반복 횟수
-    let trialList = [];
-    let currentIdx = 0;
+    const repetitions = 4; // 구역당 반복 횟수 (총 12회)
+    
+    let sessionSequence = []; // 전체 컨디션 순서
+    let currentStageIdx = 0;  // 현재 스테이지 인덱스
+    let trialPools = {};      // 스테이지별 데이터
+    let currentIdxInSet = 0;
     let experimentalData = [];
     let currentTarget = "";
 
@@ -84,43 +90,59 @@
     }
 
     function setupExp() {
-        // A, B, C 구역을 랜덤하게 섞어서 리스트 생성
-        let baseTrials = [];
-        areas.forEach(a => {
-            for(let i=0; i<repetitions; i++) baseTrials.push(a);
+        // 세션 1: 3종 랜덤
+        let s1 = ["In-air", "On-touch (Soft)", "On-touch (Hard)"].sort(() => Math.random() - 0.5);
+        // 세션 2: 2종 랜덤
+        let s2 = ["On-touch (Soft)", "On-touch (Hard)"].sort(() => Math.random() - 0.5);
+        
+        sessionSequence = s1.concat(s2);
+
+        // 스테이지별 12회 시행 무작위 셔플 생성
+        sessionSequence.forEach((condName, idx) => {
+            let base = [];
+            areas.forEach(a => {
+                for(let i=0; i<repetitions; i++) base.push({ condition: condName, area: a });
+            });
+            trialPools[idx] = base.sort(() => Math.random() - 0.5);
         });
-        trialList = baseTrials.sort(() => Math.random() - 0.5);
-        document.getElementById('total-trials').innerText = trialList.length;
         updateUI();
     }
 
     function updateUI() {
-        if(currentIdx < trialList.length) {
-            currentTarget = trialList[currentIdx];
-            document.getElementById('admin-target').innerText = currentTarget;
-            document.getElementById('trial-count').innerText = currentIdx + 1;
-        } else {
-            document.getElementById('condition-title').innerText = "Experiment Complete";
+        const condTitle = document.getElementById('condition-title');
+        if (currentStageIdx >= sessionSequence.length) {
+            condTitle.innerText = "All Experiments Finished!";
             document.getElementById('startBtn').disabled = true;
-            document.getElementById('admin-target').innerText = "FIN";
+            return;
+        }
+
+        const sessionNum = (currentStageIdx < 3) ? 1 : 2;
+        const currentPool = trialPools[currentStageIdx];
+        const t = currentPool[currentIdxInSet];
+
+        if (currentIdxInSet < 12) {
+            condTitle.innerText = "Condition: " + sessionSequence[currentStageIdx];
+            document.getElementById('admin-target').innerText = t.area;
+            document.getElementById('trial-count').innerText = currentIdxInSet + 1;
+            document.getElementById('current-session').innerText = sessionNum;
+        } else {
+            condTitle.innerText = sessionSequence[currentStageIdx] + " (S" + sessionNum + ") Finished!";
+            document.getElementById('startBtn').style.display = 'none';
+            document.getElementById('nextBtn').style.display = 'block';
         }
     }
 
     async function runSpatialTrial() {
-        if(!subjectWindow) return alert("Open Subject Window First");
-        
+        if(!subjectWindow) return alert("Open Window First");
         document.getElementById('startBtn').disabled = true;
         document.getElementById('ans-grid').style.display = 'none';
 
-        // 1. Ready
         subjectWindow.updateState("Ready...", "#333");
         await progress(1000);
 
-        // 2. Stimulus (이 타이밍에 액추에이터 구동 신호를 보낸다고 가정)
         subjectWindow.updateState("STIMULATING", "#1b5e20", "#4caf50");
         await progress(1500);
         
-        // 3. Response
         subjectWindow.updateState("Where was the stimulus?", "#1565c0");
         document.getElementById('ans-grid').style.display = 'grid';
     }
@@ -137,35 +159,50 @@
     }
 
     function logResponse(choice) {
-        const isCorrect = (choice === currentTarget);
+        const cond = sessionSequence[currentStageIdx];
+        const t = trialPools[currentStageIdx][currentIdxInSet];
+        const isCorrect = (choice === t.area);
+        
         experimentalData.push({
-            Trial: currentIdx + 1,
-            Target: currentTarget,
+            Subject: document.getElementById('subjectId').value,
+            Session: (currentStageIdx < 3 ? 1 : 2),
+            Condition: cond,
+            Trial: currentIdxInSet + 1,
+            Target: t.area,
             Choice: choice,
             IsCorrect: isCorrect
         });
 
         const log = document.createElement('div');
-        log.innerHTML = `[Trial ${currentIdx+1}] Target: ${currentTarget} | Choice: ${choice} | ${isCorrect ? '✓':'✗'}`;
+        log.innerHTML = `[${cond}] Trial ${currentIdxInSet+1}: ${isCorrect ? '✓':'✗'} (Target:${t.area})`;
         document.getElementById('logContent').prepend(log);
 
         document.getElementById('ans-grid').style.display = 'none';
         document.getElementById('startBtn').disabled = false;
         document.getElementById('progress').style.width = "0%";
-        currentIdx++;
+        currentIdxInSet++;
+        updateUI();
+    }
+
+    function proceedToNextStage() {
+        currentStageIdx++;
+        currentIdxInSet = 0;
+        document.getElementById('nextBtn').style.display = 'none';
+        document.getElementById('startBtn').style.display = 'block';
+        document.getElementById('startBtn').disabled = false;
         updateUI();
     }
 
     function downloadCSV() {
         const subId = document.getElementById('subjectId').value;
-        let csv = "\uFEFFTrial,TargetArea,UserChoice,IsCorrect\n";
+        let csv = "\uFEFFSubject,Session,Condition,Trial,TargetArea,UserChoice,IsCorrect\n";
         experimentalData.forEach(r => {
-            csv += `${r.Trial},${r.Target},${r.Choice},${r.IsCorrect}\n`;
+            csv += `${r.Subject},${r.Session},${r.Condition},${r.Trial},${r.Target},${r.Choice},${r.IsCorrect}\n`;
         });
         const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
         const a = document.createElement("a");
         a.href = URL.createObjectURL(blob);
-        a.download = `Spatial_Result_${subId}.csv`;
+        a.download = `Spatial_Full_Result_${subId}.csv`;
         a.click();
     }
 

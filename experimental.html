@@ -22,9 +22,8 @@
         #input-section { display: none; margin-top: 20px; border-top: 2px solid #f1f3f4; padding-top: 20px; }
         input.subject-input { padding: 12px; width: 100px; font-size: 20px; text-align: center; border: 2px solid #ddd; border-radius: 8px; margin-bottom: 10px; }
         #log-container { margin-top: 25px; text-align: left; font-size: 12px; max-height: 200px; overflow-y: auto; background: #fafafa; padding: 10px; border: 1px solid #eee; }
-        /* 컨디션별 색상 */
         .cond-air { color: #03a9f4; }
-        .cond-active { color: #f44336; }
+        .cond-soft { color: #f44336; }
         .cond-hard { color: #8e44ad; }
     </style>
 </head>
@@ -32,10 +31,7 @@
 
 <div id="container">
     <button id="popBtn" onclick="openSubjectWindow()">1. 피험자용 창 열기 (Subject Window)</button>
-    <div class="subject-info-box">
-        <label>Subject ID:</label>
-        <input type="text" id="subjectId" value="S01">
-    </div>
+    <div class="subject-info-box"><label>Subject ID:</label><input type="text" id="subjectId" value="S01"></div>
     
     <h2 id="condition-title">Condition: Ready</h2>
     <div class="setup-info">
@@ -45,15 +41,8 @@
         <div>Trial: <span id="trial-count">0</span> / 15</div>
     </div>
 
-    <div id="target-display">
-        <div style="font-size: 14px; color: #666;">Target (Admin Only)</div>
-        <div id="target-number">?</div>
-    </div>
-
-    <div class="progress-bar">
-        <div id="progress"></div>
-        <div id="flash"></div>
-    </div>
+    <div id="target-display"><div style="font-size: 14px; color: #666;">Target (Admin Only)</div><div id="target-number">?</div></div>
+    <div class="progress-bar"><div id="progress"></div><div id="flash"></div></div>
 
     <button id="startBtn" onclick="startTrial()">2. 시행 시작 (Start)</button>
     <button id="nextBtn" onclick="proceedToNextStage()">다음 단계로 진행</button>
@@ -63,10 +52,7 @@
         <button style="background:#34a853; color:white;" onclick="logData()">Save & Next</button>
     </div>
 
-    <div id="log-container">
-        <strong>Session Logs:</strong>
-        <div id="logContent"></div>
-    </div>
+    <div id="log-container"><strong>Session Logs:</strong><div id="logContent"></div></div>
     <button style="background:#5f6368; color:white;" onclick="downloadCSV()">Download Results (CSV)</button>
 </div>
 
@@ -76,10 +62,11 @@
     const forces = ['0.07g', '0.16g', '0.6g', '1.4g', '2.0g'];
     const TRIAL_DURATION = 15;
     
-    let trialPools = { 1: [], 2: [], 3: [] }; // 1: In-air, 2: Active, 3: On-touch(Hard)
-    let currentCondIdx = 1; 
+    let sessionSequence = []; // 전체 컨디션 순서 저장
+    let currentStageIdx = 0;  // sessionSequence의 현재 인덱스
+    let trialPools = {};      // 각 스테이지의 셔플된 15개 시행
     let currentSessionIdx = 1;
-    let currentIdxInSet = 0; // 0~14
+    let currentIdxInSet = 0;
     let experimentalData = [];
     let timerInterval;
     let timeLeft = TRIAL_DURATION;
@@ -103,38 +90,47 @@
         `);
     }
 
-    function setupTrials() {
-        const condNames = ["In-air", "On-touch (Soft)", "On-touch (Hard)"];
-        for(let c=1; c<=3; c++) {
+    function setupExp() {
+        // 세션 1: 3조건 랜덤
+        let s1_conds = ["In-air", "On-touch (Soft)", "On-touch (Hard)"].sort(() => Math.random() - 0.5);
+        // 세션 2: 2조건 랜덤
+        let s2_conds = ["On-touch (Soft)", "On-touch (Hard)"].sort(() => Math.random() - 0.5);
+        
+        // 전체 시퀀스 통합
+        sessionSequence = s1_conds.concat(s2_conds);
+        
+        // 각 스테이지(조건)별 15개 조합 셔플 생성
+        sessionSequence.forEach((condName, idx) => {
             let base = [];
-            areas.forEach(a => forces.forEach(f => {
-                base.push({ condition: condNames[c-1], area: a, force: f });
-            }));
-            trialPools[c] = base.sort(() => Math.random() - 0.5);
-        }
+            areas.forEach(a => forces.forEach(f => base.push({ condition: condName, area: a, force: f })));
+            trialPools[idx] = base.sort(() => Math.random() - 0.5);
+        });
         updateUI();
     }
 
     function updateUI() {
-        const currentPool = trialPools[currentCondIdx];
-        const t = currentPool[currentIdxInSet];
         const condTitle = document.getElementById('condition-title');
-
-        if (currentSessionIdx > 2) {
+        if (currentStageIdx >= sessionSequence.length) {
             condTitle.innerText = "All Experiments Finished!";
             document.getElementById('startBtn').disabled = true;
             return;
         }
 
+        // 현재 세션 계산 (세션 1은 인덱스 0,1,2 / 세션 2는 3,4)
+        currentSessionIdx = (currentStageIdx < 3) ? 1 : 2;
+        const currentPool = trialPools[currentStageIdx];
+        const t = currentPool[currentIdxInSet];
+
         if (currentIdxInSet < 15) {
             condTitle.innerText = `Condition: ${t.condition}`;
-            condTitle.className = currentCondIdx === 1 ? "cond-air" : (currentCondIdx === 2 ? "cond-active" : "cond-hard");
+            const cName = t.condition.toLowerCase();
+            condTitle.className = cName.includes("air") ? "cond-air" : (cName.includes("soft") ? "cond-soft" : "cond-hard");
             document.getElementById('current-area').innerText = t.area;
             document.getElementById('current-force').innerText = t.force;
             document.getElementById('trial-count').innerText = currentIdxInSet + 1;
             document.getElementById('current-session').innerText = currentSessionIdx;
         } else {
-            condTitle.innerText = `${t.condition} Session ${currentSessionIdx} Completed!`;
+            condTitle.innerText = `${t.condition} (S${currentSessionIdx}) Completed!`;
             document.getElementById('startBtn').style.display = 'none';
             document.getElementById('nextBtn').style.display = 'block';
         }
@@ -171,41 +167,25 @@
     function logData() {
         const res = document.getElementById('subjectResponse').value;
         if (res === "") return;
-        
-        const t = trialPools[currentCondIdx][currentIdxInSet];
+        const t = trialPools[currentStageIdx][currentIdxInSet];
         experimentalData.push({
-            SubjectID: document.getElementById('subjectId').value,
-            Session: currentSessionIdx,
-            Condition: t.condition, Area: t.area, Force: t.force, Target: currentTarget, Response: res, Correct: (currentTarget == res ? 1 : 0)
+            SubjectID: document.getElementById('subjectId').value, Session: currentSessionIdx, Condition: t.condition, Area: t.area, Force: t.force, Target: currentTarget, Response: res, Correct: (currentTarget == res ? 1 : 0)
         });
-
         const log = document.createElement('div');
         log.innerHTML = `<b>[S${currentSessionIdx}-${t.condition}]</b> ${t.area}-${t.force} | T:${currentTarget}, R:${res}`;
         document.getElementById('logContent').prepend(log);
-
         document.getElementById('subjectResponse').value = "";
         document.getElementById('input-section').style.display = 'none';
         document.getElementById('progress').style.width = "0%";
         subjectWindow.updateState('ready');
-        
         currentIdxInSet++;
         updateUI();
         if (currentIdxInSet < 15) document.getElementById('startBtn').disabled = false;
     }
 
     function proceedToNextStage() {
-        if (currentCondIdx < 3) {
-            currentCondIdx++; // 다음 컨디션으로
-            currentIdxInSet = 0;
-        } else {
-            // 모든 컨디션 끝났으면 세션 증가
-            currentSessionIdx++;
-            if (currentSessionIdx <= 2) {
-                currentCondIdx = 1; // 다시 In-air부터
-                currentIdxInSet = 0;
-                setupTrials(); // 새로운 셔플
-            }
-        }
+        currentStageIdx++;
+        currentIdxInSet = 0;
         document.getElementById('nextBtn').style.display = 'none';
         document.getElementById('startBtn').style.display = 'block';
         document.getElementById('startBtn').disabled = false;
@@ -218,10 +198,10 @@
         const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
         const a = document.createElement("a");
         a.href = URL.createObjectURL(blob);
-        a.download = `Tactile_Full_${document.getElementById('subjectId').value}.csv`;
+        a.download = `Tactile_Threshold_${document.getElementById('subjectId').value}.csv`;
         a.click();
     }
-    setupTrials();
+    setupExp();
 </script>
 </body>
 </html>
