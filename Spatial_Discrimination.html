@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <title>Spatial Discrimination Experiment</title>
+    <style>
+        body { font-family: 'Segoe UI', sans-serif; display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 100vh; margin: 0; background-color: #f4f7f6; }
+        #container { background: white; padding: 30px; border-radius: 20px; box-shadow: 0 10px 30px rgba(0,0,0,0.1); text-align: center; width: 650px; }
+        .subject-info-box { background: #fff; border: 2px solid #2e7d32; padding: 15px; border-radius: 10px; margin-bottom: 20px; display: flex; align-items: center; justify-content: center; gap: 10px; }
+        .setup-info { display: flex; justify-content: space-around; margin-bottom: 20px; background: #e8f5e9; padding: 15px; border-radius: 10px; font-weight: bold; }
+        #admin-display { background: #fff3e0; border: 2px dashed #ff9800; padding: 15px; border-radius: 10px; margin-bottom: 20px; }
+        .progress-bar { width: 100%; height: 15px; background: #e8eaed; border-radius: 10px; overflow: hidden; margin-bottom: 20px; }
+        #progress { width: 0%; height: 100%; background: #2e7d32; transition: width 0.1s; }
+        button { padding: 15px; font-size: 16px; cursor: pointer; border: none; border-radius: 8px; transition: 0.2s; width: 100%; font-weight: bold; margin-top: 10px; }
+        #startBtn { background: #2e7d32; color: white; }
+        #ans-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; margin-top: 20px; display: none; }
+        .ans-btn { background: #1976d2; color: white; }
+        #log-container { margin-top: 25px; text-align: left; font-size: 12px; max-height: 150px; overflow-y: auto; background: #fafafa; padding: 10px; border: 1px solid #eee; }
+    </style>
+</head>
+<body>
+
+<div id="container">
+    <h2>Spatial Discrimination (Location)</h2>
+    <button onclick="openSubjectWindow()" style="background:#43a047; color:white;">1. Subject Window Open</button>
+    
+    <div class="subject-info-box">
+        <label>Subject ID:</label>
+        <input type="text" id="subjectId" value="S01" style="padding:5px; width:60px; text-align:center;">
+    </div>
+
+    <h3 id="condition-title">Condition: Ready</h3>
+    
+    <div class="setup-info">
+        <div>Target Area: <span id="target-area">-</span></div>
+        <div>Trial: <span id="trial-count">0</span> / <span id="total-trials">0</span></div>
+    </div>
+
+    <div id="admin-display">
+        <div style="font-size: 14px; color: #666; margin-bottom: 5px;">Admin Monitor</div>
+        <div style="font-size: 24px; font-weight: bold; color: #e65100;">Target: <span id="admin-target">?</span></div>
+    </div>
+    
+    <div class="progress-bar"><div id="progress"></div></div>
+    
+    <button id="startBtn" onclick="runSpatialTrial()">자극 시작 (Start Stimulus)</button>
+
+    <div id="ans-grid">
+        <div style="grid-column: span 3; font-weight: bold; margin-bottom: 10px;">어느 구역이 자극되었습니까?</div>
+        <button class="ans-btn" onclick="logResponse('A')">Area A</button>
+        <button class="ans-btn" onclick="logResponse('B')">Area B</button>
+        <button class="ans-btn" onclick="logResponse('C')">Area C</button>
+    </div>
+
+    <div id="log-container"><strong>Session Logs:</strong><div id="logContent"></div></div>
+    <button onclick="downloadCSV()" style="background:#546e7a; color:white;">Download CSV</button>
+</div>
+
+<script>
+    let subjectWindow = null;
+    const areas = ['A', 'B', 'C'];
+    const repetitions = 4; // 구역당 반복 횟수
+    let trialList = [];
+    let currentIdx = 0;
+    let experimentalData = [];
+    let currentTarget = "";
+
+    function openSubjectWindow() {
+        subjectWindow = window.open("", "SubjectWindow", "width=600,height=400");
+        subjectWindow.document.write(`
+            <html><body style="background:#222; color:white; display:flex; align-items:center; justify-content:center; height:100vh; font-family:sans-serif;">
+                <div style="text-align:center;">
+                    <h1 id="msg" style="font-size:3rem;">Waiting...</h1>
+                    <div id="visual-cue" style="width:100px; height:100px; border-radius:50%; margin:20px auto; background:transparent;"></div>
+                </div>
+                <script>
+                    function updateState(txt, color, cueColor){ 
+                        document.getElementById('msg').innerText = txt;
+                        document.body.style.backgroundColor = color;
+                        document.getElementById('visual-cue').style.backgroundColor = cueColor || 'transparent';
+                    }
+                <\/script>
+            </body></html>`);
+    }
+
+    function setupExp() {
+        // A, B, C 구역을 랜덤하게 섞어서 리스트 생성
+        let baseTrials = [];
+        areas.forEach(a => {
+            for(let i=0; i<repetitions; i++) baseTrials.push(a);
+        });
+        trialList = baseTrials.sort(() => Math.random() - 0.5);
+        document.getElementById('total-trials').innerText = trialList.length;
+        updateUI();
+    }
+
+    function updateUI() {
+        if(currentIdx < trialList.length) {
+            currentTarget = trialList[currentIdx];
+            document.getElementById('admin-target').innerText = currentTarget;
+            document.getElementById('trial-count').innerText = currentIdx + 1;
+        } else {
+            document.getElementById('condition-title').innerText = "Experiment Complete";
+            document.getElementById('startBtn').disabled = true;
+            document.getElementById('admin-target').innerText = "FIN";
+        }
+    }
+
+    async function runSpatialTrial() {
+        if(!subjectWindow) return alert("Open Subject Window First");
+        
+        document.getElementById('startBtn').disabled = true;
+        document.getElementById('ans-grid').style.display = 'none';
+
+        // 1. Ready
+        subjectWindow.updateState("Ready...", "#333");
+        await progress(1000);
+
+        // 2. Stimulus (이 타이밍에 액추에이터 구동 신호를 보낸다고 가정)
+        subjectWindow.updateState("STIMULATING", "#1b5e20", "#4caf50");
+        await progress(1500);
+        
+        // 3. Response
+        subjectWindow.updateState("Where was the stimulus?", "#1565c0");
+        document.getElementById('ans-grid').style.display = 'grid';
+    }
+
+    function progress(ms) {
+        return new Promise(res => {
+            let start = Date.now();
+            let timer = setInterval(() => {
+                let p = (Date.now() - start) / ms * 100;
+                document.getElementById('progress').style.width = p + "%";
+                if(p >= 100) { clearInterval(timer); res(); }
+            }, 20);
+        });
+    }
+
+    function logResponse(choice) {
+        const isCorrect = (choice === currentTarget);
+        experimentalData.push({
+            Trial: currentIdx + 1,
+            Target: currentTarget,
+            Choice: choice,
+            IsCorrect: isCorrect
+        });
+
+        const log = document.createElement('div');
+        log.innerHTML = `[Trial ${currentIdx+1}] Target: ${currentTarget} | Choice: ${choice} | ${isCorrect ? '✓':'✗'}`;
+        document.getElementById('logContent').prepend(log);
+
+        document.getElementById('ans-grid').style.display = 'none';
+        document.getElementById('startBtn').disabled = false;
+        document.getElementById('progress').style.width = "0%";
+        currentIdx++;
+        updateUI();
+    }
+
+    function downloadCSV() {
+        const subId = document.getElementById('subjectId').value;
+        let csv = "\uFEFFTrial,TargetArea,UserChoice,IsCorrect\n";
+        experimentalData.forEach(r => {
+            csv += `${r.Trial},${r.Target},${r.Choice},${r.IsCorrect}\n`;
+        });
+        const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+        const a = document.createElement("a");
+        a.href = URL.createObjectURL(blob);
+        a.download = `Spatial_Result_${subId}.csv`;
+        a.click();
+    }
+
+    setupExp();
+</script>
+</body>
+</html>

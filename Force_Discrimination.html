@@ -6,11 +6,10 @@
     <style>
         body { font-family: 'Segoe UI', sans-serif; display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 100vh; margin: 0; background-color: #f0f4f8; }
         #container { background: white; padding: 30px; border-radius: 20px; box-shadow: 0 10px 30px rgba(0,0,0,0.1); text-align: center; width: 600px; }
-        .subject-info-box { background: #fff; border: 2px solid #673ab7; padding: 15px; border-radius: 10px; margin-bottom: 20px; display: flex; align-items: center; justify-content: center; gap: 10px; }
+        .subject-info-box { background: #fff; border: 2px solid #673ab7; padding: 15px; border-radius: 10px; margin-bottom: 20px; display: flex; flex-direction: column; gap: 10px; }
         .setup-info { display: flex; justify-content: space-around; margin-bottom: 20px; background: #ede7f6; padding: 15px; border-radius: 10px; font-weight: bold; }
         #admin-display { background: #fff9c4; border: 2px dashed #fbc02d; padding: 15px; border-radius: 10px; margin-bottom: 20px; display: flex; flex-direction: column; gap: 10px; }
         .pair-box { display: flex; justify-content: center; gap: 20px; font-size: 24px; font-weight: bold; }
-        .stim-label { font-size: 14px; color: #666; }
         .progress-bar { width: 100%; height: 15px; background: #e8eaed; border-radius: 10px; overflow: hidden; margin-bottom: 20px; position: relative; }
         #progress { width: 0%; height: 100%; background: #673ab7; transition: width 0.1s; }
         button { padding: 15px; font-size: 16px; cursor: pointer; border: none; border-radius: 8px; transition: 0.2s; width: 100%; font-weight: bold; margin-top: 10px; }
@@ -18,17 +17,28 @@
         #ansBtn1, #ansBtn2 { background: #3f51b5; color: white; width: 48%; }
         #input-section { display: none; margin-top: 20px; }
         #log-container { margin-top: 25px; text-align: left; font-size: 12px; max-height: 200px; overflow-y: auto; background: #fafafa; padding: 10px; border: 1px solid #eee; }
+        select { padding: 8px; border-radius: 5px; border: 1px solid #673ab7; font-weight: bold; }
     </style>
 </head>
 <body>
 
 <div id="container">
-    <h2>Force Discrimination (JND)</h2>
-    <button id="popBtn" onclick="openSubjectWindow()" style="background:#9c27b0; color:white;">1. Subject Window Open</button>
+    <h2>Force Discrimination Experiment</h2>
+    <button id="popBtn" onclick="openSubjectWindow()" style="background:#9c27b0; color:white; margin-bottom:10px;">1. Subject Window Open</button>
     
     <div class="subject-info-box">
-        <label>Subject ID:</label>
-        <input type="text" id="subjectId" value="S01" style="padding:5px; width:60px; text-align:center;">
+        <div>
+            <label>Subject ID:</label>
+            <input type="text" id="subjectId" value="S01" style="padding:5px; width:60px; text-align:center;">
+        </div>
+        <div>
+            <label>Condition:</label>
+            <select id="expCondition" onchange="setupExp()">
+                <option value="In-air">In-air</option>
+                <option value="On-touch">On-touch</option>
+                <option value="Hard-touch">Hard-touch</option>
+            </select>
+        </div>
     </div>
 
     <h3 id="condition-title">Condition: Ready</h3>
@@ -36,11 +46,11 @@
     <div class="setup-info">
         <div>Ref: <span id="ref-force">-</span></div>
         <div>Comp: <span id="comp-force">-</span></div>
-        <div>Trial: <span id="trial-count">0</span> / 6</div>
+        <div>Trial: <span id="trial-count">0</span> / <span id="total-trial">0</span></div>
     </div>
 
     <div id="admin-display">
-        <div class="stim-label">Stimulus Sequence (Admin Only)</div>
+        <div style="font-size:14px; color:#666;">Stimulus Sequence (Admin Only)</div>
         <div class="pair-box">
             <div>1st: <span id="stim1-val" style="color:blue;">?</span></div>
             <div>2nd: <span id="stim2-val" style="color:red;">?</span></div>
@@ -65,18 +75,23 @@
 
 <script>
     let subjectWindow = null;
-    // 웨버의 법칙을 고려한 Pair 디자인 (Ref vs Comp)
+    
+    // 추천된 75% 정답률 타겟 페어 (VF 강도 기준)
     const pairs = [
-        {ref: '10.0g', comp: '15.0g'}, {ref: '10.0g', comp: '8.0g'}, // Skin
-        {ref: '60.0g', comp: '26.0g'}, {ref: '60.0g', comp: '100.0g'}, // Transition
-        {ref: '180.0g', comp: '100.0g'}, {ref: '180.0g', comp: '300.0g'} // Deep
+        {ref: '0.07g', comp: '0.16g'}, 
+        {ref: '0.16g', comp: '0.60g'},
+        {ref: '0.60g', comp: '1.40g'},
+        {ref: '1.40g', comp: '2.00g'},
+        {ref: '0.07g', comp: '0.60g'}, // 대조군
+        {ref: '0.60g', comp: '2.00g'}  // 대조군
     ];
+
     let trialList = [];
     let currentIdx = 0;
     let experimentalData = [];
     let firstStim = ""; 
     let secondStim = "";
-    let strongerOne = 1; // 1이면 첫번째가 더 강함
+    let strongerOne = 1;
 
     function openSubjectWindow() {
         subjectWindow = window.open("", "SubjectWindow", "width=600,height=400");
@@ -88,7 +103,25 @@
     }
 
     function setupExp() {
-        trialList = pairs.sort(() => Math.random() - 0.5);
+        const cond = document.getElementById('expCondition').value;
+        const repetitions = 5; // <--- 한 페어당 반복할 횟수 설정
+        
+        document.getElementById('condition-title').innerText = "Condition: " + cond;
+        
+        // 페어를 반복 횟수만큼 복사해서 리스트 생성
+        let fullList = [];
+        for (let i = 0; i < repetitions; i++) {
+            fullList = fullList.concat(JSON.parse(JSON.stringify(pairs)));
+        }
+        
+        // 전체 리스트 셔플
+        trialList = fullList.sort(() => Math.random() - 0.5);
+        
+        document.getElementById('total-trial').innerText = trialList.length;
+        currentIdx = 0;
+        experimentalData = [];
+        document.getElementById('logContent').innerHTML = "";
+        document.getElementById('startBtn').disabled = false;
         updateUI();
     }
 
@@ -108,7 +141,6 @@
         if(!subjectWindow) return alert("Open Window First");
         const t = trialList[currentIdx];
         
-        // 랜덤하게 순서 결정 (Ref-Comp 또는 Comp-Ref)
         const isRefFirst = Math.random() > 0.5;
         firstStim = isRefFirst ? t.ref : t.comp;
         secondStim = isRefFirst ? t.comp : t.ref;
@@ -118,7 +150,6 @@
         document.getElementById('stim2-val').innerText = secondStim;
         document.getElementById('startBtn').disabled = true;
 
-        // Sequence
         subjectWindow.updateState("Stimulus 1...", "#2196F3");
         await progress(1000);
         subjectWindow.updateState("Interval...", "#333");
@@ -142,14 +173,25 @@
     }
 
     function logResponse(choice) {
+        const cond = document.getElementById('expCondition').value;
+        const subId = document.getElementById('subjectId').value;
         const t = trialList[currentIdx];
         const isCorrect = (choice === strongerOne);
+        
         experimentalData.push({
-            Trial: currentIdx + 1, Ref: t.ref, Comp: t.comp, First: firstStim, Second: secondStim, Choice: choice, Correct: isCorrect
+            Subject: subId,
+            Condition: cond,
+            Trial: currentIdx + 1, 
+            Ref: t.ref, 
+            Comp: t.comp, 
+            First: firstStim, 
+            Second: secondStim, 
+            Choice: choice, 
+            Correct: isCorrect
         });
 
         const log = document.createElement('div');
-        log.innerHTML = `[Trial ${currentIdx+1}] Ref:${t.ref}, Comp:${t.comp} | Correct: ${isCorrect ? '✓':'✗'}`;
+        log.innerHTML = `[${cond}] Trial ${currentIdx+1}: ${isCorrect ? '✓':'✗'} (Ref:${t.ref}, Comp:${t.comp})`;
         document.getElementById('logContent').prepend(log);
 
         document.getElementById('input-section').style.display = 'none';
@@ -160,14 +202,15 @@
     }
 
     function downloadCSV() {
-        let csv = "\uFEFFTrial,Reference,Comparison,FirstStim,SecondStim,UserChoice,IsCorrect\n";
+        const subId = document.getElementById('subjectId').value;
+        let csv = "\uFEFFSubject,Condition,Trial,Reference,Comparison,FirstStim,SecondStim,UserChoice,IsCorrect\n";
         experimentalData.forEach(r => {
-            csv += `${r.Trial},${r.Ref},${r.Comp},${r.First},${r.Second},${r.Choice},${r.Correct}\n`;
+            csv += `${r.Subject},${r.Condition},${r.Trial},${r.Ref},${r.Comp},${r.First},${r.Second},${r.Choice},${r.Correct}\n`;
         });
         const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
         const a = document.createElement("a");
         a.href = URL.createObjectURL(blob);
-        a.download = `Discrimination_Result.csv`;
+        a.download = `Discrimination_${subId}.csv`;
         a.click();
     }
     setupExp();
