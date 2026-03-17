@@ -89,15 +89,16 @@
             </body></html>`);
     }
 
+    // setupExp 함수 부분만 이 로직으로 교체하시면 됩니다.
     function setupExp() {
-        // 세션 1: 3종 랜덤
-        let s1 = ["In-air", "On-touch (Soft)", "On-touch (Hard)"].sort(() => Math.random() - 0.5);
-        // 세션 2: 2종 랜덤
-        let s2 = ["On-touch (Soft)", "On-touch (Hard)"].sort(() => Math.random() - 0.5);
+        // 세션 1 & 2 모두 동일하게 3개 조건 무작위 순서로 설정
+        let s1_conds = ["In-air", "On-touch (Soft)", "On-touch (Hard)"].sort(() => Math.random() - 0.5);
+        let s2_conds = ["In-air", "On-touch (Soft)", "On-touch (Hard)"].sort(() => Math.random() - 0.5);
         
-        sessionSequence = s1.concat(s2);
-
-        // 스테이지별 12회 시행 무작위 셔플 생성
+        // 전체 시퀀스 통합 (총 6개 스테이지)
+        sessionSequence = s1_conds.concat(s2_conds);
+        
+        // 각 스테이지(조건)별 12회 시행 무작위 셔플 생성
         sessionSequence.forEach((condName, idx) => {
             let base = [];
             areas.forEach(a => {
@@ -105,9 +106,13 @@
             });
             trialPools[idx] = base.sort(() => Math.random() - 0.5);
         });
+        
+        // 전체 시행 횟수 UI 업데이트 (세션당 36회, 총 72회)
+        document.getElementById('total-trials').innerText = 12; // 한 조건당 12회 표시 유지
         updateUI();
     }
 
+    // updateUI 함수 내 세션 계산 로직 수정
     function updateUI() {
         const condTitle = document.getElementById('condition-title');
         if (currentStageIdx >= sessionSequence.length) {
@@ -116,6 +121,7 @@
             return;
         }
 
+        // 세션 1은 인덱스 0,1,2 / 세션 2는 3,4,5
         const sessionNum = (currentStageIdx < 3) ? 1 : 2;
         const currentPool = trialPools[currentStageIdx];
         const t = currentPool[currentIdxInSet];
