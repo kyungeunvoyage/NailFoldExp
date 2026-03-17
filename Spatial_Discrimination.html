@@ -236,7 +236,8 @@
         const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
         const a = document.createElement("a");
         a.href = URL.createObjectURL(blob);
-        a.download = `Spatial_Result_ForceVars_${subId}.csv`;
+        a.download = `${subId}_Exp3_SpatialDiscrimination.csv`;
+        //P2_Exp3_SpatialDiscrimination
         a.click();
     }
 

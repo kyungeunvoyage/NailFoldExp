@@ -238,7 +238,8 @@
         const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
         const a = document.createElement("a");
         a.href = URL.createObjectURL(blob);
-        a.download = `Tactile_Threshold_${document.getElementById('subjectId').value}.csv`;
+        a.download = `${document.getElementById('subjectId').value}_Exp1_AbsoluteThresholdDetection.csv`;
+        //P2_Exp1_AbsoluteThresholdDetection
         a.click();
     }
 

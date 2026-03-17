@@ -256,7 +256,8 @@
         const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
         const a = document.createElement("a");
         a.href = URL.createObjectURL(blob);
-        a.download = `Discrimination_Result_${subId}.csv`;
+        a.download = `${subId}_Exp2_ForceDiscrimination.csv`;
+        //P2_Exp2_ForceDiscrimination
         a.click();
     }
     setupExp();
