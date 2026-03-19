@@ -34,7 +34,7 @@
         <button class="btn-outline" onclick="setMode('outline')">4. Finger Outline</button>
         <button class="btn-triangle" style="background: #e67e22; color: white;" onclick="drawTriangleV123()">5. 좌측 삼각형</button>
         <button class="btn-triangle" style="background: #d35400; color: white;" onclick="drawTriangleV456()">6. 우측 삼각형</button>
-        <button class="btn-stim" id="stimBtn" onclick="generateStimulusPoints()" disabled>7. 자극점 생성</button>
+        <button class="btn-stim" id="stimBtn" onclick="generateStimulusPoints()" disabled>자극점 생성</button>
         <button class="btn-reset" onclick="resetCanvas()">초기화</button>
     </div>
 
@@ -159,9 +159,9 @@
     function drawStimulusPoint(x, y, label) {
         ctx.fillStyle = "yellow";
         ctx.beginPath(); ctx.arc(x + RULER_SIZE, y + RULER_SIZE, 4, 0, Math.PI * 2); ctx.fill();
-        ctx.fillStyle = "black";
-        ctx.font = "bold 10px Arial";
-        ctx.fillText(label, x + RULER_SIZE + 5, y + RULER_SIZE - 5);
+        //ctx.fillStyle = "black";
+        //ctx.font = "bold 10px Arial";
+        //ctx.fillText(label, x + RULER_SIZE + 5, y + RULER_SIZE - 5);
     }
 
     function setMode(newMode) { if (!img.src) return; mode = newMode; points = []; status.innerText = "설정 위치를 클릭하세요."; }
