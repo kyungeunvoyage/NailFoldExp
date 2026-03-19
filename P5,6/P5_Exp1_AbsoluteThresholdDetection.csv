@@ -1,0 +1,45 @@
+SubjectID,Session,Condition,Area,Force,Target,Response,IsCorrect
+P05,1,In-air,B,0.6g,5,10,0
+P05,1,In-air,D,1.4g,5,5,1
+P05,1,In-air,C,0.07g,7,0,0
+P05,1,In-air,D,0.07g,7,1,0
+P05,1,In-air,B,0.16g,5,0,0
+P05,1,In-air,B,1.4g,7,8,0
+P05,1,In-air,C,2.0g,6,6,1
+P05,1,In-air,B,0.07g,5,0,0
+P05,1,In-air,B,2.0g,5,6,0
+P05,1,In-air,D,2.0g,5,5,1
+P05,1,In-air,C,0.16g,5,0,0
+P05,1,In-air,C,1.4g,7,8,0
+P05,1,In-air,C,0.6g,7,7,1
+P05,1,In-air,D,0.6g,5,5,1
+P05,1,In-air,D,0.16g,7,1,0
+P05,1,On-touch (Soft),B,1.4g,7,7,1
+P05,1,On-touch (Soft),B,0.16g,7,1,0
+P05,1,On-touch (Soft),B,0.6g,8,8,1
+P05,1,On-touch (Soft),C,2.0g,8,8,1
+P05,1,On-touch (Soft),D,0.16g,8,0,0
+P05,1,On-touch (Soft),C,0.16g,7,1,0
+P05,1,On-touch (Soft),D,1.4g,5,5,1
+P05,1,On-touch (Soft),B,2.0g,8,8,1
+P05,1,On-touch (Soft),D,0.07g,7,0,0
+P05,1,On-touch (Soft),B,0.07g,8,0,0
+P05,1,On-touch (Soft),D,2.0g,7,7,1
+P05,1,On-touch (Soft),C,1.4g,5,5,1
+P05,1,On-touch (Soft),D,0.6g,7,7,1
+P05,1,On-touch (Soft),C,0.07g,5,0,0
+P05,1,On-touch (Soft),C,0.6g,7,7,1
+P05,1,On-touch (Hard),B,0.6g,7,7,1
+P05,1,On-touch (Hard),B,2.0g,8,8,1
+P05,1,On-touch (Hard),B,0.07g,6,0,0
+P05,1,On-touch (Hard),D,1.4g,8,8,1
+P05,1,On-touch (Hard),C,0.16g,5,1,0
+P05,1,On-touch (Hard),C,1.4g,5,5,1
+P05,1,On-touch (Hard),D,0.07g,5,0,0
+P05,1,On-touch (Hard),C,0.07g,8,0,0
+P05,1,On-touch (Hard),B,0.16g,5,0,0
+P05,1,On-touch (Hard),C,0.6g,5,5,1
+P05,1,On-touch (Hard),D,0.6g,8,8,1
+P05,1,On-touch (Hard),C,2.0g,5,5,1
+P05,1,On-touch (Hard),B,1.4g,6,6,1
+P05,1,On-touch (Hard),D,0.16g,8,0,0
