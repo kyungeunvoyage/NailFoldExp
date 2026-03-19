@@ -6,7 +6,6 @@
     <style>
         body { font-family: 'Segoe UI', sans-serif; display: flex; flex-direction: column; align-items: center; background: #f0f2f5; margin: 0; padding: 20px; }
         .container { background: white; padding: 20px; border-radius: 12px; box-shadow: 0 4px 20px rgba(0,0,0,0.1); text-align: center; }
-        /* 줄자를 위한 여백 추가 */
         .canvas-wrapper { position: relative; margin-top: 30px; display: inline-block; padding-top: 30px; padding-left: 30px; background: #eee; border-radius: 8px; }
         canvas { border: 1px solid #ddd; cursor: crosshair; display: block; background-color: white; }
         .controls { margin-bottom: 15px; display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; }
@@ -33,7 +32,9 @@
         <button class="btn-h" onclick="setMode('horizontal')">2. 좌/우 가이드</button>
         <button class="btn-dipj" onclick="setMode('dipj')">3. DIPJ 설정</button>
         <button class="btn-outline" onclick="setMode('outline')">4. Finger Outline</button>
-        <button class="btn-stim" id="stimBtn" onclick="generateStimulusPoints()" disabled>5. 자극점 생성</button>
+        <button class="btn-triangle" style="background: #e67e22; color: white;" onclick="drawTriangleV123()">5. 좌측 삼각형</button>
+        <button class="btn-triangle" style="background: #d35400; color: white;" onclick="drawTriangleV456()">6. 우측 삼각형</button>
+        <button class="btn-stim" id="stimBtn" onclick="generateStimulusPoints()" disabled>7. 자극점 생성</button>
         <button class="btn-reset" onclick="resetCanvas()">초기화</button>
     </div>
 
@@ -115,7 +116,6 @@
         points.push({x, y});
 
         drawEverything();
-        // 가이드 설정 중인 점 표시 (원래 스타일: 흰색/보라/초록)
         points.forEach(p => {
             ctx.fillStyle = (mode === 'outline') ? "#8e44ad" : (mode === 'dipj' ? "#27ae60" : "white");
             ctx.beginPath(); ctx.arc(p.x + RULER_SIZE, p.y + RULER_SIZE, 3, 0, Math.PI * 2); ctx.fill();
@@ -143,7 +143,6 @@
     function finalizeSelection() {
         drawEverything();
         checkReady();
-        if (!stimBtn.disabled) generateStimulusPoints();
         points = [];
         mode = 'none';
     }
@@ -160,6 +159,9 @@
     function drawStimulusPoint(x, y, label) {
         ctx.fillStyle = "yellow";
         ctx.beginPath(); ctx.arc(x + RULER_SIZE, y + RULER_SIZE, 4, 0, Math.PI * 2); ctx.fill();
+        ctx.fillStyle = "black";
+        ctx.font = "bold 10px Arial";
+        ctx.fillText(label, x + RULER_SIZE + 5, y + RULER_SIZE - 5);
     }
 
     function setMode(newMode) { if (!img.src) return; mode = newMode; points = []; status.innerText = "설정 위치를 클릭하세요."; }
@@ -199,9 +201,70 @@
             {label: 'g', x: stimX_rightSide, y: stimY_lower}, {label: 'h', x: stimX_rightSide, y: stimY_upper}
         ];
 
+        // 삼각형 Centroid 계산 및 stimulus point에 추가
+        if (guideLines.midY !== null && guideLines.bottomY !== null && guideLines.leftX !== null && guideLines.rightX !== null) {
+            // 좌측 Centroid (v1, v2, v3)
+            const cLeftX = (guideLines.leftX + guideLines.midX + guideLines.leftX) / 3;
+            const cLeftY = (guideLines.midY + guideLines.bottomY + guideLines.bottomY) / 3;
+            stimPoints.push({label: 'C_Left', x: cLeftX, y: cLeftY});
+
+            // 우측 Centroid (v4, v5, v6)
+            const cRightX = (guideLines.rightX + guideLines.midX + guideLines.rightX) / 3;
+            const cRightY = (guideLines.midY + guideLines.bottomY + guideLines.bottomY) / 3;
+            stimPoints.push({label: 'C_Right', x: cRightX, y: cRightY});
+        }
+
         drawEverything();
         stimPoints.forEach(p => drawStimulusPoint(p.x, p.y, p.label));
-        status.innerText = "자극점 생성 완료";
+        status.innerText = "자극점 및 Centroids 생성 완료";
+    }
+
+    function drawTriangleV123() {
+        if (guideLines.midY === null || guideLines.bottomY === null || guideLines.leftX === null) {
+            status.innerText = "상/하 및 좌/우 가이드를 먼저 설정하세요.";
+            return;
+        }
+        const v1 = { x: guideLines.leftX, y: guideLines.midY };
+        const v2 = { x: guideLines.midX, y: guideLines.bottomY };
+        const v3 = { x: guideLines.leftX, y: guideLines.bottomY };
+
+        drawEverything();
+        ctx.beginPath();
+        ctx.lineWidth = 2; ctx.strokeStyle = "#e67e22"; ctx.fillStyle = "rgba(230, 126, 34, 0.3)";
+        ctx.moveTo(v1.x + RULER_SIZE, v1.y + RULER_SIZE);
+        ctx.lineTo(v2.x + RULER_SIZE, v2.y + RULER_SIZE);
+        ctx.lineTo(v3.x + RULER_SIZE, v3.y + RULER_SIZE);
+        ctx.closePath(); ctx.stroke(); ctx.fill();
+
+        [v1, v2, v3].forEach((p, i) => {
+            ctx.fillStyle = "black"; ctx.beginPath(); ctx.arc(p.x + RULER_SIZE, p.y + RULER_SIZE, 4, 0, Math.PI * 2); ctx.fill();
+            ctx.fillText(`v${i+1}`, p.x + RULER_SIZE + 5, p.y + RULER_SIZE - 5);
+        });
+        status.innerText = "좌측 삼각형 생성 완료";
+    }
+
+    function drawTriangleV456() {
+        if (guideLines.midY === null || guideLines.bottomY === null || guideLines.rightX === null) {
+            status.innerText = "상/하 및 좌/우 가이드를 먼저 설정하세요.";
+            return;
+        }
+        const v4 = { x: guideLines.rightX, y: guideLines.midY };
+        const v5 = { x: guideLines.midX, y: guideLines.bottomY };
+        const v6 = { x: guideLines.rightX, y: guideLines.bottomY };
+
+        drawEverything();
+        ctx.beginPath();
+        ctx.lineWidth = 2; ctx.strokeStyle = "#d35400"; ctx.fillStyle = "rgba(211, 84, 0, 0.3)";
+        ctx.moveTo(v4.x + RULER_SIZE, v4.y + RULER_SIZE);
+        ctx.lineTo(v5.x + RULER_SIZE, v5.y + RULER_SIZE);
+        ctx.lineTo(v6.x + RULER_SIZE, v6.y + RULER_SIZE);
+        ctx.closePath(); ctx.stroke(); ctx.fill();
+
+        [v4, v5, v6].forEach((p, i) => {
+            ctx.fillStyle = "black"; ctx.beginPath(); ctx.arc(p.x + RULER_SIZE, p.y + RULER_SIZE, 4, 0, Math.PI * 2); ctx.fill();
+            ctx.fillText(`v${i+4}`, p.x + RULER_SIZE + 5, p.y + RULER_SIZE - 5);
+        });
+        status.innerText = "우측 삼각형 생성 완료";
     }
 
     function resetCanvas() {
