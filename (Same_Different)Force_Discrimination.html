@@ -1,0 +1,285 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <title>Force Discrimination Experiment (Same-Different)</title>
+    <style>
+        body { font-family: 'Segoe UI', sans-serif; display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 100vh; margin: 0; background-color: #f0f4f8; }
+        #container { background: white; padding: 30px; border-radius: 20px; box-shadow: 0 10px 30px rgba(0,0,0,0.1); text-align: center; width: 600px; }
+        .subject-info-box { background: #fff; border: 2px solid #673ab7; padding: 15px; border-radius: 10px; margin-bottom: 20px; display: flex; flex-direction: column; gap: 10px; }
+        .setup-info { display: flex; justify-content: space-around; margin-bottom: 20px; background: #ede7f6; padding: 15px; border-radius: 10px; font-weight: bold; }
+        #admin-display { background: #fff9c4; border: 2px dashed #fbc02d; padding: 15px; border-radius: 10px; margin-bottom: 20px; display: flex; flex-direction: column; gap: 10px; }
+        #status-display { background: #e3f2fd; border: 2px solid #2196f3; padding: 10px; border-radius: 10px; margin-bottom: 15px; font-weight: bold; color: #0d47a1; font-size: 1.1rem; }
+        .pair-box { display: flex; justify-content: center; gap: 20px; font-size: 24px; font-weight: bold; }
+        .progress-bar { width: 100%; height: 15px; background: #e8eaed; border-radius: 10px; overflow: hidden; margin-bottom: 20px; position: relative; }
+        #progress { width: 0%; height: 100%; background: #673ab7; transition: width 0.1s; }
+        button { padding: 15px; font-size: 16px; cursor: pointer; border: none; border-radius: 8px; transition: 0.2s; width: 100%; font-weight: bold; margin-top: 10px; }
+        #startBtn { background: #673ab7; color: white; }
+        #ansBtn1, #ansBtn2 { background: #3f51b5; color: white; width: 48%; }
+        #input-section { display: none; margin-top: 20px; }
+        #nextBtn { background: #ff9800; color: white; display: none; }
+        #log-container { margin-top: 25px; text-align: left; font-size: 12px; max-height: 200px; overflow-y: auto; background: #fafafa; padding: 10px; border: 1px solid #eee; }
+    </style>
+</head>
+<body>
+
+<div id="container">
+    <h2>Force Discrimination (Same-Different)</h2>
+    <button id="popBtn" onclick="openSubjectWindow()" style="background:#9c27b0; color:white; margin-bottom:10px;">1. Subject Window Open</button>
+    
+    <div class="subject-info-box">
+        <div>
+            <label>Subject ID:</label>
+            <input type="text" id="subjectId" value="S01" style="padding:5px; width:60px; text-align:center;">
+        </div>
+    </div>
+
+    <h3 id="condition-title">Condition: Ready</h3>
+    
+    <div id="status-display">Status: Waiting to Start</div>
+
+    <div class="setup-info">
+        <div>Session: <span id="current-session">1</span> / 2</div>
+        <div>Region: <span id="current-region">-</span></div>
+        <div>Trial: <span id="trial-count">0</span> / <span id="total-trial-count">0</span></div>
+    </div>
+
+    <div id="admin-display">
+        <div style="font-size:14px; color:#666;">Admin Monitor (Stimulus Pair)</div>
+        <div style="font-weight:bold; color:red;">Target Region: <span id="admin-region">?</span></div>
+        <div class="pair-box">
+            <div>1st: <span id="stim1-val" style="color:blue;">?</span></div>
+            <div>2nd: <span id="stim2-val" style="color:red;">?</span></div>
+        </div>
+        <div id="admin-relation" style="font-size:14px; color: #d32f2f; font-weight: bold;">Ground Truth: ?</div>
+    </div>
+    
+    <div class="progress-bar"><div id="progress"></div></div>
+    
+    <button id="startBtn" onclick="runDiscriminationTrial()">다음 시행 시작 (Start Sequence)</button>
+    <button id="nextBtn" onclick="proceedToNextStage()">다음 단계로 진행</button>
+
+    <div id="input-section">
+        <div style="margin-bottom:15px; font-weight:bold;">두 자극이 같았습니까, 달랐습니까?</div>
+        <div style="display:flex; justify-content:space-between;">
+            <button id="ansBtn1" onclick="logResponse(1)">SAME (같음)</button>
+            <button id="ansBtn2" onclick="logResponse(2)">DIFFERENT (다름)</button>
+        </div>
+    </div>
+
+    <div id="log-container"><strong>Session Logs:</strong><div id="logContent"></div></div>
+    <button onclick="downloadCSV()" style="background:#5f6368; color:white;">Download CSV</button>
+</div>
+
+<script>
+    let subjectWindow = null;
+    const regions = ['A', 'B', 'C'];
+    const basePairs = [
+        {ref: '0.16g', comp: '0.60g'}, 
+        {ref: '0.60g', comp: '1.40g'}, 
+        {ref: '1.40g', comp: '2.00g'}, 
+        {ref: '0.16g', comp: '1.40g'}, 
+        {ref: '0.60g', comp: '2.00g'}  
+    ];
+
+    let sessionSequence = []; 
+    let currentStageIdx = 0;  
+    let trialPools = {};      
+    let currentIdxInSet = 0;
+    let experimentalData = [];
+    let firstStim = "", secondStim = "";
+    let correctChoice = 1; // 1: Same, 2: Different
+
+    function updateAdminStatus(text) {
+        document.getElementById('status-display').innerText = "Status: " + text;
+    }
+
+    function openSubjectWindow() {
+        subjectWindow = window.open("", "SubjectWindow", "width=600,height=400");
+        subjectWindow.document.write(`
+            <html><body style="background:#333; color:white; display:flex; align-items:center; justify-content:center; height:100vh; font-family:sans-serif;">
+                <h1 id="msg" style="font-size:3rem; text-align:center;">실험 대기 중...</h1>
+                <script>function updateState(txt, color){ document.body.style.backgroundColor=color; document.getElementById('msg').innerText=txt; }<\/script>
+            </body></html>`);
+    }
+
+    function setupExp() {
+        // Condition 수정: In-air와 On-touch 두 가지만 남김
+        // Session 1: 두 조건을 랜덤 순서로
+        let s1 = ["In-air", "On-touch"].sort(() => Math.random() - 0.5);
+        // Session 2: 동일하게 두 조건을 랜덤 순서로 반복하거나 순서 변경
+        let s2 = ["In-air", "On-touch"].sort(() => Math.random() - 0.5);
+        
+        sessionSequence = s1.concat(s2);
+
+        sessionSequence.forEach((condName, idx) => {
+            let fullList = [];
+            regions.forEach(reg => {
+                basePairs.forEach(p => {
+                    // AA, AB, BA, BB 페어링 생성
+                    fullList.push({s1: p.ref, s2: p.ref, region: reg, type: 'Same'});
+                    fullList.push({s1: p.ref, s2: p.comp, region: reg, type: 'Different'});
+                    fullList.push({s1: p.comp, s2: p.ref, region: reg, type: 'Different'});
+                    fullList.push({s1: p.comp, s2: p.comp, region: reg, type: 'Same'});
+                });
+            });
+            // 조건당 총 시행: 3(구역) * 5(쌍) * 4(조합) = 60 Trials
+            trialPools[idx] = fullList.sort(() => Math.random() - 0.5);
+        });
+        
+        currentIdxInSet = 0;
+        currentStageIdx = 0;
+        prepareNextTrial();
+        updateAdminStatus("실험 준비 완료 (In-air & On-touch)");
+    }
+
+    function prepareNextTrial() {
+        if (currentStageIdx >= sessionSequence.length) return;
+
+        const currentPool = trialPools[currentStageIdx];
+        const t = currentPool[currentIdxInSet];
+
+        firstStim = t.s1;
+        secondStim = t.s2;
+        correctChoice = (t.type === 'Same') ? 1 : 2;
+
+        document.getElementById('current-region').innerText = t.region;
+        document.getElementById('admin-region').innerText = t.region;
+        document.getElementById('stim1-val').innerText = firstStim;
+        document.getElementById('stim2-val').innerText = secondStim;
+        document.getElementById('admin-relation').innerText = "Ground Truth: " + t.type;
+        
+        updateUI();
+    }
+
+    function updateUI() {
+        const condTitle = document.getElementById('condition-title');
+        const startBtn = document.getElementById('startBtn');
+        const nextBtn = document.getElementById('nextBtn');
+        
+        if (currentStageIdx >= sessionSequence.length) {
+            condTitle.innerText = "All Finished!";
+            updateAdminStatus("실험 종료");
+            startBtn.disabled = true;
+            return;
+        }
+
+        // 세션 번호 표시 로직 (총 4개 단계 중 앞 2개가 Session 1, 뒤 2개가 Session 2)
+        const sessionNum = (currentStageIdx < 2) ? 1 : 2;
+        const totalTrialsInSet = trialPools[currentStageIdx].length;
+        
+        condTitle.innerText = "Condition: " + sessionSequence[currentStageIdx];
+        document.getElementById('current-session').innerText = sessionNum;
+        document.getElementById('total-trial-count').innerText = totalTrialsInSet;
+        document.getElementById('trial-count').innerText = currentIdxInSet + 1;
+
+        if (currentIdxInSet >= totalTrialsInSet) {
+            condTitle.innerText = sessionSequence[currentStageIdx] + " 종료!";
+            startBtn.style.display = 'none';
+            nextBtn.style.display = 'block';
+            updateAdminStatus("단계 종료. 다음으로 진행하세요.");
+        } else {
+            startBtn.disabled = false;
+            startBtn.style.display = 'block';
+            nextBtn.style.display = 'none';
+        }
+    }
+
+    async function runDiscriminationTrial() {
+        if(!subjectWindow) return alert("피험자 창을 먼저 열어주세요.");
+        
+        document.getElementById('startBtn').disabled = true;
+        document.getElementById('input-section').style.display = 'none';
+
+        // Stimulus 1
+        updateAdminStatus("Stimulus 1 출력 중");
+        subjectWindow.updateState("자극 1...", "#2196F3");
+        await progress(800); 
+
+        // Interval
+        updateAdminStatus("간격 대기 중");
+        subjectWindow.updateState("대기...", "#333");
+        await progress(700);
+
+        // Stimulus 2
+        updateAdminStatus("Stimulus 2 출력 중");
+        subjectWindow.updateState("자극 2...", "#F44336");
+        await progress(600);
+        
+        updateAdminStatus("피험자 응답 대기 중");
+        subjectWindow.updateState("같습니까, 다릅니까?", "#9C27B0");
+        document.getElementById('input-section').style.display = 'block';
+    }
+
+    function progress(ms) {
+        return new Promise(res => {
+            let start = Date.now();
+            let timer = setInterval(() => {
+                let p = (Date.now() - start) / ms * 100;
+                document.getElementById('progress').style.width = p + "%";
+                if(p >= 100) { clearInterval(timer); res(); }
+            }, 20);
+        });
+    }
+
+    function logResponse(choice) {
+        const cond = sessionSequence[currentStageIdx];
+        const t = trialPools[currentStageIdx][currentIdxInSet];
+        const isCorrect = (choice === correctChoice);
+        
+        experimentalData.push({
+            Subject: document.getElementById('subjectId').value,
+            Session: (currentStageIdx < 2 ? 1 : 2),
+            Condition: cond,
+            Region: t.region,
+            Trial: currentIdxInSet + 1, 
+            First: firstStim, 
+            Second: secondStim, 
+            TrueRelation: t.type,
+            UserChoice: (choice === 1 ? 'Same' : 'Different'), 
+            IsCorrect: isCorrect
+        });
+
+        const log = document.createElement('div');
+        log.innerHTML = `[${t.region}] Trial ${currentIdxInSet+1}: ${isCorrect ? '✓':'✗'} (${t.type})`;
+        document.getElementById('logContent').prepend(log);
+
+        document.getElementById('input-section').style.display = 'none';
+        document.getElementById('progress').style.width = "0%";
+        
+        currentIdxInSet++;
+        
+        if (currentIdxInSet < trialPools[currentStageIdx].length) {
+            updateAdminStatus("응답 저장됨. 다음 시행을 시작하세요.");
+            prepareNextTrial();
+        } else {
+            updateUI();
+        }
+    }
+
+    function proceedToNextStage() {
+        currentStageIdx++;
+        currentIdxInSet = 0;
+        document.getElementById('nextBtn').style.display = 'none';
+        document.getElementById('startBtn').style.display = 'block';
+        document.getElementById('startBtn').disabled = false;
+        prepareNextTrial();
+        updateAdminStatus("다음 조건 준비 완료");
+    }
+
+    function downloadCSV() {
+        const subId = document.getElementById('subjectId').value;
+        let csv = "\uFEFFSubject,Session,Condition,Region,Trial,FirstStim,SecondStim,TrueRelation,UserChoice,IsCorrect\n";
+        experimentalData.forEach(r => {
+            csv += `${r.Subject},${r.Session},${r.Condition},${r.Region},${r.Trial},${r.First},${r.Second},${r.TrueRelation},${r.UserChoice},${r.IsCorrect}\n`;
+        });
+        const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+        const a = document.createElement("a");
+        a.href = URL.createObjectURL(blob);
+        a.download = `${subId}_Exp2_SameDifferent_Discrimination.csv`;
+        a.click();
+    }
+    setupExp();
+</script>
+</body>
+</html>
