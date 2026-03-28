@@ -2,10 +2,10 @@
 <html lang="ko">
 <head>
     <meta charset="UTF-8">
-    <title>Spatial Discrimination (Same-Different)</title>
+    <title>Spatial Discrimination (AX Task)</title>
     <style>
         body { font-family: 'Segoe UI', sans-serif; display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 100vh; margin: 0; background-color: #f4f7f6; }
-        #container { background: white; padding: 30px; border-radius: 20px; box-shadow: 0 10px 30px rgba(0,0,0,0.1); text-align: center; width: 650px; }
+        #container { background: white; padding: 30px; border-radius: 20px; box-shadow: 0 10px 30px rgba(0,0,0,0.1); text-align: center; width: 700px; }
         .subject-info-box { background: #fff; border: 2px solid #2e7d32; padding: 15px; border-radius: 10px; margin-bottom: 20px; display: flex; align-items: center; justify-content: center; gap: 10px; }
         .setup-info { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 20px; background: #e8f5e9; padding: 15px; border-radius: 10px; font-weight: bold; }
         #admin-display { background: #fff3e0; border: 2px dashed #ff9800; padding: 15px; border-radius: 10px; margin-bottom: 20px; }
@@ -14,16 +14,17 @@
         button { padding: 15px; font-size: 16px; cursor: pointer; border: none; border-radius: 8px; transition: 0.2s; width: 100%; font-weight: bold; margin-top: 10px; }
         #startBtn { background: #2e7d32; color: white; }
         #ans-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-top: 20px; display: none; }
-        .ans-btn { background: #1976d2; color: white; }
+        .ans-btn { background: #1976d2; color: white; font-size: 1.2rem; }
         #nextBtn { background: #ff9800; color: white; display: none; }
         #log-container { margin-top: 25px; text-align: left; font-size: 12px; max-height: 150px; overflow-y: auto; background: #fafafa; padding: 10px; border: 1px solid #eee; }
-        .highlight-text { color: #e65100; font-size: 1.2rem; }
+        .highlight-text { color: #d32f2f; font-size: 1.5rem; font-weight: 800; }
+        .point-label { color: #1565c0; font-size: 1.8rem; }
     </style>
 </head>
 <body>
 
 <div id="container">
-    <h2>Spatial Discrimination (Same-Different)</h2>
+    <h2>Spatial Discrimination (AX Task)</h2>
     <button onclick="openSubjectWindow()" style="background:#43a047; color:white;">1. 피험자 창 열기 (Subject Window)</button>
     
     <div class="subject-info-box">
@@ -36,40 +37,46 @@
     <div class="setup-info">
         <div>Session: <span id="current-session">1</span> / 2</div>
         <div>Trial: <span id="trial-count">0</span> / <span id="total-trial-count">0</span></div>
-        <div>Force: <span id="current-force-display" class="highlight-text">-</span></div>
+        <div style="grid-column: span 2;">Condition: <span id="current-cond-display" style="color:#2e7d32;">-</span></div>
     </div>
 
     <div id="admin-display">
-        <div style="font-size: 14px; color: #666; margin-bottom: 5px;">Admin Monitor (Same-Different GT)</div>
-        <div style="font-size: 18px; font-weight: bold;">
-            1st: <span id="admin-area1" style="color:#1565c0;">?</span> | 
-            2nd: <span id="admin-area2" style="color:#c62828;">?</span>
+        <div style="font-size: 14px; color: #666; margin-bottom: 5px;">Admin Monitor (GT Sequence)</div>
+        <div style="display: flex; justify-content: space-around; align-items: center;">
+            <div>1st: <span id="admin-area1" class="point-label">?</span></div>
+            <div style="font-size: 2rem; color: #ccc;">→</div>
+            <div>2nd: <span id="admin-area2" class="point-label">?</span></div>
+            <div style="border-left: 1px solid #ddd; padding-left: 15px;">
+                Force: <span id="admin-force" class="highlight-text">?</span><br>
+                정답: <span id="admin-gt" style="color:#e65100;">?</span>
+            </div>
         </div>
-        <div style="margin-top:5px; font-weight:bold; color:#e65100;">Ground Truth: <span id="admin-gt">?</span></div>
     </div>
     
     <div class="progress-bar"><div id="progress"></div></div>
     
-    <button id="startBtn" onclick="runSpatialTrial()">다음 시행 시작 (Start Sequence)</button>
+    <button id="startBtn" onclick="runSpatialTrial()">자극 시퀀스 시작 (Start)</button>
     <button id="nextBtn" onclick="proceedToNextStage()">다음 단계로 진행</button>
 
     <div id="ans-grid">
         <div style="grid-column: span 2; font-weight: bold; margin-bottom: 10px;">두 자극의 위치가 같았습니까?</div>
-        <button class="ans-btn" onclick="logResponse('Same')">SAME (같음)</button>
-        <button class="ans-btn" onclick="logResponse('Different')">DIFFERENT (다름)</button>
+        <button class="ans-btn" onclick="logResponse('Same')">Same (같음)</button>
+        <button class="ans-btn" onclick="logResponse('Different')">Different (다름)</button>
     </div>
 
-    <div id="log-container"><strong>Session Logs:</strong><div id="logContent"></div></div>
+    <div id="log-container"><strong>Logs:</strong><div id="logContent"></div></div>
     <button onclick="downloadCSV()" style="background:#546e7a; color:white;">Download CSV</button>
 </div>
 
 <script>
     let subjectWindow = null;
-    const areas = ['A', 'B', 'C'];
-    const forces = ['0.6g', '1.4g'];
     
-    // 공간 페어링 (A-B, B-C, A-C)
-    const areaPairs = [ ['A', 'B'], ['B', 'C'], ['A', 'C'] ];
+    const diffNear = [['a','b'],['b','c'],['b','i'],['b','d'],['c','d'],['c','i'],['d','e'],['d','j'],['d','i'],['i','j'],['e','f'],['j','f']];
+    const diffMid = [['a','c'],['a','d'],['a','i'],['a','e'],['a','j'],['a','f'],['b','e'],['b','j'],['b','f'],['c','e'],['c','j'],['d','f'],['i','f']];
+    const diffFar = [['a','f'],['b','f'],['c','f']];
+    
+    const pointsForSame = ['a','b','c','d','e','f','i','j'];
+    const forces = ['1.4g'];
 
     let sessionSequence = []; 
     let currentStageIdx = 0;  
@@ -80,44 +87,42 @@
     function openSubjectWindow() {
         subjectWindow = window.open("", "SubjectWindow", "width=600,height=400");
         subjectWindow.document.write(`
-            <html><body style="background:#222; color:white; display:flex; align-items:center; justify-content:center; height:100vh; font-family:sans-serif;">
+            <html><body style="background:#222; color:white; display:flex; align-items:center; justify-content:center; height:100vh; font-family:sans-serif; overflow:hidden;">
                 <div style="text-align:center;">
-                    <h1 id="msg" style="font-size:3rem;">Ready</h1>
-                    <div id="visual-cue" style="width:100px; height:100px; border-radius:50%; margin:20px auto; background:transparent;"></div>
+                    <h1 id="msg" style="font-size:3.5rem;">Ready</h1>
+                    <div id="indicator" style="width:100px; height:100px; border-radius:50%; margin:30px auto; background:transparent;"></div>
                 </div>
-                <script>
-                    function updateState(txt, color, cueColor){ 
-                        document.getElementById('msg').innerText = txt;
-                        document.body.style.backgroundColor = color;
-                        document.getElementById('visual-cue').style.backgroundColor = cueColor || 'transparent';
-                    }
-                <\/script>
+                <script>function updateState(txt, color, indColor){ 
+                    document.getElementById('msg').innerText=txt; 
+                    document.body.style.backgroundColor=color; 
+                    document.getElementById('indicator').style.backgroundColor=indColor || 'transparent';
+                }<\/script>
             </body></html>`);
     }
 
     function setupExp() {
-        // Condition Order Randomization
-        let s1_conds = ["In-air", "On-touch (Soft)", "On-touch (Hard)"].sort(() => Math.random() - 0.5);
-        let s2_conds = ["In-air", "On-touch (Soft)", "On-touch (Hard)"].sort(() => Math.random() - 0.5);
-        sessionSequence = s1_conds.concat(s2_conds);
+        // 세션을 In-air, On-touch 한 번씩만 수행 (총 2단계)
+        sessionSequence = ["In-air", "On-touch"].sort(() => Math.random() - 0.5);
         
         sessionSequence.forEach((condName, idx) => {
             let fullList = [];
             forces.forEach(f => {
-                areaPairs.forEach(pair => {
-                    // 각 페어당 AA, AB, BA, BB 4가지 조합 생성
-                    fullList.push({ f: f, a1: pair[0], a2: pair[0], type: 'Same' });
-                    fullList.push({ f: f, a1: pair[0], a2: pair[1], type: 'Different' });
-                    fullList.push({ f: f, a1: pair[1], a2: pair[0], type: 'Different' });
-                    fullList.push({ f: f, a1: pair[1], a2: pair[1], type: 'Same' });
+                let allDiffs = [...diffNear, ...diffMid, ...diffFar];
+                
+                // 1. Different Trials (총 28개)
+                allDiffs.forEach(pair => {
+                    let p = Math.random() > 0.5 ? [pair[0], pair[1]] : [pair[1], pair[0]];
+                    fullList.push({ f: f, a1: p[0], a2: p[1], type: 'Different' });
+                });
+
+                // 2. Same Trials (총 8개 - 요청하신 대로 고정)
+                pointsForSame.forEach(pt => {
+                    fullList.push({ f: f, a1: pt, a2: pt, type: 'Same' });
                 });
             });
-            // 조건당 총 시행: 2(강도) * 3(페어) * 4(조합) = 24 Trials
+            // 무작위로 섞기
             trialPools[idx] = fullList.sort(() => Math.random() - 0.5);
         });
-        
-        currentStageIdx = 0;
-        currentIdxInSet = 0;
         updateUI();
     }
 
@@ -127,34 +132,29 @@
         const nextBtn = document.getElementById('nextBtn');
         
         if (currentStageIdx >= sessionSequence.length) {
-            condTitle.innerText = "All Experiments Finished!";
+            condTitle.innerText = "All Sessions Finished!";
             startBtn.disabled = true;
             return;
         }
 
-        const sessionNum = (currentStageIdx < 3) ? 1 : 2;
         const currentPool = trialPools[currentStageIdx];
-        const totalInSet = currentPool.length;
-        
-        document.getElementById('total-trial-count').innerText = totalInSet;
+        document.getElementById('total-trial-count').innerText = currentPool.length;
 
-        if (currentIdxInSet < totalInSet) {
+        if (currentIdxInSet < currentPool.length) {
             const t = currentPool[currentIdxInSet];
-            condTitle.innerText = "Condition: " + sessionSequence[currentStageIdx];
-            
+            condTitle.innerText = "Condition Progress";
+            document.getElementById('current-cond-display').innerText = sessionSequence[currentStageIdx];
             document.getElementById('admin-area1').innerText = t.a1;
             document.getElementById('admin-area2').innerText = t.a2;
             document.getElementById('admin-gt').innerText = t.type;
-            document.getElementById('current-force-display').innerText = t.f;
-            
+            document.getElementById('admin-force').innerText = t.f;
             document.getElementById('trial-count').innerText = currentIdxInSet + 1;
-            document.getElementById('current-session').innerText = sessionNum;
-            
+            document.getElementById('current-session').innerText = currentStageIdx + 1;
             startBtn.style.display = 'block';
             startBtn.disabled = false;
             nextBtn.style.display = 'none';
         } else {
-            condTitle.innerText = sessionSequence[currentStageIdx] + " (S" + sessionNum + ") Finished!";
+            condTitle.innerText = "Stage Clear!";
             startBtn.style.display = 'none';
             nextBtn.style.display = 'block';
         }
@@ -165,19 +165,14 @@
         document.getElementById('startBtn').disabled = true;
         document.getElementById('ans-grid').style.display = 'none';
 
-        // Stimulus 1
         subjectWindow.updateState("Stimulus 1", "#1b5e20", "#4caf50");
-        await progress(800);
-
-        // Interval
+        await progress(5000);
         subjectWindow.updateState("Interval", "#222", "transparent");
-        await progress(700);
-
-        // Stimulus 2
+        await progress(5000);
         subjectWindow.updateState("Stimulus 2", "#b71c1c", "#f44336");
-        await progress(800);
+        await progress(5000);
         
-        subjectWindow.updateState("Same or Different?", "#1565c0");
+        subjectWindow.updateState("Are they SAME?", "#1565c0", "transparent");
         document.getElementById('ans-grid').style.display = 'grid';
     }
 
@@ -186,63 +181,47 @@
             let start = Date.now();
             let timer = setInterval(() => {
                 let p = (Date.now() - start) / ms * 100;
-                document.getElementById('progress').style.width = p + "%";
+                document.getElementById('progress').style.width = Math.min(p, 100) + "%";
                 if(p >= 100) { clearInterval(timer); res(); }
             }, 20);
         });
     }
 
     function logResponse(choice) {
-        const cond = sessionSequence[currentStageIdx];
         const t = trialPools[currentStageIdx][currentIdxInSet];
         const isCorrect = (choice === t.type);
-        
         experimentalData.push({
             Subject: document.getElementById('subjectId').value,
-            Session: (currentStageIdx < 3 ? 1 : 2),
-            Condition: cond,
-            Trial: currentIdxInSet + 1,
-            Force: t.f,
-            Area1: t.a1,
-            Area2: t.a2,
-            TrueRelation: t.type,
-            Choice: choice,
-            IsCorrect: isCorrect
+            Condition: sessionSequence[currentStageIdx],
+            Force: t.f, Area1: t.a1, Area2: t.a2, TrueRelation: t.type, Choice: choice, IsCorrect: isCorrect ? 1 : 0
         });
-
         const log = document.createElement('div');
-        log.innerHTML = `[${t.a1}-${t.a2}] Trial ${currentIdxInSet+1}: ${isCorrect ? '✓':'✗'} (${t.type})`;
+        log.style.color = isCorrect ? "#2e7d32" : "#d32f2f";
+        log.innerHTML = `[${t.a1}-${t.a2}] Result: ${isCorrect ? '✓':'✗'} (${t.type})`;
         document.getElementById('logContent').prepend(log);
-
         document.getElementById('ans-grid').style.display = 'none';
         document.getElementById('progress').style.width = "0%";
-        
         currentIdxInSet++;
-        updateUI(); 
+        updateUI();
     }
 
     function proceedToNextStage() {
         currentStageIdx++;
         currentIdxInSet = 0;
-        document.getElementById('nextBtn').style.display = 'none';
-        document.getElementById('startBtn').style.display = 'block';
-        document.getElementById('startBtn').disabled = false;
-        updateUI(); 
+        updateUI();
     }
 
     function downloadCSV() {
-        const subId = document.getElementById('subjectId').value;
-        let csv = "\uFEFFSubject,Session,Condition,Trial,Force,Area1,Area2,TrueRelation,UserChoice,IsCorrect\n";
+        let csv = "\uFEFFSubject,Condition,Force,Area1,Area2,TrueRelation,Choice,IsCorrect\n";
         experimentalData.forEach(r => {
-            csv += `${r.Subject},${r.Session},${r.Condition},${r.Trial},${r.Force},${r.Area1},${r.Area2},${r.TrueRelation},${r.Choice},${r.IsCorrect}\n`;
+            csv += `${r.Subject},${r.Condition},${r.Force},${r.Area1},${r.Area2},${r.TrueRelation},${r.Choice},${r.IsCorrect}\n`;
         });
         const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
         const a = document.createElement("a");
         a.href = URL.createObjectURL(blob);
-        a.download = `${subId}_Exp3_Spatial_SameDifferent.csv`;
+        a.download = `Spatial_AX_Result.csv`;
         a.click();
     }
-
     setupExp();
 </script>
 </body>

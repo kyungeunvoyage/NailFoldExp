@@ -33,9 +33,7 @@
         <button class="btn-h" onclick="setMode('horizontal')">2. 좌/우 가이드</button>
         <button class="btn-dipj" onclick="setMode('dipj')">3. DIPJ 설정</button>
         <button class="btn-outline" onclick="setMode('outline')">4. Finger Outline</button>
-        <button class="btn-triangle" style="background: #e67e22; color: white;" onclick="drawTriangleV123()">5. 좌측 삼각형</button>
-        <button class="btn-triangle" style="background: #d35400; color: white;" onclick="drawTriangleV456()">6. 우측 삼각형</button>
-        <button class="btn-tangent" onclick="setMode('tangent')">7. 비스듬한 접선 (2점 클릭)</button>
+        <button class="btn-tangent" onclick="setMode('tangent')">7. 비스듬한 접선 (연속 클릭)</button>
         <button class="btn-stim" id="stimBtn" onclick="generateStimulusPoints()" disabled>자극점 생성</button>
         <button class="btn-reset" onclick="resetCanvas()">초기화</button>
     </div>
@@ -53,6 +51,8 @@
     let img = new Image();
     let mode = 'none';
     let points = [];
+    let lastTangentPoint = null;
+    let isStimulusGenerated = false; // 자극점 생성 여부 확인용
 
     const RULER_SIZE = 30; 
     let guideLines = { topY: null, midY: null, bottomY: null, leftX: null, midX: null, rightX: null, dipjY: null, outlines: [], tangents: [] };
@@ -79,7 +79,7 @@
         for (let x = 0; x <= img.width; x += 10) {
             let posX = x + RULER_SIZE;
             ctx.beginPath(); ctx.moveTo(posX, RULER_SIZE);
-            if (x % 100 === 0) { ctx.lineTo(posX, 0); ctx.fillText(x/10 + 'cm', posX + 2, 10); }
+            if (x % 100 === 0) { ctx.lineTo(posX, 0); ctx.fillText(x, posX + 2, 10); } // cm 대신 mm(x) 표기
             else if (x % 50 === 0) ctx.lineTo(posX, 10);
             else ctx.lineTo(posX, 20);
             ctx.stroke();
@@ -89,7 +89,7 @@
             ctx.beginPath(); ctx.moveTo(RULER_SIZE, posY);
             if (y % 100 === 0) {
                 ctx.lineTo(0, posY); ctx.save(); ctx.translate(10, posY + 2); ctx.rotate(-Math.PI / 2);
-                ctx.fillText(y/10 + 'cm', 0, 0); ctx.restore();
+                ctx.fillText(y, 0, 0); ctx.restore(); // cm 대신 mm(y) 표기
             }
             else if (y % 50 === 0) ctx.lineTo(10, posY);
             else ctx.lineTo(20, posY);
@@ -115,8 +115,22 @@
 
         const x = rawX - RULER_SIZE;
         const y = rawY - RULER_SIZE;
-        points.push({x, y});
+        const currentClickPoint = {x, y};
 
+        if (mode === 'tangent') {
+            if (lastTangentPoint === null) {
+                lastTangentPoint = currentClickPoint;
+                status.innerText = "다음 지점을 클릭하여 접선을 완성하세요.";
+            } else {
+                guideLines.tangents.push({p1: lastTangentPoint, p2: currentClickPoint});
+                lastTangentPoint = currentClickPoint;
+                status.innerText = "다음 지점을 클릭하여 연속된 접선을 그리세요.";
+            }
+            drawEverything();
+            return;
+        }
+
+        points.push(currentClickPoint);
         drawEverything();
         points.forEach(p => {
             ctx.fillStyle = (mode === 'outline') ? "#8e44ad" : (mode === 'dipj' ? "#27ae60" : "white");
@@ -137,8 +151,6 @@
                 guideLines.midX = (guideLines.leftX + guideLines.rightX) / 2;
             } else if (mode === 'outline') {
                 guideLines.outlines = [Math.min(points[0].x, points[1].x), Math.max(points[0].x, points[1].x)];
-            } else if (mode === 'tangent') {
-                guideLines.tangents.push({p1: points[0], p2: points[1]});
             }
             finalizeSelection();
         }
@@ -149,6 +161,7 @@
         checkReady();
         points = [];
         mode = 'none';
+        isStimulusGenerated = false; 
     }
 
     function checkReady() {
@@ -160,14 +173,34 @@
     function drawHLine(y) { ctx.beginPath(); ctx.moveTo(RULER_SIZE, y + RULER_SIZE); ctx.lineTo(canvas.width, y + RULER_SIZE); ctx.stroke(); }
     function drawVLine(x) { ctx.beginPath(); ctx.moveTo(x + RULER_SIZE, RULER_SIZE); ctx.lineTo(x + RULER_SIZE, canvas.height); ctx.stroke(); }
     
+    // 라벨(알파벳) 마킹 기능 추가
     function drawStimulusPoint(x, y, label) {
         ctx.fillStyle = "yellow";
         ctx.beginPath(); ctx.arc(x + RULER_SIZE, y + RULER_SIZE, 4, 0, Math.PI * 2); ctx.fill();
+        
+        ctx.fillStyle = "black";
+        ctx.font = "bold 12px Segoe UI, sans-serif";
+        ctx.textAlign = "left";
+        ctx.fillText(label, x + RULER_SIZE + 6, y + RULER_SIZE + 4);
     }
 
-    function setMode(newMode) { if (!img.src) return; mode = newMode; points = []; status.innerText = (newMode === 'tangent') ? "접선의 기준이 될 두 지점을 클릭하세요." : "설정 위치를 클릭하세요."; }
+    function setMode(newMode) { 
+        if (!img.src) return; 
+        mode = newMode; 
+        points = []; 
+        isStimulusGenerated = false; 
+        if (newMode === 'tangent') {
+            lastTangentPoint = null;
+            status.innerText = "접선의 첫 지점을 클릭하세요.";
+        } else {
+            status.innerText = "설정 위치를 클릭하세요."; 
+        }
+    }
 
     function renderAllGuides() {
+        // 자극점이 생성된 상태라면 모든 가이드를 렌더링하지 않고 종료
+        if (isStimulusGenerated) return;
+
         if (guideLines.topY !== null) {
             ctx.lineWidth = 4; ctx.setLineDash([15, 10]); ctx.strokeStyle = "#e74c3c";
             drawHLine(guideLines.topY); drawHLine(guideLines.bottomY);
@@ -184,29 +217,67 @@
         if (guideLines.outlines.length === 2) {
             ctx.lineWidth = 3; ctx.setLineDash([]); ctx.strokeStyle = "#8e44ad"; guideLines.outlines.forEach(x => drawVLine(x));
         }
-        // 비스듬한 접선 렌더링
+        
         if (guideLines.tangents.length > 0) {
             ctx.lineWidth = 2; ctx.strokeStyle = "rgba(255, 255, 0, 0.9)";
             guideLines.tangents.forEach(t => {
                 const dx = t.p2.x - t.p1.x;
                 const dy = t.p2.y - t.p1.y;
                 const angle = Math.atan2(dy, dx);
-                const length = 2000; // 충분히 길게 그림
-
+                const length = 2000;
                 ctx.beginPath();
                 ctx.moveTo(t.p1.x + RULER_SIZE - Math.cos(angle) * length, t.p1.y + RULER_SIZE - Math.sin(angle) * length);
                 ctx.lineTo(t.p1.x + RULER_SIZE + Math.cos(angle) * length, t.p1.y + RULER_SIZE + Math.sin(angle) * length);
                 ctx.stroke();
-
-                // 클릭한 포인트 표시
-                ctx.fillStyle = "yellow";
+                ctx.fillStyle = "green";
                 ctx.beginPath(); ctx.arc(t.p1.x + RULER_SIZE, t.p1.y + RULER_SIZE, 3, 0, Math.PI * 2); ctx.fill();
                 ctx.beginPath(); ctx.arc(t.p2.x + RULER_SIZE, t.p2.y + RULER_SIZE, 3, 0, Math.PI * 2); ctx.fill();
             });
+
+            for (let i = 1; i < guideLines.tangents.length; i++) {
+                const e1 = guideLines.tangents[i-1];
+                const e2 = guideLines.tangents[i];
+                if (e1.p2.x === e2.p1.x && e1.p2.y === e2.p1.y) {
+                    const b1 = e1.p2;
+                    const dx1 = e1.p2.x - e1.p1.x; const dy1 = e1.p2.y - e1.p1.y;
+                    const dx2 = e2.p2.x - e2.p1.x; const dy2 = e2.p2.y - e2.p1.y;
+
+                    if (dx1 !== 0 && dx2 !== 0) {
+                        if (guideLines.leftX !== null) {
+                            const v1y = e1.p1.y + (dy1 / dx1) * (guideLines.leftX - e1.p1.x);
+                            const v2y = e2.p1.y + (dy2 / dx2) * (guideLines.leftX - e2.p1.x);
+                            ctx.beginPath();
+                            ctx.moveTo(guideLines.leftX + RULER_SIZE, v1y + RULER_SIZE);
+                            ctx.lineTo(guideLines.leftX + RULER_SIZE, v2y + RULER_SIZE);
+                            ctx.lineTo(b1.x + RULER_SIZE, b1.y + RULER_SIZE);
+                            ctx.closePath();
+                            ctx.fillStyle = "rgba(255, 165, 0, 0.4)"; ctx.fill();
+                            ctx.strokeStyle = "rgba(255, 165, 0, 0.8)"; ctx.stroke();
+                        }
+                        if (guideLines.rightX !== null) {
+                            const v3y = e1.p1.y + (dy1 / dx1) * (guideLines.rightX - e1.p1.x);
+                            const v4y = e2.p1.y + (dy2 / dx2) * (guideLines.rightX - e2.p1.x);
+                            ctx.beginPath();
+                            ctx.moveTo(guideLines.rightX + RULER_SIZE, v3y + RULER_SIZE);
+                            ctx.lineTo(guideLines.rightX + RULER_SIZE, v4y + RULER_SIZE);
+                            ctx.lineTo(b1.x + RULER_SIZE, b1.y + RULER_SIZE);
+                            ctx.closePath();
+                            ctx.fillStyle = "rgba(0, 165, 255, 0.4)"; ctx.fill();
+                            ctx.strokeStyle = "rgba(0, 165, 255, 0.8)"; ctx.stroke();
+                        }
+                    }
+                }
+            }
+        }
+        if (lastTangentPoint && mode === 'tangent') {
+            ctx.fillStyle = "green";
+            ctx.beginPath(); ctx.arc(lastTangentPoint.x + RULER_SIZE, lastTangentPoint.y + RULER_SIZE, 4, 0, Math.PI * 2); ctx.fill();
         }
     }
 
     function generateStimulusPoints() {
+        isStimulusGenerated = true; 
+        
         const stimY_upper = (guideLines.topY + guideLines.midY) / 2;
         const stimY_lower = (guideLines.midY + guideLines.bottomY) / 2;
         const stimY_DE = guideLines.bottomY + (guideLines.dipjY - guideLines.bottomY) * 0.2;
@@ -222,71 +293,41 @@
             {label: 'g', x: stimX_rightSide, y: stimY_lower}, {label: 'h', x: stimX_rightSide, y: stimY_upper}
         ];
 
-        if (guideLines.midY !== null && guideLines.bottomY !== null && guideLines.leftX !== null && guideLines.rightX !== null) {
-            const cLeftX = (guideLines.leftX + guideLines.midX + guideLines.leftX) / 3;
-            const cLeftY = (guideLines.midY + guideLines.bottomY + guideLines.bottomY) / 3;
-            stimPoints.push({label: 'C_Left', x: cLeftX, y: cLeftY});
-            const cRightX = (guideLines.rightX + guideLines.midX + guideLines.rightX) / 3;
-            const cRightY = (guideLines.midY + guideLines.bottomY + guideLines.bottomY) / 3;
-            stimPoints.push({label: 'C_Right', x: cRightX, y: cRightY});
+        if (guideLines.tangents.length > 0) {
+            for (let i = 1; i < guideLines.tangents.length; i++) {
+                const e1 = guideLines.tangents[i-1];
+                const e2 = guideLines.tangents[i];
+                if (e1.p2.x === e2.p1.x && e1.p2.y === e2.p1.y) {
+                    const b1 = e1.p2;
+                    const dx1 = e1.p2.x - e1.p1.x; const dy1 = e1.p2.y - e1.p1.y;
+                    const dx2 = e2.p2.x - e2.p1.x; const dy2 = e2.p2.y - e2.p1.y;
+
+                    if (dx1 !== 0 && dx2 !== 0) {
+                        if (guideLines.leftX !== null) {
+                            const v1y = e1.p1.y + (dy1 / dx1) * (guideLines.leftX - e1.p1.x);
+                            const v2y = e2.p1.y + (dy2 / dx2) * (guideLines.leftX - e2.p1.x);
+                            stimPoints.push({label: `CL${i}`, x: (guideLines.leftX + guideLines.leftX + b1.x) / 3, y: (v1y + v2y + b1.y) / 3});
+                        }
+                        if (guideLines.rightX !== null) {
+                            const v3y = e1.p1.y + (dy1 / dx1) * (guideLines.rightX - e1.p1.x);
+                            const v4y = e2.p1.y + (dy2 / dx2) * (guideLines.rightX - e2.p1.x);
+                            stimPoints.push({label: `CR${i}`, x: (guideLines.rightX + guideLines.rightX + b1.x) / 3, y: (v3y + v4y + b1.y) / 3});
+                        }
+                    }
+                }
+            }
         }
 
         drawEverything();
         stimPoints.forEach(p => drawStimulusPoint(p.x, p.y, p.label));
-        status.innerText = "자극점 및 Centroids 생성 완료";
-    }
-
-    function drawTriangleV123() {
-        if (guideLines.midY === null || guideLines.bottomY === null || guideLines.leftX === null) {
-            status.innerText = "상/하 및 좌/우 가이드를 먼저 설정하세요.";
-            return;
-        }
-        const v1 = { x: guideLines.leftX, y: guideLines.midY };
-        const v2 = { x: guideLines.midX, y: guideLines.bottomY };
-        const v3 = { x: guideLines.leftX, y: guideLines.bottomY };
-
-        drawEverything();
-        ctx.beginPath();
-        ctx.lineWidth = 2; ctx.strokeStyle = "#e67e22"; ctx.fillStyle = "rgba(230, 126, 34, 0.3)";
-        ctx.moveTo(v1.x + RULER_SIZE, v1.y + RULER_SIZE);
-        ctx.lineTo(v2.x + RULER_SIZE, v2.y + RULER_SIZE);
-        ctx.lineTo(v3.x + RULER_SIZE, v3.y + RULER_SIZE);
-        ctx.closePath(); ctx.stroke(); ctx.fill();
-
-        [v1, v2, v3].forEach((p, i) => {
-            ctx.fillStyle = "black"; ctx.beginPath(); ctx.arc(p.x + RULER_SIZE, p.y + RULER_SIZE, 4, 0, Math.PI * 2); ctx.fill();
-            ctx.fillText(`v${i+1}`, p.x + RULER_SIZE + 5, p.y + RULER_SIZE - 5);
-        });
-        status.innerText = "좌측 삼각형 생성 완료";
-    }
-
-    function drawTriangleV456() {
-        if (guideLines.midY === null || guideLines.bottomY === null || guideLines.rightX === null) {
-            status.innerText = "상/하 및 좌/우 가이드를 먼저 설정하세요.";
-            return;
-        }
-        const v4 = { x: guideLines.rightX, y: guideLines.midY };
-        const v5 = { x: guideLines.midX, y: guideLines.bottomY };
-        const v6 = { x: guideLines.rightX, y: guideLines.bottomY };
-
-        drawEverything();
-        ctx.beginPath();
-        ctx.lineWidth = 2; ctx.strokeStyle = "#d35400"; ctx.fillStyle = "rgba(211, 84, 0, 0.3)";
-        ctx.moveTo(v4.x + RULER_SIZE, v4.y + RULER_SIZE);
-        ctx.lineTo(v5.x + RULER_SIZE, v5.y + RULER_SIZE);
-        ctx.lineTo(v6.x + RULER_SIZE, v6.y + RULER_SIZE);
-        ctx.closePath(); ctx.stroke(); ctx.fill();
-
-        [v4, v5, v6].forEach((p, i) => {
-            ctx.fillStyle = "black"; ctx.beginPath(); ctx.arc(p.x + RULER_SIZE, p.y + RULER_SIZE, 4, 0, Math.PI * 2); ctx.fill();
-            ctx.fillText(`v${i+4}`, p.x + RULER_SIZE + 5, p.y + RULER_SIZE - 5);
-        });
-        status.innerText = "우측 삼각형 생성 완료";
+        status.innerText = "자극점 및 Centroids 생성 완료 (모든 가이드 숨김)";
     }
 
     function resetCanvas() {
         if(img.src) {
             guideLines = { topY: null, midY: null, bottomY: null, leftX: null, midX: null, rightX: null, dipjY: null, outlines: [], tangents: [] };
+            lastTangentPoint = null;
+            isStimulusGenerated = false;
             drawEverything(); stimBtn.disabled = true; status.innerText = "초기화되었습니다.";
         }
     }
