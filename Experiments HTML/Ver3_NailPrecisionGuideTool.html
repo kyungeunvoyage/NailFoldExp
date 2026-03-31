@@ -18,6 +18,7 @@
         .btn-stim { background: #ff4757; color: white; }
         .btn-reset { background: #95a5a6; color: white; }
         .btn-expand { background: #16a085; color: white; } 
+        .btn-final { background: #2c3e50; color: white; } /* Final Stimuli 버튼 색상 */
         button:hover { opacity: 0.8; transform: translateY(-1px); }
         .status-bar { background: #34495e; color: white; padding: 10px; border-radius: 6px; margin-bottom: 10px; min-width: 450px; font-weight: 500; }
     </style>
@@ -37,6 +38,7 @@
         <button class="btn-outline" onclick="setMode('outline')">4. Finger Outline</button>
         <button class="btn-expand" id="expandBtn" onclick="expandUCurve()" disabled>7. U-Curve 확장</button>
         <button class="btn-stim" id="stimBtn" onclick="generateStimulusPoints()" disabled>자극점 생성</button>
+        <button class="btn-final" id="finalBtn" onclick="showFinalStimuli()" disabled>Final Stimuli</button>
         <button class="btn-reset" onclick="resetCanvas()">초기화</button>
     </div>
 
@@ -51,11 +53,13 @@
     const status = document.getElementById('status');
     const stimBtn = document.getElementById('stimBtn');
     const expandBtn = document.getElementById('expandBtn');
+    const finalBtn = document.getElementById('finalBtn');
     let img = new Image();
     let mode = 'none';
     let points = [];
     let isStimulusGenerated = false;
     let isCurveExpanded = false;
+    let isFinalView = false;
 
     const RULER_SIZE = 30; 
     let guideLines = { 
@@ -109,7 +113,7 @@
         if (img.src) {
             ctx.drawImage(img, RULER_SIZE, RULER_SIZE);
             drawRuler();
-            renderAllGuides();
+            if (!isFinalView) renderAllGuides();
             
             points.forEach((p, index) => {
                 ctx.fillStyle = "white";
@@ -169,6 +173,7 @@
         points = [];
         mode = 'none';
         isStimulusGenerated = false; 
+        isFinalView = false;
     }
 
     function checkReady() {
@@ -177,6 +182,7 @@
         }
         if (guideLines.uPoints.length === 5 && guideLines.dipjY !== null && guideLines.outlines.length === 2) {
             expandBtn.disabled = false;
+            finalBtn.disabled = false;
         }
     }
 
@@ -197,6 +203,7 @@
         mode = newMode; 
         points = []; 
         isStimulusGenerated = false; 
+        isFinalView = false;
         if (newMode === 'u-curve') {
             status.innerText = "V1부터 V5까지 순서대로 클릭하세요.";
         } else {
@@ -206,9 +213,8 @@
     }
 
     function renderAllGuides() {
-        if (isStimulusGenerated) return;
+        if (isStimulusGenerated || isFinalView) return;
 
-        // 원본 U-Curve는 항상 렌더링 (주황색)
         if (guideLines.uPoints.length === 5) {
             ctx.strokeStyle = "#f39c12"; ctx.lineWidth = 3; ctx.setLineDash([]);
             ctx.beginPath();
@@ -231,9 +237,8 @@
             });
         }
 
-        // 확장된 커브가 있으면 흰색으로 렌더링
         if (isCurveExpanded) {
-            expandUCurve(true); // true 인자를 넘겨서 드로잉만 수행
+            expandUCurve(true);
         }
 
         if (guideLines.topY !== null) {
@@ -256,7 +261,7 @@
 
     function expandUCurve(onlyDraw = false) {
         if (guideLines.uPoints.length < 5) return;
-        if (!onlyDraw) isCurveExpanded = true;
+        if (!onlyDraw) { isCurveExpanded = true; isFinalView = false; }
         
         const up = guideLines.uPoints;
         const leftLimitX = guideLines.outlines[0];
@@ -295,18 +300,71 @@
         ctx.stroke();
 
         if (!onlyDraw) {
-            status.innerText = "U-Curve 확장 완료 (원본 가이드 유지)";
+            status.innerText = "U-Curve 확장 완료";
             drawEverything();
         }
-        return extendedUp; // 좌표 정보 반환
+        return extendedUp; 
+    }
+
+    function showFinalStimuli() {
+        isFinalView = true;
+        isStimulusGenerated = false;
+        
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        ctx.drawImage(img, RULER_SIZE, RULER_SIZE);
+        drawRuler();
+
+        // 1. 원본 주황색 커브 그리기
+        if (guideLines.uPoints.length === 5) {
+            ctx.strokeStyle = "#f39c12"; ctx.lineWidth = 3; ctx.setLineDash([]);
+            ctx.beginPath();
+            const up = guideLines.uPoints;
+            ctx.moveTo(up[0].x + RULER_SIZE, up[0].y + RULER_SIZE);
+            for (let i = 0; i < up.length - 1; i++) {
+                const midX = (up[i].x + up[i+1].x) / 2;
+                const midY = (up[i].y + up[i+1].y) / 2;
+                ctx.quadraticCurveTo(up[i].x + RULER_SIZE, up[i].y + RULER_SIZE, midX + RULER_SIZE, midY + RULER_SIZE);
+            }
+            ctx.lineTo(up[4].x + RULER_SIZE, up[4].y + RULER_SIZE);
+            ctx.stroke();
+        }
+
+        // 2. 확장된 흰색 커브 그리기
+        expandUCurve(true);
+
+        // 3. 자극점 생성 및 표시
+        const stimY_upper = (guideLines.topY + guideLines.midY) / 2;
+        const stimY_lower = (guideLines.midY + guideLines.bottomY) / 2;
+        const stimY_DE = guideLines.bottomY + (guideLines.dipjY - guideLines.bottomY) * 0.2;
+        
+        const leftLateralX = guideLines.outlines[0] + (guideLines.leftX - guideLines.outlines[0]) * 0.5;
+        const rightLateralX = guideLines.outlines[1] - (guideLines.outlines[1] - guideLines.rightX) * 0.5;
+        
+        const stimX_leftInner = (guideLines.leftX + guideLines.midX) / 2;
+        const stimX_rightInner = (guideLines.midX + guideLines.rightX) / 2;
+        const stimX_leftSide = (guideLines.outlines[0] + guideLines.leftX) / 2;
+        const stimX_rightSide = (guideLines.rightX + guideLines.outlines[1]) / 2;
+
+        const stimPoints = [
+            {label: 'a', x: leftLateralX, y: stimY_upper}, 
+            {label: 'b', x: leftLateralX, y: stimY_lower},
+            {label: 'c', x: (leftLateralX + stimX_leftInner)/2, y: (stimY_lower + stimY_DE)/2}, 
+            {label: 'd', x: stimX_leftInner, y: stimY_DE},
+            {label: 'e', x: stimX_rightInner, y: stimY_DE}, 
+            {label: 'f', x: (rightLateralX + stimX_rightInner)/2, y: (stimY_lower + stimY_DE)/2},
+            {label: 'g', x: rightLateralX, y: stimY_lower}, 
+            {label: 'h', x: rightLateralX, y: stimY_upper}
+        ];
+
+        stimPoints.forEach(p => drawStimulusPoint(p.x, p.y, p.label));
+        status.innerText = "Final Stimuli View: 원본/확장 커브 및 자극점 통합 표시";
     }
 
     function generateStimulusPoints() {
         isStimulusGenerated = true; 
+        isFinalView = false;
         drawEverything();
-        
-        let expandedCurve = guideLines.uPoints;
-        if(isCurveExpanded) expandedCurve = expandUCurve(true);
+        if(isCurveExpanded) expandUCurve(true);
 
         const stimY_upper = (guideLines.topY + guideLines.midY) / 2;
         const stimY_lower = (guideLines.midY + guideLines.bottomY) / 2;
@@ -317,35 +375,22 @@
         
         const stimX_leftInner = (guideLines.leftX + guideLines.midX) / 2;
         const stimX_rightInner = (guideLines.midX + guideLines.rightX) / 2;
-
         const stimX_leftSide = (guideLines.outlines[0] + guideLines.leftX) / 2;
         const stimX_rightSide = (guideLines.rightX + guideLines.outlines[1]) / 2;
-
-        // V2(b)와 V4(g)의 확장된 좌표 가져오기
-        const v2_exp = expandedCurve[1];
-        const v3_exp = expandedCurve[2];
-        const v4_exp = expandedCurve[3];
 
         const stimPoints = [
             {label: 'a', x: leftLateralX, y: stimY_upper}, 
             {label: 'b', x: leftLateralX, y: stimY_lower},
-            // c: b와 d의 중간 지점 (확장된 커브 라인 안쪽으로 올림)
             {label: 'c', x: (leftLateralX + stimX_leftInner)/2, y: (stimY_lower + stimY_DE)/2}, 
-            //{label: 'c', x: stimX_leftSide, y: stimY_DE}, 
-            // c : 
-
-            
             {label: 'd', x: stimX_leftInner, y: stimY_DE},
             {label: 'e', x: stimX_rightInner, y: stimY_DE}, 
-            // f: g와 e의 중간 지점
             {label: 'f', x: (rightLateralX + stimX_rightInner)/2, y: (stimY_lower + stimY_DE)/2},
-            //{label: 'f', x: stimX_rightSide, y: stimY_DE},
             {label: 'g', x: rightLateralX, y: stimY_lower}, 
             {label: 'h', x: rightLateralX, y: stimY_upper}
         ];
 
         stimPoints.forEach(p => drawStimulusPoint(p.x, p.y, p.label));
-        status.innerText = "자극점 생성 완료 (c, f 지점 보정됨)";
+        status.innerText = "자극점 생성 완료";
     }
 
     function resetCanvas() {
@@ -354,9 +399,11 @@
             points = [];
             isStimulusGenerated = false;
             isCurveExpanded = false;
+            isFinalView = false;
             drawEverything(); 
             stimBtn.disabled = true; 
             expandBtn.disabled = true;
+            finalBtn.disabled = true;
             status.innerText = "초기화되었습니다.";
         }
     }
