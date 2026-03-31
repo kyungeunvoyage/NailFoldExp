@@ -2,29 +2,30 @@
 <html lang="ko">
 <head>
     <meta charset="UTF-8">
-    <title>Vibrotactile 2PD (Randomized Mapping)</title>
+    <title>Vibrotactile 2PD (Full Random Mode)</title>
     <style>
         body { font-family: 'Segoe UI', sans-serif; display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 100vh; margin: 0; background-color: #f4f7f6; }
         #container { background: white; padding: 30px; border-radius: 20px; box-shadow: 0 10px 30px rgba(0,0,0,0.1); text-align: center; width: 720px; }
         .subject-info-box { background: #fff; border: 2px solid #2e7d32; padding: 15px; border-radius: 10px; margin-bottom: 20px; display: flex; align-items: center; justify-content: center; gap: 15px; }
-        .session-selector { background: #e3f2fd; padding: 15px; border-radius: 10px; margin-bottom: 20px; border: 1px solid #90caf9; }
-        .setup-info { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 20px; background: #e8f5e9; padding: 15px; border-radius: 10px; font-weight: bold; }
+        .setup-info { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 20px; background: #e1f5fe; padding: 15px; border-radius: 10px; font-weight: bold; }
         #admin-display { background: #fff3e0; border: 2px dashed #ff9800; padding: 15px; border-radius: 10px; margin-bottom: 20px; }
         .progress-bar { width: 100%; height: 15px; background: #e8eaed; border-radius: 10px; overflow: hidden; margin-bottom: 20px; }
-        #progress { width: 0%; height: 100%; background: #2e7d32; transition: width 0.1s; }
+        #progress { width: 0%; height: 100%; background: #0288d1; transition: width 0.1s; }
         button { padding: 12px; font-size: 16px; cursor: pointer; border: none; border-radius: 8px; transition: 0.2s; width: 100%; font-weight: bold; margin-top: 10px; }
-        #startBtn { background: #2e7d32; color: white; }
+        #startBtn { background: #0288d1; color: white; }
         #ans-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-top: 20px; display: none; }
         .ans-btn { background: #1976d2; color: white; font-size: 1.2rem; }
-        .highlight-text { color: #d32f2f; font-size: 1.5rem; font-weight: 800; }
         .question-text { grid-column: span 2; font-weight: bold; margin-bottom: 10px; color: #d32f2f; font-size: 1.4rem; }
         #log-container { margin-top: 25px; text-align: left; font-size: 12px; max-height: 150px; overflow-y: auto; background: #fafafa; padding: 10px; border: 1px solid #eee; }
+        .session-btn-container { display: flex; gap: 10px; margin-bottom: 20px; }
+        /* 미리보기 강조 스타일 */
+        .preview-box { font-size: 1.2rem; color: #e65100; font-weight: 800; background: #ffe0b2; padding: 5px 10px; border-radius: 5px; }
     </style>
 </head>
 <body>
 
 <div id="container">
-    <h2>Vibrotactile 2PD (Randomized Mapping)</h2>
+    <h2>Vibrotactile 2PD (Full Random Mode)</h2>
     <button onclick="openSubjectWindow()" style="background:#43a047; color:white; width:auto; margin-bottom:15px;">1. Open Subject Window</button>
     
     <div class="subject-info-box">
@@ -32,27 +33,31 @@
         <input type="text" id="subjectId" value="S01" style="padding:5px; width:60px; text-align:center;">
     </div>
 
-    <div class="session-selector" id="session-init">
-        <div style="margin-bottom:10px; font-weight:bold;">2. Select Axis Session:</div>
-        <div style="display:flex; gap:10px;">
-            <button onclick="initSession('LR')" style="background:#1976d2; color:white;">Horizontal (Left-Right)</button>
-            <button onclick="initSession('UD')" style="background:#ef6c00; color:white;">Vertical (Up-Down)</button>
-        </div>
+    <div class="session-btn-container">
+        <button onclick="selectSession('LR')" style="background:#1976d2; color:white;">Horizontal Session</button>
+        <button onclick="selectSession('UD')" style="background:#ef6c00; color:white;">Vertical Session</button>
     </div>
 
     <div class="setup-info">
-        <div>Trial: <span id="trial-count">0</span> / 50</div>
-        <div>Current Axis: <span id="axis-display" style="color:#d32f2f;">None</span></div>
+        <div>Trial Progress: <span id="trial-count">0</span> / <span id="total-trials">0</span></div>
+        <div>Current Axis: <span id="current-axis-label" style="color:#0288d1;">None</span></div>
     </div>
 
     <div id="admin-display">
-        <div style="font-size: 14px; color: #666;">Admin: <span id="admin-target-pins">?</span> (<span id="admin-dist">0</span>mm)</div>
-        <div style="font-weight:bold; color:#e65100;">1st: <span id="admin-first-pin">?</span></div>
+        <div style="font-size: 14px; color: #666; margin-bottom: 10px;">[Admin Monitor] Next Trial Preview</div>
+        <div style="display: flex; justify-content: center; gap: 20px; align-items: center;">
+            <div>Target Pair: <span id="pair-display" class="preview-box">-</span></div>
+            <div>Sequence: <span id="admin-seq" style="font-weight:bold; color: #d32f2f;">?</span></div>
+        </div>
+        <div style="font-size: 13px; margin-top: 10px; color: #555;">
+            Distance: <span id="admin-dist" style="font-weight:bold;">0</span>mm | 
+            GT (First): <span id="admin-first-pin" style="color: #e65100; font-weight:bold;">?</span>
+        </div>
     </div>
     
     <div class="progress-bar"><div id="progress"></div></div>
     
-    <button id="startBtn" onclick="runAdaptiveTrial()" disabled>Select Session to Start</button>
+    <button id="startBtn" onclick="runRandomTrial()" disabled>Select Session First</button>
 
     <div id="ans-grid">
         <div id="dynamic-question" class="question-text">Question?</div>
@@ -61,26 +66,22 @@
     </div>
 
     <div id="log-container"><strong>Logs:</strong><div id="logContent"></div></div>
-    <button onclick="downloadCSV()" style="background:#546e7a; color:white;">Download CSV</button>
+    <button onclick="downloadCSV()" style="background:#455a64; color:white;">Download CSV Result</button>
 </div>
 
 <script>
     let subjectWindow = null;
+    let trialList = [];
     let experimentalData = [];
-    let currentTrialNum = 0;
-    const maxTrials = 50;
-    let currentDistance = 30.0;
-    let activeMap = []; 
-    let currentAxis = '';
+    let currentTrialIdx = 0;
+    let selectedAxis = "";
 
     const distanceMap = [
-        // Horizontal Pairs (LR)
         { p1: 'd', p2: 'e', dist: 2.5, axis: 'LR', q: "Which one was the Left?" },
         { p1: 'c', p2: 'f', dist: 12.5, axis: 'LR', q: "Which one was the Left?" },
         { p1: 'b', p2: 'g', dist: 20.0, axis: 'LR', q: "Which one was the Left?" },
         { p1: 'a', p2: 'h', dist: 35.0, axis: 'LR', q: "Which one was the Left?" },
         
-        // Vertical Pairs (UD)
         { p1: 'a', p2: 'b', dist: 3.0, axis: 'UD', q: "Which one was the Up?" },
         { p1: 'b', p2: 'c', dist: 3.0, axis: 'UD', q: "Which one was the Up?" },
         { p1: 'g', p2: 'h', dist: 3.0, axis: 'UD', q: "Which one was the Up?" },
@@ -93,7 +94,7 @@
     function openSubjectWindow() {
         subjectWindow = window.open("", "SubjectWindow", "width=600,height=400");
         subjectWindow.document.write(`
-            <html><body style="background:#222; color:white; display:flex; align-items:center; justify-content:center; height:100vh; font-family:sans-serif;">
+            <html><body style="background:#222; color:white; display:flex; align-items:center; justify-content:center; height:100vh; font-family:sans-serif; overflow:hidden;">
                 <div style="text-align:center;">
                     <h1 id="msg" style="font-size:3rem;">Ready</h1>
                     <div id="indicator" style="width:80px; height:80px; border-radius:50%; margin:20px auto; background:transparent;"></div>
@@ -106,48 +107,68 @@
             </body></html>`);
     }
 
-    function initSession(axis) {
-        currentAxis = axis;
-        activeMap = distanceMap.filter(item => item.axis === axis);
-        document.getElementById('axis-display').innerText = axis === 'LR' ? "Horizontal" : "Vertical";
-        document.getElementById('startBtn').disabled = false;
-        document.getElementById('startBtn').innerText = "자극 시퀀스 시작 (Start)";
-        document.getElementById('session-init').style.opacity = "0.5";
-        document.getElementById('session-init').style.pointerEvents = "none";
-        
-        currentDistance = Math.max(...activeMap.map(o => o.dist));
+    function selectSession(axis) {
+        selectedAxis = axis;
+        document.getElementById('current-axis-label').innerText = axis === 'LR' ? "Horizontal" : "Vertical";
+        generateTrialList(axis);
     }
 
-    // 핵심 수정 부분: 타겟 거리 근처의 후보군 중 무작위 선택
-    function findBestPair(targetDist) {
-        const threshold = 5.0; // 오차 범위 mm
-        let candidates = activeMap.filter(item => Math.abs(item.dist - targetDist) <= threshold);
-
-        if (candidates.length === 0) {
-            return activeMap.reduce((prev, curr) => 
-                Math.abs(curr.dist - targetDist) < Math.abs(prev.dist - targetDist) ? curr : prev
-            );
+    function generateTrialList(axis) {
+        const repetitions = 5; 
+        const filteredMap = distanceMap.filter(d => d.axis === axis);
+        trialList = [];
+        for (let i = 0; i < repetitions; i++) {
+            trialList.push(...filteredMap);
         }
-        return candidates[Math.floor(Math.random() * candidates.length)];
+        
+        for (let i = trialList.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [trialList[i], trialList[j]] = [trialList[j], trialList[i]];
+        }
+        
+        currentTrialIdx = 0;
+        document.getElementById('total-trials').innerText = trialList.length;
+        document.getElementById('trial-count').innerText = "0";
+        document.getElementById('startBtn').disabled = false;
+        document.getElementById('startBtn').innerText = "실험 시작 (Start)";
+        document.getElementById('logContent').innerHTML = "";
+        experimentalData = [];
+        
+        // 첫 번째 시행 미리보기 업데이트
+        updateAdminPreview();
     }
 
-    async function runAdaptiveTrial() {
-        if(!subjectWindow) return alert("Open Subject Window First");
-        
-        const bestPair = findBestPair(currentDistance);
-        
-        const isP1First = Math.random() > 0.5;
-        const firstPin = isP1First ? bestPair.p1 : bestPair.p2;
-        const secondPin = isP1First ? bestPair.p2 : bestPair.p1;
+    // 다음 자극에 대한 정보를 관리자 화면에 미리 표시하는 함수
+    function updateAdminPreview() {
+        if (currentTrialIdx < trialList.length) {
+            const nextTrial = trialList[currentTrialIdx];
+            // 미리보기 단계에서는 무작위 순서를 미리 결정하여 표시 (실제 실행 시 이 값을 사용)
+            window.nextOrderIsP1First = Math.random() > 0.5;
+            const firstPin = window.nextOrderIsP1First ? nextTrial.p1 : nextTrial.p2;
+            const secondPin = window.nextOrderIsP1First ? nextTrial.p2 : nextTrial.p1;
 
-        document.getElementById('admin-target-pins').innerText = `${bestPair.p1}-${bestPair.p2}`;
-        document.getElementById('admin-dist').innerText = bestPair.dist;
-        document.getElementById('admin-first-pin').innerText = firstPin.toUpperCase();
-        document.getElementById('dynamic-question').innerText = bestPair.q;
+            document.getElementById('pair-display').innerText = `${nextTrial.p1.toUpperCase()}-${nextTrial.p2.toUpperCase()}`;
+            document.getElementById('admin-seq').innerText = `${firstPin.toUpperCase()} → ${secondPin.toUpperCase()}`;
+            document.getElementById('admin-dist').innerText = nextTrial.dist;
+            document.getElementById('admin-first-pin').innerText = firstPin.toUpperCase();
+            document.getElementById('dynamic-question').innerText = nextTrial.q;
+        }
+    }
+
+    async function runRandomTrial() {
+        if(!subjectWindow) return alert("Open Subject Window First");
+        if(currentTrialIdx >= trialList.length) return alert("All trials completed!");
+
+        const currentTrial = trialList[currentTrialIdx];
+        // 미리보기에서 결정된 순서 사용
+        const isP1First = window.nextOrderIsP1First;
+        const firstPin = isP1First ? currentTrial.p1 : currentTrial.p2;
+        const secondPin = isP1First ? currentTrial.p2 : currentTrial.p1;
 
         document.getElementById('startBtn').disabled = true;
         document.getElementById('ans-grid').style.display = 'none';
 
+        // 2IFC Sequence
         subjectWindow.updateState("Stimulus 1", "#1b5e20", "#4caf50");
         await progress(200); 
         subjectWindow.updateState("Interval", "#222", "transparent");
@@ -155,9 +176,15 @@
         subjectWindow.updateState("Stimulus 2", "#b71c1c", "#f44336");
         await progress(200); 
 
-        subjectWindow.updateState(bestPair.q, "#1565c0", "transparent");
+        subjectWindow.updateState(currentTrial.q, "#1565c0", "transparent");
         
-        window.currentTrial = { dist: bestPair.dist, correct: isP1First ? "1st" : "2nd" };
+        window.activeTrialData = { 
+            dist: currentTrial.dist, 
+            axis: currentTrial.axis, 
+            p1: currentTrial.p1, 
+            p2: currentTrial.p2,
+            correct: isP1First ? "1st" : "2nd" 
+        };
         document.getElementById('ans-grid').style.display = 'grid';
     }
 
@@ -173,43 +200,47 @@
     }
 
     function logResponse(choice) {
-        const isCorrect = (choice === window.currentTrial.correct);
+        const info = window.activeTrialData;
+        const isCorrect = (choice === info.correct);
+        
         experimentalData.push({
-            Trial: currentTrialNum + 1,
-            Axis: currentAxis,
-            TargetDist: window.currentTrial.dist,
+            Trial: currentTrialIdx + 1,
+            Pair: `${info.p1}-${info.p2}`,
+            Distance: info.dist,
+            Axis: info.axis,
+            Choice: choice,
             IsCorrect: isCorrect ? 1 : 0
         });
 
         const log = document.createElement('div');
         log.style.color = isCorrect ? "#2e7d32" : "#d32f2f";
-        log.innerHTML = `T${currentTrialNum+1} (${window.currentTrial.dist}mm): ${isCorrect ? '✓':'✗'}`;
+        log.innerHTML = `T${currentTrialIdx+1} [${info.p1}-${info.p2}]: ${isCorrect ? '✓':'✗'}`;
         document.getElementById('logContent').prepend(log);
 
-        if (isCorrect) currentDistance = Math.max(2.5, currentDistance - 2.5);
-        else currentDistance = Math.min(40.0, currentDistance + 5.0);
-
-        currentTrialNum++;
-        document.getElementById('trial-count').innerText = currentTrialNum;
+        currentTrialIdx++;
+        document.getElementById('trial-count').innerText = currentTrialIdx;
         document.getElementById('ans-grid').style.display = 'none';
         document.getElementById('progress').style.width = "0%";
         document.getElementById('startBtn').disabled = false;
 
-        if(currentTrialNum >= maxTrials) {
-            document.getElementById('startBtn').innerText = "Session Completed";
+        // 다음 시행 미리보기 업데이트
+        updateAdminPreview();
+
+        if(currentTrialIdx >= trialList.length) {
+            document.getElementById('startBtn').innerText = "All Sessions Done";
             document.getElementById('startBtn').disabled = true;
         }
     }
 
     function downloadCSV() {
-        let csv = "\uFEFFTrial,Axis,Distance,IsCorrect\n";
+        let csv = "\uFEFFTrial,Pair,Distance,Axis,Choice,IsCorrect\n";
         experimentalData.forEach(r => {
-            csv += `${r.Trial},${r.Axis},${r.TargetDist},${r.IsCorrect}\n`;
+            csv += `${r.Trial},${r.Pair},${r.Distance},${r.Axis},${r.Choice},${r.IsCorrect}\n`;
         });
         const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
         const a = document.createElement("a");
         a.href = URL.createObjectURL(blob);
-        a.download = `2PD_${currentAxis}_Result.csv`;
+        a.download = `2PD_Random_${selectedAxis}_Result.csv`;
         a.click();
     }
 </script>
