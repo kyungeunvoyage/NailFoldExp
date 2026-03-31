@@ -1,0 +1,216 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <title>Vibrotactile 2PD (Split Sessions)</title>
+    <style>
+        body { font-family: 'Segoe UI', sans-serif; display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 100vh; margin: 0; background-color: #f4f7f6; }
+        #container { background: white; padding: 30px; border-radius: 20px; box-shadow: 0 10px 30px rgba(0,0,0,0.1); text-align: center; width: 720px; }
+        .subject-info-box { background: #fff; border: 2px solid #2e7d32; padding: 15px; border-radius: 10px; margin-bottom: 20px; display: flex; align-items: center; justify-content: center; gap: 15px; }
+        .session-selector { background: #e3f2fd; padding: 15px; border-radius: 10px; margin-bottom: 20px; border: 1px solid #90caf9; }
+        .setup-info { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 20px; background: #e8f5e9; padding: 15px; border-radius: 10px; font-weight: bold; }
+        #admin-display { background: #fff3e0; border: 2px dashed #ff9800; padding: 15px; border-radius: 10px; margin-bottom: 20px; }
+        .progress-bar { width: 100%; height: 15px; background: #e8eaed; border-radius: 10px; overflow: hidden; margin-bottom: 20px; }
+        #progress { width: 0%; height: 100%; background: #2e7d32; transition: width 0.1s; }
+        button { padding: 12px; font-size: 16px; cursor: pointer; border: none; border-radius: 8px; transition: 0.2s; width: 100%; font-weight: bold; margin-top: 10px; }
+        #startBtn { background: #2e7d32; color: white; }
+        #ans-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-top: 20px; display: none; }
+        .ans-btn { background: #1976d2; color: white; font-size: 1.2rem; }
+        .highlight-text { color: #d32f2f; font-size: 1.5rem; font-weight: 800; }
+        .question-text { grid-column: span 2; font-weight: bold; margin-bottom: 10px; color: #d32f2f; font-size: 1.4rem; }
+        #log-container { margin-top: 25px; text-align: left; font-size: 12px; max-height: 150px; overflow-y: auto; background: #fafafa; padding: 10px; border: 1px solid #eee; }
+    </style>
+</head>
+<body>
+
+<div id="container">
+    <h2>Vibrotactile 2PD (Split Sessions)</h2>
+    <button onclick="openSubjectWindow()" style="background:#43a047; color:white; width:auto; margin-bottom:15px;">1. Open Subject Window</button>
+    
+    <div class="subject-info-box">
+        <label>Subject ID:</label>
+        <input type="text" id="subjectId" value="S01" style="padding:5px; width:60px; text-align:center;">
+    </div>
+
+    <div class="session-selector" id="session-init">
+        <div style="margin-bottom:10px; font-weight:bold;">2. Select Axis Session:</div>
+        <div style="display:flex; gap:10px;">
+            <button onclick="initSession('LR')" style="background:#1976d2; color:white;">Horizontal (A-H)</button>
+            <button onclick="initSession('UD')" style="background:#ef6c00; color:white;">Vertical (Up-Down)</button>
+        </div>
+    </div>
+
+    <div class="setup-info">
+        <div>Trial: <span id="trial-count">0</span> / 50</div>
+        <div>Current Axis: <span id="axis-display" style="color:#d32f2f;">None</span></div>
+    </div>
+
+    <div id="admin-display">
+        <div style="font-size: 14px; color: #666;">Admin: <span id="admin-target-pins">?</span> (<span id="admin-dist">0</span>mm)</div>
+        <div style="font-weight:bold; color:#e65100;">1st: <span id="admin-first-pin">?</span></div>
+    </div>
+    
+    <div class="progress-bar"><div id="progress"></div></div>
+    
+    <button id="startBtn" onclick="runAdaptiveTrial()" disabled>Select Session to Start</button>
+
+    <div id="ans-grid">
+        <div id="dynamic-question" class="question-text">Question?</div>
+        <button class="ans-btn" onclick="logResponse('1st')">1st (First)</button>
+        <button class="ans-btn" onclick="logResponse('2nd')">2nd (Second)</button>
+    </div>
+
+    <div id="log-container"><strong>Logs:</strong><div id="logContent"></div></div>
+    <button onclick="downloadCSV()" style="background:#546e7a; color:white;">Download CSV</button>
+</div>
+
+<script>
+    let subjectWindow = null;
+    let experimentalData = [];
+    let currentTrialNum = 0;
+    const maxTrials = 50;
+    let currentDistance = 30.0;
+    let activeMap = []; // 필터링된 맵
+    let currentAxis = '';
+
+    const distanceMap = [
+        { p1: 'd', p2: 'e', dist: 2.5, axis: 'LR', q: "Which one was the Left?" },
+        { p1: 'c', p2: 'f', dist: 12.5, axis: 'LR', q: "Which one was the Left?" },
+        { p1: 'b', p2: 'g', dist: 20.0, axis: 'LR', q: "Which one was the Left?" },
+        { p1: 'a', p2: 'h', dist: 35.0, axis: 'LR', q: "Which one was the Left?" },
+        
+        { p1: 'a', p2: 'b', dist: 3.0, axis: 'UD', q: "Which one was the Up?" },
+        { p1: 'b', p2: 'c', dist: 3.0, axis: 'UD', q: "Which one was the Up?" },
+        { p1: 'g', p2: 'h', dist: 3.0, axis: 'UD', q: "Which one was the Up?" },
+        { p1: 'a', p2: 'c', dist: 10.0, axis: 'UD', q: "Which one was the Up?" },
+        { p1: 'h', p2: 'g', dist: 3.0, axis: 'UD', q: "Which one was the Up?" },
+        { p1: 'h', p2: 'f', dist: 3.0, axis: 'UD', q: "Which one was the Up?" },
+        { p1: 'g', p2: 'f', dist: 3.0, axis: 'UD', q: "Which one was the Up?" }
+    ];
+
+    function openSubjectWindow() {
+        subjectWindow = window.open("", "SubjectWindow", "width=600,height=400");
+        subjectWindow.document.write(`
+            <html><body style="background:#222; color:white; display:flex; align-items:center; justify-content:center; height:100vh; font-family:sans-serif;">
+                <div style="text-align:center;">
+                    <h1 id="msg" style="font-size:3rem;">Ready</h1>
+                    <div id="indicator" style="width:80px; height:80px; border-radius:50%; margin:20px auto; background:transparent;"></div>
+                </div>
+                <script>function updateState(txt, color, indColor){ 
+                    document.getElementById('msg').innerText=txt; 
+                    document.body.style.backgroundColor=color; 
+                    document.getElementById('indicator').style.backgroundColor=indColor || 'transparent';
+                }<\/script>
+            </body></html>`);
+    }
+
+    // 세션 초기화: 선택된 축만 남김
+    function initSession(axis) {
+        currentAxis = axis;
+        activeMap = distanceMap.filter(item => item.axis === axis);
+        document.getElementById('axis-display').innerText = axis === 'LR' ? "Horizontal" : "Vertical";
+        document.getElementById('startBtn').disabled = false;
+        document.getElementById('startBtn').innerText = "자극 시퀀스 시작 (Start)";
+        document.getElementById('session-init').style.opacity = "0.5";
+        document.getElementById('session-init').style.pointerEvents = "none";
+        
+        // 초기 거리 설정 (해당 축의 최대값 근처)
+        currentDistance = Math.max(...activeMap.map(o => o.dist));
+    }
+
+    function findBestPair(targetDist) {
+        return activeMap.reduce((prev, curr) => 
+            Math.abs(curr.dist - targetDist) < Math.abs(prev.dist - targetDist) ? curr : prev
+        );
+    }
+
+    async function runAdaptiveTrial() {
+        if(!subjectWindow) return alert("Open Subject Window First");
+        
+        const bestPair = findBestPair(currentDistance);
+        
+        // 2IFC 순서 무작위화
+        // 여기서 p1이 'Left' 혹은 'Up' 역할을 하는 기준점이라고 가정합니다.
+        const isP1First = Math.random() > 0.5;
+        const firstPin = isP1First ? bestPair.p1 : bestPair.p2;
+        const secondPin = isP1First ? bestPair.p2 : bestPair.p1;
+
+        document.getElementById('admin-target-pins').innerText = `${bestPair.p1}-${bestPair.p2}`;
+        document.getElementById('admin-dist').innerText = bestPair.dist;
+        document.getElementById('admin-first-pin').innerText = firstPin.toUpperCase();
+        document.getElementById('dynamic-question').innerText = bestPair.q;
+
+        document.getElementById('startBtn').disabled = true;
+        document.getElementById('ans-grid').style.display = 'none';
+
+        // 1st Stim
+        subjectWindow.updateState("Stimulus 1", "#1b5e20", "#4caf50");
+        await progress(200); 
+        subjectWindow.updateState("Interval", "#222", "transparent");
+        await progress(1000); 
+        // 2nd Stim
+        subjectWindow.updateState("Stimulus 2", "#b71c1c", "#f44336");
+        await progress(200); 
+
+        subjectWindow.updateState(bestPair.q, "#1565c0", "transparent");
+        
+        // 정답 기준: p1(Left/Up)이 먼저 울렸다면 정답은 1st
+        window.currentTrial = { dist: bestPair.dist, correct: isP1First ? "1st" : "2nd" };
+        document.getElementById('ans-grid').style.display = 'grid';
+    }
+
+    function progress(ms) {
+        return new Promise(res => {
+            let start = Date.now();
+            let timer = setInterval(() => {
+                let p = (Date.now() - start) / ms * 100;
+                document.getElementById('progress').style.width = Math.min(p, 100) + "%";
+                if(p >= 100) { clearInterval(timer); res(); }
+            }, 20);
+        });
+    }
+
+    function logResponse(choice) {
+        const isCorrect = (choice === window.currentTrial.correct);
+        experimentalData.push({
+            Trial: currentTrialNum + 1,
+            Axis: currentAxis,
+            TargetDist: window.currentTrial.dist,
+            IsCorrect: isCorrect ? 1 : 0
+        });
+
+        const log = document.createElement('div');
+        log.style.color = isCorrect ? "#2e7d32" : "#d32f2f";
+        log.innerHTML = `T${currentTrialNum+1} (${window.currentTrial.dist}mm): ${isCorrect ? '✓':'✗'}`;
+        document.getElementById('logContent').prepend(log);
+
+        // BAPE Adaptive Logic
+        if (isCorrect) currentDistance = Math.max(2.5, currentDistance - 2.5);
+        else currentDistance = Math.min(40.0, currentDistance + 5.0);
+
+        currentTrialNum++;
+        document.getElementById('trial-count').innerText = currentTrialNum;
+        document.getElementById('ans-grid').style.display = 'none';
+        document.getElementById('progress').style.width = "0%";
+        document.getElementById('startBtn').disabled = false;
+
+        if(currentTrialNum >= maxTrials) {
+            document.getElementById('startBtn').innerText = "Session Completed";
+            document.getElementById('startBtn').disabled = true;
+        }
+    }
+
+    function downloadCSV() {
+        let csv = "\uFEFFTrial,Axis,Distance,IsCorrect\n";
+        experimentalData.forEach(r => {
+            csv += `${r.Trial},${r.Axis},${r.TargetDist},${r.IsCorrect}\n`;
+        });
+        const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+        const a = document.createElement("a");
+        a.href = URL.createObjectURL(blob);
+        a.download = `2PD_${currentAxis}_Result.csv`;
+        a.click();
+    }
+</script>
+</body>
+</html>
