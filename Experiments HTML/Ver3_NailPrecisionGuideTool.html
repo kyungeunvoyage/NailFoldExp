@@ -208,7 +208,8 @@
     function renderAllGuides() {
         if (isStimulusGenerated) return;
 
-        if (guideLines.uPoints.length === 5 && !isCurveExpanded) {
+        // 원본 U-Curve는 항상 렌더링 (주황색)
+        if (guideLines.uPoints.length === 5) {
             ctx.strokeStyle = "#f39c12"; ctx.lineWidth = 3; ctx.setLineDash([]);
             ctx.beginPath();
             const up = guideLines.uPoints;
@@ -230,6 +231,11 @@
             });
         }
 
+        // 확장된 커브가 있으면 흰색으로 렌더링
+        if (isCurveExpanded) {
+            expandUCurve(true); // true 인자를 넘겨서 드로잉만 수행
+        }
+
         if (guideLines.topY !== null) {
             ctx.lineWidth = 4; ctx.setLineDash([15, 10]); ctx.strokeStyle = "#e74c3c";
             drawHLine(guideLines.topY); drawHLine(guideLines.bottomY);
@@ -248,38 +254,27 @@
         }
     }
 
-    function expandUCurve() {
+    function expandUCurve(onlyDraw = false) {
         if (guideLines.uPoints.length < 5) return;
-        isCurveExpanded = true;
-        drawEverything();
-        
-        ctx.strokeStyle = "white"; ctx.lineWidth = 3; ctx.setLineDash([]);
-        ctx.beginPath();
+        if (!onlyDraw) isCurveExpanded = true;
         
         const up = guideLines.uPoints;
         const leftLimitX = guideLines.outlines[0];
         const rightLimitX = guideLines.outlines[1];
-        
-        // DIPJ 방향 40% 지점으로 고정
         const proximalLimitY = guideLines.bottomY + (guideLines.dipjY - guideLines.bottomY) * 0.4;
 
         const extendedUp = up.map((p, index) => {
             if (index === 0 || index === 4) {
-                // V1, V5 고정
                 return {x: p.x, y: p.y};
             } else if (index === 2) {
-                // V3: Y축만 proximalLimitY로 직접 확장
                 return {x: p.x, y: proximalLimitY};
             } else {
                 let newX = p.x;
-                // V2는 왼쪽 Outline 방향으로, V4는 오른쪽 Outline 방향으로 확장
-                if (index === 1) { // V2
+                if (index === 1) { 
                     newX = leftLimitX + (p.x - up[0].x) * 0.5;
-                } else if (index === 3) { // V4
+                } else if (index === 3) { 
                     newX = rightLimitX - (up[4].x - p.x) * 0.5; 
                 }
-
-                // V2, V4의 Y축 비례 확장
                 const minY = Math.min(...up.map(pt => pt.y));
                 const maxY = Math.max(...up.map(pt => pt.y));
                 const ratioY = (p.y - minY) / (maxY - minY);
@@ -288,6 +283,8 @@
             }
         });
 
+        ctx.strokeStyle = "white"; ctx.lineWidth = 3; ctx.setLineDash([]);
+        ctx.beginPath();
         ctx.moveTo(extendedUp[0].x + RULER_SIZE, extendedUp[0].y + RULER_SIZE);
         for (let i = 0; i < extendedUp.length - 1; i++) {
             const midX = (extendedUp[i].x + extendedUp[i+1].x) / 2;
@@ -296,32 +293,59 @@
         }
         ctx.lineTo(extendedUp[4].x + RULER_SIZE, extendedUp[4].y + RULER_SIZE);
         ctx.stroke();
-        status.innerText = "U-Curve 확장 완료 (V3 하단 타겟 고정)";
+
+        if (!onlyDraw) {
+            status.innerText = "U-Curve 확장 완료 (원본 가이드 유지)";
+            drawEverything();
+        }
+        return extendedUp; // 좌표 정보 반환
     }
 
     function generateStimulusPoints() {
         isStimulusGenerated = true; 
+        drawEverything();
         
+        let expandedCurve = guideLines.uPoints;
+        if(isCurveExpanded) expandedCurve = expandUCurve(true);
+
         const stimY_upper = (guideLines.topY + guideLines.midY) / 2;
         const stimY_lower = (guideLines.midY + guideLines.bottomY) / 2;
         const stimY_DE = guideLines.bottomY + (guideLines.dipjY - guideLines.bottomY) * 0.2;
-        const stimX_leftSide = (guideLines.outlines[0] + guideLines.leftX) / 2;
-        const stimX_rightSide = (guideLines.rightX + guideLines.outlines[1]) / 2;
+        
+        const leftLateralX = guideLines.outlines[0] + (guideLines.leftX - guideLines.outlines[0]) * 0.5;
+        const rightLateralX = guideLines.outlines[1] - (guideLines.outlines[1] - guideLines.rightX) * 0.5;
+        
         const stimX_leftInner = (guideLines.leftX + guideLines.midX) / 2;
         const stimX_rightInner = (guideLines.midX + guideLines.rightX) / 2;
 
+        const stimX_leftSide = (guideLines.outlines[0] + guideLines.leftX) / 2;
+        const stimX_rightSide = (guideLines.rightX + guideLines.outlines[1]) / 2;
+
+        // V2(b)와 V4(g)의 확장된 좌표 가져오기
+        const v2_exp = expandedCurve[1];
+        const v3_exp = expandedCurve[2];
+        const v4_exp = expandedCurve[3];
+
         const stimPoints = [
-            {label: 'a', x: stimX_leftSide, y: stimY_upper}, {label: 'b', x: stimX_leftSide, y: stimY_lower},
-            {label: 'c', x: stimX_leftSide, y: stimY_DE}, {label: 'd', x: stimX_leftInner, y: stimY_DE},
-            {label: 'e', x: stimX_rightInner, y: stimY_DE}, {label: 'f', x: stimX_rightSide, y: stimY_DE},
-            {label: 'g', x: stimX_rightSide, y: stimY_lower}, {label: 'h', x: stimX_rightSide, y: stimY_upper}
+            {label: 'a', x: leftLateralX, y: stimY_upper}, 
+            {label: 'b', x: leftLateralX, y: stimY_lower},
+            // c: b와 d의 중간 지점 (확장된 커브 라인 안쪽으로 올림)
+            {label: 'c', x: (leftLateralX + stimX_leftInner)/2, y: (stimY_lower + stimY_DE)/2}, 
+            //{label: 'c', x: stimX_leftSide, y: stimY_DE}, 
+            // c : 
+
+            
+            {label: 'd', x: stimX_leftInner, y: stimY_DE},
+            {label: 'e', x: stimX_rightInner, y: stimY_DE}, 
+            // f: g와 e의 중간 지점
+            {label: 'f', x: (rightLateralX + stimX_rightInner)/2, y: (stimY_lower + stimY_DE)/2},
+            //{label: 'f', x: stimX_rightSide, y: stimY_DE},
+            {label: 'g', x: rightLateralX, y: stimY_lower}, 
+            {label: 'h', x: rightLateralX, y: stimY_upper}
         ];
 
-        drawEverything();
-        if(isCurveExpanded) expandUCurve();
-
         stimPoints.forEach(p => drawStimulusPoint(p.x, p.y, p.label));
-        status.innerText = "자극점 생성 완료";
+        status.innerText = "자극점 생성 완료 (c, f 지점 보정됨)";
     }
 
     function resetCanvas() {
