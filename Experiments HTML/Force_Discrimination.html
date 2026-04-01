@@ -2,196 +2,142 @@
 <html lang="ko">
 <head>
     <meta charset="UTF-8">
-    <title>Force Discrimination Experiment</title>
+    <title>Force Discrimination - 2AFC JND (In-air & On-touch)</title>
     <style>
         body { font-family: 'Segoe UI', sans-serif; display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 100vh; margin: 0; background-color: #f0f4f8; }
-        #container { background: white; padding: 30px; border-radius: 20px; box-shadow: 0 10px 30px rgba(0,0,0,0.1); text-align: center; width: 600px; }
-        .subject-info-box { background: #fff; border: 2px solid #673ab7; padding: 15px; border-radius: 10px; margin-bottom: 20px; display: flex; flex-direction: column; gap: 10px; }
+        #container { background: white; padding: 30px; border-radius: 20px; box-shadow: 0 10px 30px rgba(0,0,0,0.1); text-align: center; width: 620px; }
         .setup-info { display: flex; justify-content: space-around; margin-bottom: 20px; background: #ede7f6; padding: 15px; border-radius: 10px; font-weight: bold; }
-        #admin-display { background: #fff9c4; border: 2px dashed #fbc02d; padding: 15px; border-radius: 10px; margin-bottom: 20px; display: flex; flex-direction: column; gap: 10px; }
-        #status-display { background: #e3f2fd; border: 2px solid #2196f3; padding: 10px; border-radius: 10px; margin-bottom: 15px; font-weight: bold; color: #0d47a1; font-size: 1.1rem; }
-        .pair-box { display: flex; justify-content: center; gap: 20px; font-size: 24px; font-weight: bold; }
-        .progress-bar { width: 100%; height: 15px; background: #e8eaed; border-radius: 10px; overflow: hidden; margin-bottom: 20px; position: relative; }
+        #admin-display { background: #fff9c4; border: 2px dashed #fbc02d; padding: 15px; border-radius: 10px; margin-bottom: 20px; }
+        #status-display { background: #e3f2fd; border: 2px solid #2196f3; padding: 10px; border-radius: 10px; margin-bottom: 15px; font-weight: bold; color: #0d47a1; }
+        .progress-bar { width: 100%; height: 15px; background: #e8eaed; border-radius: 10px; overflow: hidden; margin-bottom: 20px; }
         #progress { width: 0%; height: 100%; background: #673ab7; transition: width 0.1s; }
-        button { padding: 15px; font-size: 16px; cursor: pointer; border: none; border-radius: 8px; transition: 0.2s; width: 100%; font-weight: bold; margin-top: 10px; }
+        button { padding: 15px; font-size: 16px; cursor: pointer; border: none; border-radius: 8px; width: 100%; font-weight: bold; margin-top: 10px; transition: 0.2s; }
         #startBtn { background: #673ab7; color: white; }
         #ansBtn1, #ansBtn2 { background: #3f51b5; color: white; width: 48%; }
-        #input-section { display: none; margin-top: 20px; }
-        #nextBtn { background: #ff9800; color: white; display: none; }
-        #log-container { margin-top: 25px; text-align: left; font-size: 12px; max-height: 200px; overflow-y: auto; background: #fafafa; padding: 10px; border: 1px solid #eee; }
+        #input-section { display: none; margin-top: 20px; border-top: 2px solid #eee; padding-top: 20px; }
+        #log-container { margin-top: 25px; text-align: left; font-size: 12px; max-height: 150px; overflow-y: auto; background: #fafafa; padding: 10px; border: 1px solid #ddd; }
+        .condition-badge { background: #e74c3c; color: white; padding: 5px 15px; border-radius: 20px; font-size: 0.9rem; margin-bottom: 10px; display: inline-block; }
+        button:hover { opacity: 0.9; }
+        button:disabled { background: #ccc; cursor: not-allowed; }
     </style>
 </head>
 <body>
 
 <div id="container">
-    <h2>Force Discrimination Experiment</h2>
-    <button id="popBtn" onclick="openSubjectWindow()" style="background:#9c27b0; color:white; margin-bottom:10px;">1. Subject Window Open</button>
+    <h2>Force Discrimination (2-AFC)</h2>
+    <div id="current-condition-display" class="condition-badge">Condition: Ready</div>
+    <p style="margin-top:0px; color:#666;">Reference Intensity: <strong>0.60g</strong></p>
     
-    <div class="subject-info-box">
-        <div>
-            <label>Subject ID:</label>
-            <input type="text" id="subjectId" value="S01" style="padding:5px; width:60px; text-align:center;">
-        </div>
-    </div>
-
-    <h3 id="condition-title">Condition: Ready</h3>
+    <button onclick="openSubjectWindow()" style="background:#9c27b0; color:white; margin-bottom:10px;">1. Subject Window Open</button>
     
-    <div id="status-display">Status: Waiting to Start</div>
-
     <div class="setup-info">
-        <div>Session: <span id="current-session">1</span> / 2</div>
         <div>Region: <span id="current-region">-</span></div>
-        <div>Trial: <span id="trial-count">0</span> / 18</div>
+        <div>Trial: <span id="trial-count">0</span> / <span id="total-trials">0</span></div>
     </div>
 
     <div id="admin-display">
-        <div style="font-size:14px; color:#666;">Stimulus Sequence (Admin Only)</div>
-        <div style="font-weight:bold; color:red;">Target Region: <span id="admin-region">?</span></div>
-        <div class="pair-box">
-            <div>1st: <span id="stim1-val" style="color:blue;">?</span></div>
-            <div>2nd: <span id="stim2-val" style="color:red;">?</span></div>
-        </div>
+        <div style="font-size:12px; color:#888; padding-top:5px;">Admin Guide (Target: <span id="target-reg" style="color:red; font-weight:bold;">-</span>)</div>
+        <div style="font-size:20px; font-weight:bold; padding:10px;">1st: <span id="s1" style="color:blue;">-</span> vs 2nd: <span id="s2" style="color:red;">-</span></div>
     </div>
     
+    <div id="status-display">Waiting for Admin to Start</div>
     <div class="progress-bar"><div id="progress"></div></div>
     
-    <button id="startBtn" onclick="runDiscriminationTrial()">다음 시행 시작 (Start Sequence)</button>
-    <button id="nextBtn" onclick="proceedToNextStage()">다음 단계로 진행</button>
+    <button id="startBtn" onclick="runTrial()">다음 시행 시작 (Start Sequence)</button>
 
     <div id="input-section">
-        <div style="margin-bottom:15px; font-weight:bold;">Which stimulus was STRONGER?</div>
+        <p style="font-size:1.1rem; font-weight:bold;">Q. 어떤 자극이 더 강했습니까?<br><span style="font-size:0.9rem; color:#666;">(Which stimulus was STRONGER?)</span></p>
         <div style="display:flex; justify-content:space-between;">
-            <button id="ansBtn1" onclick="logResponse(1)">1st was Stronger</button>
-            <button id="ansBtn2" onclick="logResponse(2)">2nd was Stronger</button>
+            <button id="ansBtn1" onclick="logResponse(1)">1번째 자극 (1st)</button>
+            <button id="ansBtn2" onclick="logResponse(2)">2번째 자극 (2nd)</button>
         </div>
     </div>
 
     <div id="log-container"><strong>Session Logs:</strong><div id="logContent"></div></div>
-    <button onclick="downloadCSV()" style="background:#5f6368; color:white;">Download CSV</button>
+    <button onclick="downloadCSV()" style="background:#5f6368; color:white; font-size:14px;">Download CSV Data</button>
 </div>
 
 <script>
     let subjectWindow = null;
-    const regions = ['A', 'B', 'C'];
+    const regions = ['A', 'B', 'C', 'D'];
+    const referenceValue = 0.60;
     const pairs = [
-        {ref: '0.07g', comp: '0.16g'}, {ref: '0.16g', comp: '0.60g'},
-        {ref: '0.60g', comp: '1.40g'}, {ref: '1.40g', comp: '2.00g'},
-        {ref: '0.07g', comp: '0.60g'}, {ref: '0.60g', comp: '2.00g'}
+        {comp: 0.16}, {comp: 0.40}, {comp: 0.60}, {comp: 1.00}, {comp: 1.40}
     ];
 
-    let sessionSequence = []; 
-    let currentStageIdx = 0;  
-    let trialPools = {};      
-    let currentIdxInSet = 0;
-    let experimentalData = [];
-    let firstStim = "", secondStim = "";
-    let strongerOne = 1;
+    const sessionConditions = ['In-air', 'On-touch'];
+    let currentConditionIdx = 0;
 
-    function updateAdminStatus(text) {
-        document.getElementById('status-display').innerText = "Status: " + text;
-    }
+    let trialPool = []; // 현재 컨디션의 트라이얼들
+    let currentIdx = 0;
+    let experimentalData = [];
+    let firstStim = 0, secondStim = 0;
 
     function openSubjectWindow() {
-        subjectWindow = window.open("", "SubjectWindow", "width=600,height=400");
+        subjectWindow = window.open("", "SubWin", "width=800,height=500");
         subjectWindow.document.write(`
-            <html><body style="background:#333; color:white; display:flex; align-items:center; justify-content:center; height:100vh; font-family:sans-serif;">
-                <h1 id="msg" style="font-size:3rem; text-align:center;">Waiting...</h1>
-                <script>function updateState(txt, color){ document.body.style.backgroundColor=color; document.getElementById('msg').innerText=txt; }<\/script>
-            </body></html>`);
+            <body style="background:#333; color:white; display:flex; flex-direction:column; align-items:center; justify-content:center; height:100vh; font-family:sans-serif; margin:0;">
+                <h1 id="m" style="font-size:3.5rem; text-align:center;">Ready</h1>
+                <script>function update(t,c){document.body.style.backgroundColor=c; document.getElementById('m').innerText=t;}<\/script>
+            </body>`);
+    }
+
+    // 특정 컨디션에 대한 트라이얼 풀 생성
+    function createTrialPool(condition) {
+        let list = [];
+        regions.forEach(reg => {
+            pairs.forEach(p => {
+                // 각 쌍당 2회 반복
+                list.push({ref: referenceValue, comp: p.comp, region: reg, condition: condition});
+                list.push({ref: referenceValue, comp: p.comp, region: reg, condition: condition});
+            });
+        });
+        return list.sort(() => Math.random() - 0.5);
     }
 
     function setupExp() {
-        let s1 = ["In-air", "On-touch", "Hard-touch"].sort(() => Math.random() - 0.5);
-        let s2 = ["On-touch", "Hard-touch"].sort(() => Math.random() - 0.5);
-        sessionSequence = s1.concat(s2);
-
-        sessionSequence.forEach((condName, idx) => {
-            let fullList = [];
-            regions.forEach(reg => {
-                pairs.forEach(p => {
-                    fullList.push({...p, region: reg});
-                });
-            });
-            trialPools[idx] = fullList.sort(() => Math.random() - 0.5);
-        });
+        currentConditionIdx = 0;
+        currentIdx = 0;
+        trialPool = createTrialPool(sessionConditions[currentConditionIdx]);
         
-        currentIdxInSet = 0;
-        currentStageIdx = 0;
-        prepareNextTrial();
-        updateAdminStatus("Ready to Start Session");
+        // UI 초기화
+        document.getElementById('total-trials').innerText = trialPool.length;
+        document.getElementById('current-condition-display').innerText = "Condition: " + sessionConditions[currentConditionIdx];
+        prepareTrial();
     }
 
-    function prepareNextTrial() {
-        if (currentStageIdx >= sessionSequence.length) return;
-
-        const currentPool = trialPools[currentStageIdx];
-        const t = currentPool[currentIdxInSet];
-
+    function prepareTrial() {
+        const t = trialPool[currentIdx];
         const isRefFirst = Math.random() > 0.5;
         firstStim = isRefFirst ? t.ref : t.comp;
         secondStim = isRefFirst ? t.comp : t.ref;
-        strongerOne = parseFloat(firstStim) > parseFloat(secondStim) ? 1 : 2;
 
         document.getElementById('current-region').innerText = t.region;
-        document.getElementById('admin-region').innerText = t.region;
-        document.getElementById('stim1-val').innerText = firstStim;
-        document.getElementById('stim2-val').innerText = secondStim;
-        
-        updateUI();
+        document.getElementById('target-reg').innerText = t.region;
+        document.getElementById('s1').innerText = firstStim.toFixed(2) + "g";
+        document.getElementById('s2').innerText = secondStim.toFixed(2) + "g";
+        document.getElementById('trial-count').innerText = currentIdx + 1;
     }
 
-    function updateUI() {
-        const condTitle = document.getElementById('condition-title');
-        const startBtn = document.getElementById('startBtn');
-        const nextBtn = document.getElementById('nextBtn');
-        
-        if (currentStageIdx >= sessionSequence.length) {
-            condTitle.innerText = "All Finished!";
-            updateAdminStatus("Experiment Complete");
-            startBtn.disabled = true;
-            return;
-        }
-
-        const sessionNum = (currentStageIdx < 3) ? 1 : 2;
-        const totalTrialsInSet = trialPools[currentStageIdx].length;
-        
-        condTitle.innerText = "Condition: " + sessionSequence[currentStageIdx];
-        document.getElementById('current-session').innerText = sessionNum;
-        document.querySelector('.setup-info div:last-child').innerHTML = `Trial: <span id="trial-count">${currentIdxInSet + 1}</span> / ${totalTrialsInSet}`;
-
-        if (currentIdxInSet >= totalTrialsInSet) {
-            condTitle.innerText = sessionSequence[currentStageIdx] + " (S" + sessionNum + ") Finished!";
-            startBtn.style.display = 'none';
-            nextBtn.style.display = 'block';
-            updateAdminStatus("Condition Finished. Please Proceed.");
-        } else {
-            // 버튼을 다시 활성화하여 실험자가 누를 수 있게 함
-            startBtn.disabled = false;
-            startBtn.style.display = 'block';
-            nextBtn.style.display = 'none';
-        }
-    }
-
-    async function runDiscriminationTrial() {
-        if(!subjectWindow) return alert("Open Window First");
-        
+    async function runTrial() {
+        if(!subjectWindow) return alert("피험자 창을 먼저 열어주세요.");
         document.getElementById('startBtn').disabled = true;
         document.getElementById('input-section').style.display = 'none';
 
-        updateAdminStatus("Stimulus 1 (Active)");
-        subjectWindow.updateState("Stimulus 1...", "#2196F3");
-        await progress(8000); 
+        document.getElementById('status-display').innerText = "첫 번째 자극 제시 중...";
+        subjectWindow.update("자극 1 (Stimulus 1)", "#2196F3");
+        await progress(3000); 
 
-        updateAdminStatus("Interval (Waiting)");
-        subjectWindow.updateState("Interval...", "#333");
-        await progress(7000);
+        document.getElementById('status-display').innerText = "대기 (Interval)...";
+        subjectWindow.update("+", "#333");
+        await progress(2000);
 
-        updateAdminStatus("Stimulus 2 (Active)");
-        subjectWindow.updateState("Stimulus 2...", "#F44336");
-        await progress(6000);
+        document.getElementById('status-display').innerText = "두 번째 자극 제시 중...";
+        subjectWindow.update("자극 2 (Stimulus 2)", "#F44336");
+        await progress(3000);
         
-        updateAdminStatus("Waiting for Participant Response");
-        subjectWindow.updateState("Choose stronger one", "#9C27B0");
+        document.getElementById('status-display').innerText = "피험자 응답 대기 중";
+        subjectWindow.update("어느 자극이 더 강했습니까?", "#9C27B0");
         document.getElementById('input-section').style.display = 'block';
     }
 
@@ -202,64 +148,78 @@
                 let p = (Date.now() - start) / ms * 100;
                 document.getElementById('progress').style.width = p + "%";
                 if(p >= 100) { clearInterval(timer); res(); }
-            }, 20);
+            }, 30);
         });
     }
 
     function logResponse(choice) {
-        const cond = sessionSequence[currentStageIdx];
-        const t = trialPools[currentStageIdx][currentIdxInSet];
-        const isCorrect = (choice === strongerOne);
-        
+        const t = trialPool[currentIdx];
+        const chosenStim = (choice === 1) ? firstStim : secondStim;
+        const choseComparison = (chosenStim === t.comp) ? 1 : 0;
+
         experimentalData.push({
-            Subject: document.getElementById('subjectId').value,
-            Session: (currentStageIdx < 3 ? 1 : 2),
-            Condition: cond,
-            Region: t.region,
-            Trial: currentIdxInSet + 1, 
-            Ref: t.ref, Comp: t.comp, First: firstStim, Second: secondStim, Choice: choice, Correct: isCorrect
+            Subject: "S01", 
+            Condition: t.condition,
+            Region: t.region, 
+            Ref: t.ref, 
+            Comp: t.comp,
+            First: firstStim, 
+            Second: secondStim, 
+            Choice: choice, 
+            ChoseComp: choseComparison
         });
 
         const log = document.createElement('div');
-        log.innerHTML = `[${t.region}] Trial ${currentIdxInSet+1}: ${isCorrect ? '✓':'✗'}`;
+        log.innerText = `[${t.condition}-${t.region}] Trial ${currentIdx+1}: 선택(${chosenStim}g)`;
         document.getElementById('logContent').prepend(log);
 
         document.getElementById('input-section').style.display = 'none';
         document.getElementById('progress').style.width = "0%";
+        currentIdx++;
         
-        currentIdxInSet++;
-        
-        if (currentIdxInSet < trialPools[currentStageIdx].length) {
-            updateAdminStatus("Response Saved. Waiting for Admin to start next trial.");
-            prepareNextTrial(); // 다음 자극 정보 미리 준비하고 대기
+        // 현재 컨디션 종료 체크
+        if (currentIdx < trialPool.length) {
+            document.getElementById('startBtn').disabled = false;
+            prepareTrial();
         } else {
-            updateUI();
+            // 다음 컨디션으로 전환 혹은 실험 종료
+            moveToNextCondition();
         }
     }
 
-    function proceedToNextStage() {
-        currentStageIdx++;
-        currentIdxInSet = 0;
-        document.getElementById('nextBtn').style.display = 'none';
-        document.getElementById('startBtn').style.display = 'block';
-        document.getElementById('startBtn').disabled = false;
-        prepareNextTrial();
-        updateAdminStatus("Next Condition Ready");
+    function moveToNextCondition() {
+        currentConditionIdx++;
+        if (currentConditionIdx < sessionConditions.length) {
+            const nextCond = sessionConditions[currentConditionIdx];
+            alert(`'${sessionConditions[currentConditionIdx-1]}' 조건이 끝났습니다.\n다음 조건인 '${nextCond}'을 시작합니다.`);
+            
+            currentIdx = 0;
+            trialPool = createTrialPool(nextCond);
+            
+            // UI 업데이트
+            document.getElementById('total-trials').innerText = trialPool.length;
+            document.getElementById('current-condition-display').innerText = "Condition: " + nextCond;
+            document.getElementById('startBtn').disabled = false;
+            prepareTrial();
+        } else {
+            document.getElementById('status-display').innerText = "모든 실험 종료";
+            document.getElementById('current-condition-display').innerText = "Status: All Finished";
+            subjectWindow.update("모든 실험이 완료되었습니다.", "#2E7D32");
+        }
     }
 
     function downloadCSV() {
-        const subId = document.getElementById('subjectId').value;
-        let csv = "\uFEFFSubject,Session,Condition,Region,Trial,Reference,Comparison,FirstStim,SecondStim,UserChoice,IsCorrect\n";
+        let csv = "\uFEFFCondition,Region,Reference,Comparison,FirstStim,SecondStim,UserChoice,ChoseComparison\n";
         experimentalData.forEach(r => {
-            csv += `${r.Subject},${r.Session},${r.Condition},${r.Region},${r.Trial},${r.Ref},${r.Comp},${r.First},${r.Second},${r.Choice},${r.Correct}\n`;
+            csv += `${r.Condition},${r.Region},${r.Ref},${r.Comp},${r.First},${r.Second},${r.Choice},${r.ChoseComp}\n`;
         });
         const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
         const a = document.createElement("a");
         a.href = URL.createObjectURL(blob);
-        a.download = `${subId}_Exp2_ForceDiscrimination.csv`;
-        //P2_Exp2_ForceDiscrimination
+        a.download = `2AFC_Force_JND_Data_All_Conditions.csv`;
         a.click();
     }
+
     setupExp();
 </script>
 </body>

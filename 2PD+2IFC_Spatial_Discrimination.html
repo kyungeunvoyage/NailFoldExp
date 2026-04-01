@@ -2,7 +2,7 @@
 <html lang="ko">
 <head>
     <meta charset="UTF-8">
-    <title>Vibrotactile 2PD (Full Random Mode)</title>
+    <title>2PD+2IFC Spatial Discrimination</title>
     <style>
         body { font-family: 'Segoe UI', sans-serif; display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 100vh; margin: 0; background-color: #f4f7f6; }
         #container { background: white; padding: 30px; border-radius: 20px; box-shadow: 0 10px 30px rgba(0,0,0,0.1); text-align: center; width: 720px; }
@@ -20,12 +20,16 @@
         .session-btn-container { display: flex; gap: 10px; margin-bottom: 20px; }
         /* 미리보기 강조 스타일 */
         .preview-box { font-size: 1.2rem; color: #e65100; font-weight: 800; background: #ffe0b2; padding: 5px 10px; border-radius: 5px; }
+        /* 컨디션 표시 스타일 추가 */
+        .condition-badge { background: #d32f2f; color: white; padding: 5px 15px; border-radius: 20px; font-size: 0.9rem; margin-bottom: 10px; display: inline-block; font-weight: bold; }
     </style>
 </head>
 <body>
 
 <div id="container">
     <h2>Vibrotactile 2PD (Full Random Mode)</h2>
+    <div id="cond-badge" class="condition-badge" style="display:none;">Condition: Ready</div>
+    <br>
     <button onclick="openSubjectWindow()" style="background:#43a047; color:white; width:auto; margin-bottom:15px;">1. Open Subject Window</button>
     
     <div class="subject-info-box">
@@ -71,10 +75,14 @@
 
 <script>
     let subjectWindow = null;
-    let trialList = [];
+    let trialPool = [];
     let experimentalData = [];
-    let currentTrialIdx = 0;
+    let currentIdx = 0;
     let selectedAxis = "";
+    
+    // 컨디션 설정
+    const sessionConditions = ['In-air', 'On-touch'];
+    let currentConditionIdx = 0;
 
     const distanceMap = [
         { p1: 'd', p2: 'e', dist: 2.5, axis: 'LR', q: "Which one was the Left?" },
@@ -86,7 +94,6 @@
         { p1: 'b', p2: 'c', dist: 3.0, axis: 'UD', q: "Which one was the Up?" },
         { p1: 'g', p2: 'h', dist: 3.0, axis: 'UD', q: "Which one was the Up?" },
         { p1: 'a', p2: 'c', dist: 10.0, axis: 'UD', q: "Which one was the Up?" },
-        { p1: 'h', p2: 'g', dist: 3.0, axis: 'UD', q: "Which one was the Up?" },
         { p1: 'h', p2: 'f', dist: 3.0, axis: 'UD', q: "Which one was the Up?" },
         { p1: 'g', p2: 'f', dist: 3.0, axis: 'UD', q: "Which one was the Up?" }
     ];
@@ -109,40 +116,42 @@
 
     function selectSession(axis) {
         selectedAxis = axis;
+        currentConditionIdx = 0; 
         document.getElementById('current-axis-label').innerText = axis === 'LR' ? "Horizontal" : "Vertical";
-        generateTrialList(axis);
+        document.getElementById('cond-badge').style.display = 'inline-block';
+        initiateCondition();
     }
 
-    function generateTrialList(axis) {
+    function initiateCondition() {
+        const cond = sessionConditions[currentConditionIdx];
+        document.getElementById('cond-badge').innerText = "Condition: " + cond;
+        generateTrialList(selectedAxis, cond);
+    }
+
+    function generateTrialList(axis, condition) {
         const repetitions = 5; 
         const filteredMap = distanceMap.filter(d => d.axis === axis);
-        trialList = [];
+        trialPool = [];
         for (let i = 0; i < repetitions; i++) {
-            trialList.push(...filteredMap);
+            filteredMap.forEach(item => trialPool.push({...item, condition: condition}));
         }
         
-        for (let i = trialList.length - 1; i > 0; i--) {
+        for (let i = trialPool.length - 1; i > 0; i--) {
             const j = Math.floor(Math.random() * (i + 1));
-            [trialList[i], trialList[j]] = [trialList[j], trialList[i]];
+            [trialPool[i], trialPool[j]] = [trialPool[j], trialPool[i]];
         }
         
-        currentTrialIdx = 0;
-        document.getElementById('total-trials').innerText = trialList.length;
+        currentIdx = 0;
+        document.getElementById('total-trials').innerText = trialPool.length;
         document.getElementById('trial-count').innerText = "0";
         document.getElementById('startBtn').disabled = false;
         document.getElementById('startBtn').innerText = "실험 시작 (Start)";
-        document.getElementById('logContent').innerHTML = "";
-        experimentalData = [];
-        
-        // 첫 번째 시행 미리보기 업데이트
         updateAdminPreview();
     }
 
-    // 다음 자극에 대한 정보를 관리자 화면에 미리 표시하는 함수
     function updateAdminPreview() {
-        if (currentTrialIdx < trialList.length) {
-            const nextTrial = trialList[currentTrialIdx];
-            // 미리보기 단계에서는 무작위 순서를 미리 결정하여 표시 (실제 실행 시 이 값을 사용)
+        if (currentIdx < trialPool.length) {
+            const nextTrial = trialPool[currentIdx];
             window.nextOrderIsP1First = Math.random() > 0.5;
             const firstPin = window.nextOrderIsP1First ? nextTrial.p1 : nextTrial.p2;
             const secondPin = window.nextOrderIsP1First ? nextTrial.p2 : nextTrial.p1;
@@ -157,18 +166,12 @@
 
     async function runRandomTrial() {
         if(!subjectWindow) return alert("Open Subject Window First");
-        if(currentTrialIdx >= trialList.length) return alert("All trials completed!");
-
-        const currentTrial = trialList[currentTrialIdx];
-        // 미리보기에서 결정된 순서 사용
+        const currentTrial = trialPool[currentIdx];
         const isP1First = window.nextOrderIsP1First;
-        const firstPin = isP1First ? currentTrial.p1 : currentTrial.p2;
-        const secondPin = isP1First ? currentTrial.p2 : currentTrial.p1;
 
         document.getElementById('startBtn').disabled = true;
         document.getElementById('ans-grid').style.display = 'none';
 
-        // 2IFC Sequence
         subjectWindow.updateState("Stimulus 1", "#1b5e20", "#4caf50");
         await progress(200); 
         subjectWindow.updateState("Interval", "#222", "transparent");
@@ -179,6 +182,7 @@
         subjectWindow.updateState(currentTrial.q, "#1565c0", "transparent");
         
         window.activeTrialData = { 
+            condition: currentTrial.condition,
             dist: currentTrial.dist, 
             axis: currentTrial.axis, 
             p1: currentTrial.p1, 
@@ -204,7 +208,8 @@
         const isCorrect = (choice === info.correct);
         
         experimentalData.push({
-            Trial: currentTrialIdx + 1,
+            Condition: info.condition,
+            Trial: currentIdx + 1,
             Pair: `${info.p1}-${info.p2}`,
             Distance: info.dist,
             Axis: info.axis,
@@ -214,33 +219,45 @@
 
         const log = document.createElement('div');
         log.style.color = isCorrect ? "#2e7d32" : "#d32f2f";
-        log.innerHTML = `T${currentTrialIdx+1} [${info.p1}-${info.p2}]: ${isCorrect ? '✓':'✗'}`;
+        log.innerHTML = `[${info.condition}] T${currentIdx+1} [${info.p1}-${info.p2}]: ${isCorrect ? '✓':'✗'}`;
         document.getElementById('logContent').prepend(log);
 
-        currentTrialIdx++;
-        document.getElementById('trial-count').innerText = currentTrialIdx;
+        currentIdx++;
+        document.getElementById('trial-count').innerText = currentIdx;
         document.getElementById('ans-grid').style.display = 'none';
         document.getElementById('progress').style.width = "0%";
-        document.getElementById('startBtn').disabled = false;
+        
+        if(currentIdx < trialPool.length) {
+            document.getElementById('startBtn').disabled = false;
+            updateAdminPreview();
+        } else {
+            moveToNextCondition();
+        }
+    }
 
-        // 다음 시행 미리보기 업데이트
-        updateAdminPreview();
-
-        if(currentTrialIdx >= trialList.length) {
-            document.getElementById('startBtn').innerText = "All Sessions Done";
+    function moveToNextCondition() {
+        currentConditionIdx++;
+        if (currentConditionIdx < sessionConditions.length) {
+            const nextCond = sessionConditions[currentConditionIdx];
+            alert(`'${sessionConditions[currentConditionIdx-1]}' 조건 완료. 다음 '${nextCond}' 시작.`);
+            initiateCondition();
+        } else {
+            alert("모든 실험 조건 종료.");
+            document.getElementById('startBtn').innerText = "All Finished";
             document.getElementById('startBtn').disabled = true;
+            subjectWindow.updateState("Experiment Completed", "#222", "transparent");
         }
     }
 
     function downloadCSV() {
-        let csv = "\uFEFFTrial,Pair,Distance,Axis,Choice,IsCorrect\n";
+        let csv = "\uFEFFCondition,Trial,Pair,Distance,Axis,Choice,IsCorrect\n";
         experimentalData.forEach(r => {
-            csv += `${r.Trial},${r.Pair},${r.Distance},${r.Axis},${r.Choice},${r.IsCorrect}\n`;
+            csv += `${r.Condition},${r.Trial},${r.Pair},${r.Distance},${r.Axis},${r.Choice},${r.IsCorrect}\n`;
         });
         const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
         const a = document.createElement("a");
         a.href = URL.createObjectURL(blob);
-        a.download = `2PD_Random_${selectedAxis}_Result.csv`;
+        a.download = `2PD_${selectedAxis}_Results.csv`;
         a.click();
     }
 </script>
