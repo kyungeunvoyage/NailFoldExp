@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <title>2PD+2IFC Spatial Discrimination</title>
     <style>
+        /* 기존 스타일 유지 */
         body { font-family: 'Segoe UI', sans-serif; display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 100vh; margin: 0; background-color: #f4f7f6; }
         #container { background: white; padding: 30px; border-radius: 20px; box-shadow: 0 10px 30px rgba(0,0,0,0.1); text-align: center; width: 720px; }
         .subject-info-box { background: #fff; border: 2px solid #2e7d32; padding: 15px; border-radius: 10px; margin-bottom: 20px; display: flex; align-items: center; justify-content: center; gap: 15px; }
@@ -18,20 +19,19 @@
         .question-text { grid-column: span 2; font-weight: bold; margin-bottom: 10px; color: #d32f2f; font-size: 1.4rem; }
         #log-container { margin-top: 25px; text-align: left; font-size: 12px; max-height: 150px; overflow-y: auto; background: #fafafa; padding: 10px; border: 1px solid #eee; }
         .session-btn-container { display: flex; gap: 10px; margin-bottom: 20px; }
-        /* 미리보기 강조 스타일 */
         .preview-box { font-size: 1.2rem; color: #e65100; font-weight: 800; background: #ffe0b2; padding: 5px 10px; border-radius: 5px; }
-        /* 컨디션 표시 스타일 추가 */
         .condition-badge { background: #d32f2f; color: white; padding: 5px 15px; border-radius: 20px; font-size: 0.9rem; margin-bottom: 10px; display: inline-block; font-weight: bold; }
     </style>
 </head>
 <body>
 
 <div id="container">
-    <h2>Vibrotactile 2PD (Full Random Mode)</h2>
+    <h2>Vibrotactile 2PD (Condition Mode)</h2>
     <div id="cond-badge" class="condition-badge" style="display:none;">Condition: Ready</div>
     <br>
     <button onclick="openSubjectWindow()" style="background:#43a047; color:white; width:auto; margin-bottom:15px;">1. Open Subject Window</button>
     
+    <!-- 이하 기존 HTML 구조 동일 -->
     <div class="subject-info-box">
         <label>Subject ID:</label>
         <input type="text" id="subjectId" value="S01" style="padding:5px; width:60px; text-align:center;">
@@ -80,46 +80,51 @@
     let currentIdx = 0;
     let selectedAxis = "";
     
-    // 컨디션 설정
     const sessionConditions = ['In-air', 'On-touch'];
     let currentConditionIdx = 0;
+
+    const imgSrc = "guide_image.png"; 
 
     const distanceMap = [
         { p1: 'd', p2: 'e', dist: 2.5, axis: 'LR', q: "Which one was the Left?" },
         { p1: 'c', p2: 'f', dist: 12.5, axis: 'LR', q: "Which one was the Left?" },
         { p1: 'b', p2: 'g', dist: 20.0, axis: 'LR', q: "Which one was the Left?" },
         { p1: 'a', p2: 'h', dist: 35.0, axis: 'LR', q: "Which one was the Left?" },
-        
-        
-        { p1: 'a', p2: 'b', dist: 3.0, axis: 'UD', q: "Which one was the Up?" },
-        { p1: 'b', p2: 'd', dist: 3.0, axis: 'UD', q: "Which one was the Up?" },
-        { p1: 'c', p2: 'd', dist: 3.0, axis: 'UD', q: "Which one was the Up?" },
-        { p1: 'b', p2: 'c', dist: 3.0, axis: 'UD', q: "Which one was the Up?" },
-        { p1: 'g', p2: 'h', dist: 3.0, axis: 'UD', q: "Which one was the Up?" },
-        { p1: 'a', p2: 'c', dist: 10.0, axis: 'UD', q: "Which one was the Up?" },
-        { p1: 'h', p2: 'f', dist: 3.0, axis: 'UD', q: "Which one was the Up?" },
-        { p1: 'h', p2: 'g', dist: 3.0, axis: 'UD', q: "Which one was the Up?" },
-        { p1: 'h', p2: 'e', dist: 3.0, axis: 'UD', q: "Which one was the Up?" },
-        { p1: 'f', p2: 'e', dist: 3.0, axis: 'UD', q: "Which one was the Up?" },
-        { p1: 'g', p2: 'f', dist: 3.0, axis: 'UD', q: "Which one was the Up?" },
-        { p1: 'g', p2: 'e', dist: 3.0, axis: 'UD', q: "Which one was the Left?" }
+        { p1: 'a', p2: 'b', dist: 3.0, axis: 'UD', q: "Which one was the Proximal?" },
+        { p1: 'b', p2: 'd', dist: 3.0, axis: 'UD', q: "Which one was the Proximal?" },
+        { p1: 'c', p2: 'd', dist: 3.0, axis: 'UD', q: "Which one was the Proximal?" },
+        { p1: 'b', p2: 'c', dist: 3.0, axis: 'UD', q: "Which one was the Proximal?" },
+        { p1: 'g', p2: 'h', dist: 3.0, axis: 'UD', q: "Which one was the Proximal?" },
+        { p1: 'a', p2: 'c', dist: 10.0, axis: 'UD', q: "Which one was the Proximal?" },
+        { p1: 'h', p2: 'f', dist: 3.0, axis: 'UD', q: "Which one was the Proximal?" },
+        { p1: 'h', p2: 'g', dist: 3.0, axis: 'UD', q: "Which one was the Proximal?" },
+        { p1: 'h', p2: 'e', dist: 3.0, axis: 'UD', q: "Which one was the Proximal?" },
+        { p1: 'f', p2: 'e', dist: 3.0, axis: 'UD', q: "Which one was the Proximal?" },
+        { p1: 'g', p2: 'f', dist: 3.0, axis: 'UD', q: "Which one was the Proximal?" },
+        { p1: 'g', p2: 'e', dist: 3.0, axis: 'UD', q: "Which one was the Proximal?" }
     ];
 
     function openSubjectWindow() {
-        subjectWindow = window.open("", "SubjectWindow", "width=600,height=400");
+        subjectWindow = window.open("", "SubjectWindow", "width=800,height=900");
         subjectWindow.document.write(`
-            <html><body style="background:#222; color:white; display:flex; align-items:center; justify-content:center; height:100vh; font-family:sans-serif; overflow:hidden;">
+            <html><body style="background:#222; color:white; display:flex; flex-direction:column; align-items:center; justify-content:center; height:100vh; font-family:sans-serif; overflow:hidden; margin:0;">
                 <div style="text-align:center;">
-                    <h1 id="msg" style="font-size:3rem;">Ready</h1>
-                    <div id="indicator" style="width:80px; height:80px; border-radius:50%; margin:20px auto; background:transparent;"></div>
+                    <h1 id="msg" style="font-size:3rem; margin-bottom:20px;">Ready</h1>
+                    <div id="indicator" style="width:60px; height:60px; border-radius:50%; margin:0 auto 30px auto; background:transparent;"></div>
+                    <img id="guide-img" src="${imgSrc}" style="width:400px; height:auto; opacity:0.8; border:2px solid #444; border-radius:10px;">
                 </div>
-                <script>function updateState(txt, color, indColor){ 
-                    document.getElementById('msg').innerText=txt; 
-                    document.body.style.backgroundColor=color; 
-                    document.getElementById('indicator').style.backgroundColor=indColor || 'transparent';
-                }<\/script>
+                <script>
+                    function updateState(txt, color, indColor, showImg){ 
+                        document.getElementById('msg').innerText = txt; 
+                        document.body.style.backgroundColor = color; 
+                        document.getElementById('indicator').style.backgroundColor = indColor || 'transparent';
+                        document.getElementById('guide-img').style.display = showImg ? 'block' : 'none';
+                    }
+                <\/script>
             </body></html>`);
     }
+
+    // selectSession, initiateCondition, generateTrialList, updateAdminPreview 함수는 기존과 동일
 
     function selectSession(axis) {
         selectedAxis = axis;
@@ -179,14 +184,17 @@
         document.getElementById('startBtn').disabled = true;
         document.getElementById('ans-grid').style.display = 'none';
 
-        subjectWindow.updateState("Stimulus 1", "#1b5e20", "#4caf50");
+        // 2IFC Sequence - 자극 제시 중에는 이미지를 숨기거나 흐리게 처리 (선택 가능)
+        // 여기서는 자극 제시 중(Stim 1, Interval, Stim 2)에는 이미지를 숨기고 질문 시에만 보여줍니다.
+        subjectWindow.updateState("Stimulus 1", "#1b5e20", "#4caf50", false);
         await progress(200); 
-        subjectWindow.updateState("Interval", "#222", "transparent");
+        subjectWindow.updateState("Interval", "#222", "transparent", false);
         await progress(1000); 
-        subjectWindow.updateState("Stimulus 2", "#b71c1c", "#f44336");
+        subjectWindow.updateState("Stimulus 2", "#b71c1c", "#f44336", false);
         await progress(200); 
 
-        subjectWindow.updateState(currentTrial.q, "#1565c0", "transparent");
+        // 질문 단계에서 이미지 표시
+        subjectWindow.updateState(currentTrial.q, "#1565c0", "transparent", true);
         
         window.activeTrialData = { 
             condition: currentTrial.condition,
@@ -209,6 +217,8 @@
             }, 20);
         });
     }
+
+    // logResponse, moveToNextCondition, downloadCSV 함수는 기존과 동일
 
     function logResponse(choice) {
         const info = window.activeTrialData;
@@ -252,7 +262,7 @@
             alert("모든 실험 조건 종료.");
             document.getElementById('startBtn').innerText = "All Finished";
             document.getElementById('startBtn').disabled = true;
-            subjectWindow.updateState("Experiment Completed", "#222", "transparent");
+            subjectWindow.updateState("Experiment Completed", "#222", "transparent", false);
         }
     }
 
