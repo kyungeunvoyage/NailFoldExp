@@ -18,7 +18,7 @@
         .btn-stim { background: #ff4757; color: white; }
         .btn-reset { background: #95a5a6; color: white; }
         .btn-expand { background: #16a085; color: white; } 
-        .btn-final { background: #2c3e50; color: white; } /* Final Stimuli 버튼 색상 */
+        .btn-final { background: #2c3e50; color: white; }
         button:hover { opacity: 0.8; transform: translateY(-1px); }
         .status-bar { background: #34495e; color: white; padding: 10px; border-radius: 6px; margin-bottom: 10px; min-width: 450px; font-weight: 500; }
     </style>
@@ -81,6 +81,15 @@
         };
         reader.readAsDataURL(e.target.files[0]);
     });
+
+    // 이차 베지에 곡선 위의 점을 계산하는 함수 (t: 0~1)
+    function getBezierPoint(t, p0, p1, p2) {
+        const invT = 1 - t;
+        return {
+            x: invT * invT * p0.x + 2 * invT * t * p1.x + t * t * p2.x,
+            y: invT * invT * p0.y + 2 * invT * t * p1.y + t * t * p2.y
+        };
+    }
 
     function drawRuler() {
         ctx.fillStyle = "#34495e";
@@ -269,20 +278,22 @@
         const proximalLimitY = guideLines.bottomY + (guideLines.dipjY - guideLines.bottomY) * 0.4;
 
         const extendedUp = up.map((p, index) => {
-            if (index === 0 || index === 4) {
-                return {x: p.x, y: p.y};
-            } else if (index === 2) {
+            if (index === 2) {
                 return {x: p.x, y: proximalLimitY};
             } else {
                 let newX = p.x;
-                if (index === 1) { 
+                if (index === 0 || index === 1) { 
                     newX = leftLimitX + (p.x - up[0].x) * 0.5;
-                } else if (index === 3) { 
+                } 
+                else if (index === 3 || index === 4) { 
                     newX = rightLimitX - (up[4].x - p.x) * 0.5; 
                 }
+
                 const minY = Math.min(...up.map(pt => pt.y));
-                const maxY = Math.max(...up.map(pt => pt.y));
-                const ratioY = (p.y - minY) / (maxY - minY);
+                const maxY = Math.max(...pt.y ? [pt.y] : up.map(pt => pt.y)); 
+                const actualMaxY = Math.max(...up.map(pt => pt.y));
+                const ratioY = (p.y - minY) / (actualMaxY - minY);
+                
                 const newY = minY + ratioY * (proximalLimitY - minY);
                 return {x: newX, y: newY};
             }
@@ -300,13 +311,55 @@
         ctx.stroke();
 
         if (!onlyDraw) {
-            status.innerText = "U-Curve 확장 완료";
+            status.innerText = "U-Curve 확장 완료 (V1-V5 전체 확장 적용)";
             drawEverything();
         }
         return extendedUp; 
     }
 
+    function generateStimulusPoints() {
+        if (guideLines.uPoints.length < 5) return;
+        isStimulusGenerated = true; 
+        isFinalView = false;
+        drawEverything();
+        
+        // 확장된 커브 좌표 가져오기
+        const ext = expandUCurve(true); 
+        if (!ext) return;
+
+        const stimY_upper = (guideLines.topY + guideLines.midY) / 2;
+        const stimY_lower = (guideLines.midY + guideLines.bottomY) / 2;
+        const stimY_DE = guideLines.bottomY + (guideLines.dipjY - guideLines.bottomY) * 0.2;
+        
+        const leftLateralX = guideLines.outlines[0] + (guideLines.leftX - guideLines.outlines[0]) * 0.5;
+        const rightLateralX = guideLines.outlines[1] - (guideLines.outlines[1] - guideLines.rightX) * 0.5;
+        
+        const stimX_leftInner = (guideLines.leftX + guideLines.midX) / 2;
+        const stimX_rightInner = (guideLines.midX + guideLines.rightX) / 2;
+
+        // C와 F를 곡선 위 특정 비율(t) 지점에 배치
+        // t=0.8은 첫번째 곡선(ext[0]-ext[1]-ext[2])의 하단 부근
+        // t=0.2는 두번째 곡선(ext[2]-ext[3]-ext[4])의 상단 부근
+        const pointC = getBezierPoint(0.8, ext[0], ext[1], ext[2]);
+        const pointF = getBezierPoint(0.2, ext[2], ext[3], ext[4]);
+
+        const stimPoints = [
+            {label: 'a', x: leftLateralX, y: stimY_upper}, 
+            {label: 'b', x: leftLateralX, y: stimY_lower},
+            {label: 'c', x: pointC.x, y: pointC.y}, 
+            {label: 'd', x: stimX_leftInner, y: stimY_DE},
+            {label: 'e', x: stimX_rightInner, y: stimY_DE}, 
+            {label: 'f', x: pointF.x, y: pointF.y},
+            {label: 'g', x: rightLateralX, y: stimY_lower}, 
+            {label: 'h', x: rightLateralX, y: stimY_upper}
+        ];
+
+        stimPoints.forEach(p => drawStimulusPoint(p.x, p.y, p.label));
+        status.innerText = "자극점 생성 완료 (c, f 점이 확장 커브 라인에 고정됨)";
+    }
+
     function showFinalStimuli() {
+        if (guideLines.uPoints.length < 5) return;
         isFinalView = true;
         isStimulusGenerated = false;
         
@@ -314,83 +367,48 @@
         ctx.drawImage(img, RULER_SIZE, RULER_SIZE);
         drawRuler();
 
-        // 1. 원본 주황색 커브 그리기
-        if (guideLines.uPoints.length === 5) {
-            ctx.strokeStyle = "#f39c12"; ctx.lineWidth = 3; ctx.setLineDash([]);
-            ctx.beginPath();
-            const up = guideLines.uPoints;
-            ctx.moveTo(up[0].x + RULER_SIZE, up[0].y + RULER_SIZE);
-            for (let i = 0; i < up.length - 1; i++) {
-                const midX = (up[i].x + up[i+1].x) / 2;
-                const midY = (up[i].y + up[i+1].y) / 2;
-                ctx.quadraticCurveTo(up[i].x + RULER_SIZE, up[i].y + RULER_SIZE, midX + RULER_SIZE, midY + RULER_SIZE);
-            }
-            ctx.lineTo(up[4].x + RULER_SIZE, up[4].y + RULER_SIZE);
-            ctx.stroke();
+        // 1. 원본 주황색 커브
+        ctx.strokeStyle = "#f39c12"; ctx.lineWidth = 3; ctx.setLineDash([]);
+        ctx.beginPath();
+        const up = guideLines.uPoints;
+        ctx.moveTo(up[0].x + RULER_SIZE, up[0].y + RULER_SIZE);
+        for (let i = 0; i < up.length - 1; i++) {
+            const midX = (up[i].x + up[i+1].x) / 2;
+            const midY = (up[i].y + up[i+1].y) / 2;
+            ctx.quadraticCurveTo(up[i].x + RULER_SIZE, up[i].y + RULER_SIZE, midX + RULER_SIZE, midY + RULER_SIZE);
         }
+        ctx.lineTo(up[4].x + RULER_SIZE, up[4].y + RULER_SIZE);
+        ctx.stroke();
 
-        // 2. 확장된 흰색 커브 그리기
-        expandUCurve(true);
+        // 2. 확장된 흰색 커브
+        const ext = expandUCurve(true);
 
-        // 3. 자극점 생성 및 표시
-        const stimY_upper = (guideLines.topY + guideLines.midY) / 2;
-        const stimY_lower = (guideLines.midY + guideLines.bottomY) / 2;
-        const stimY_DE = guideLines.bottomY + (guideLines.dipjY - guideLines.bottomY) * 0.2;
-        
-        const leftLateralX = guideLines.outlines[0] + (guideLines.leftX - guideLines.outlines[0]) * 0.5;
-        const rightLateralX = guideLines.outlines[1] - (guideLines.outlines[1] - guideLines.rightX) * 0.5;
-        
-        const stimX_leftInner = (guideLines.leftX + guideLines.midX) / 2;
-        const stimX_rightInner = (guideLines.midX + guideLines.rightX) / 2;
-        const stimX_leftSide = (guideLines.outlines[0] + guideLines.leftX) / 2;
-        const stimX_rightSide = (guideLines.rightX + guideLines.outlines[1]) / 2;
+        // 3. 자극점 표시 (곡선 위 고정 포함)
+        if(ext) {
+            const stimY_upper = (guideLines.topY + guideLines.midY) / 2;
+            const stimY_lower = (guideLines.midY + guideLines.bottomY) / 2;
+            const stimY_DE = guideLines.bottomY + (guideLines.dipjY - guideLines.bottomY) * 0.2;
+            const leftLateralX = guideLines.outlines[0] + (guideLines.leftX - guideLines.outlines[0]) * 0.5;
+            const rightLateralX = guideLines.outlines[1] - (guideLines.outlines[1] - guideLines.rightX) * 0.5;
+            const stimX_leftInner = (guideLines.leftX + guideLines.midX) / 2;
+            const stimX_rightInner = (guideLines.midX + guideLines.rightX) / 2;
 
-        const stimPoints = [
-            {label: 'a', x: leftLateralX, y: stimY_upper}, 
-            {label: 'b', x: leftLateralX, y: stimY_lower},
-            {label: 'c', x: (leftLateralX + stimX_leftInner)/2, y: (stimY_lower + stimY_DE)/2}, 
-            {label: 'd', x: stimX_leftInner, y: stimY_DE},
-            {label: 'e', x: stimX_rightInner, y: stimY_DE}, 
-            {label: 'f', x: (rightLateralX + stimX_rightInner)/2, y: (stimY_lower + stimY_DE)/2},
-            {label: 'g', x: rightLateralX, y: stimY_lower}, 
-            {label: 'h', x: rightLateralX, y: stimY_upper}
-        ];
+            const pointC = getBezierPoint(0.8, ext[0], ext[1], ext[2]);
+            const pointF = getBezierPoint(0.2, ext[2], ext[3], ext[4]);
 
-        stimPoints.forEach(p => drawStimulusPoint(p.x, p.y, p.label));
-        status.innerText = "Final Stimuli View: 원본/확장 커브 및 자극점 통합 표시";
-    }
-
-    function generateStimulusPoints() {
-        isStimulusGenerated = true; 
-        isFinalView = false;
-        drawEverything();
-        if(isCurveExpanded) expandUCurve(true);
-
-        const stimY_upper = (guideLines.topY + guideLines.midY) / 2;
-        const stimY_lower = (guideLines.midY + guideLines.bottomY) / 2;
-        const stimY_DE = guideLines.bottomY + (guideLines.dipjY - guideLines.bottomY) * 0.2;
-        
-        const leftLateralX = guideLines.outlines[0] + (guideLines.leftX - guideLines.outlines[0]) * 0.5;
-        const rightLateralX = guideLines.outlines[1] - (guideLines.outlines[1] - guideLines.rightX) * 0.5;
-        
-        const stimX_leftInner = (guideLines.leftX + guideLines.midX) / 2;
-        const stimX_rightInner = (guideLines.midX + guideLines.rightX) / 2;
-        const stimX_leftSide = (guideLines.outlines[0] + guideLines.leftX) / 2;
-        const stimX_rightSide = (guideLines.rightX + guideLines.outlines[1]) / 2;
-
-        const stimPoints = [
-            {label: 'a', x: leftLateralX, y: stimY_upper}, 
-            {label: 'b', x: leftLateralX, y: stimY_lower},
-            {label: 'c', x: (leftLateralX + stimX_leftInner)/2, y: (stimY_lower + stimY_DE)/2}, 
-            {label: 'd', x: stimX_leftInner, y: stimY_DE},
-            {label: 'e', x: stimX_rightInner, y: stimY_DE}, 
-            {label: 'f', x: (rightLateralX + stimX_rightInner)/2, y: (stimY_lower + stimY_DE)/2},
-            {label: 'g', x: rightLateralX, y: stimY_lower}, 
-            {label: 'h', x: rightLateralX, y: stimY_upper}
-        ];
-
-        stimPoints.forEach(p => drawStimulusPoint(p.x, p.y, p.label));
-        status.innerText = "자극점 생성 완료";
+            const stimPoints = [
+                {label: 'a', x: leftLateralX, y: stimY_upper}, 
+                {label: 'b', x: leftLateralX, y: stimY_lower},
+                {label: 'c', x: pointC.x, y: pointC.y}, 
+                {label: 'd', x: stimX_leftInner, y: stimY_DE},
+                {label: 'e', x: stimX_rightInner, y: stimY_DE}, 
+                {label: 'f', x: pointF.x, y: pointF.y},
+                {label: 'g', x: rightLateralX, y: stimY_lower}, 
+                {label: 'h', x: rightLateralX, y: stimY_upper}
+            ];
+            stimPoints.forEach(p => drawStimulusPoint(p.x, p.y, p.label));
+        }
+        status.innerText = "Final Stimuli View: 모든 가이드 및 자극점 표시";
     }
 
     function resetCanvas() {
