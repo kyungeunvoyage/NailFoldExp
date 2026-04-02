@@ -1,0 +1,412 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <title>Nail Precision Guide Tool</title>
+    <style>
+        body { font-family: 'Segoe UI', sans-serif; display: flex; flex-direction: column; align-items: center; background: #f0f2f5; margin: 0; padding: 20px; }
+        .container { background: white; padding: 20px; border-radius: 12px; box-shadow: 0 4px 20px rgba(0,0,0,0.1); text-align: center; }
+        .canvas-wrapper { position: relative; margin-top: 30px; display: inline-block; padding-top: 30px; padding-left: 30px; background: #eee; border-radius: 8px; }
+        canvas { border: 1px solid #ddd; cursor: crosshair; display: block; background-color: white; }
+        .controls { margin-bottom: 15px; display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; }
+        button { padding: 12px 20px; border: none; border-radius: 8px; cursor: pointer; font-weight: bold; transition: 0.2s; }
+        .btn-v { background: #e74c3c; color: white; } 
+        .btn-h { background: #3498db; color: white; } 
+        .btn-u { background: #f39c12; color: white; } 
+        .btn-dipj { background: #27ae60; color: white; }
+        .btn-outline { background: #8e44ad; color: white; } 
+        .btn-stim { background: #ff4757; color: white; }
+        .btn-reset { background: #95a5a6; color: white; }
+        .btn-expand { background: #16a085; color: white; } 
+        .btn-final { background: #2c3e50; color: white; } /* Final Stimuli 버튼 색상 */
+        button:hover { opacity: 0.8; transform: translateY(-1px); }
+        .status-bar { background: #34495e; color: white; padding: 10px; border-radius: 6px; margin-bottom: 10px; min-width: 450px; font-weight: 500; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h2>Nail & Finger Stimulus Point Tool</h2>
+    <div class="status-bar" id="status">이미지를 업로드하세요.</div>
+
+    <div class="controls">
+        <input type="file" id="upload" accept="image/*">
+        <button class="btn-u" onclick="setMode('u-curve')">0. U-Curve (V1-V5 클릭)</button>
+        <button class="btn-v" onclick="setMode('vertical')">1. 상/하 가이드</button>
+        <button class="btn-h" onclick="setMode('horizontal')">2. 좌/우 가이드</button>
+        <button class="btn-dipj" onclick="setMode('dipj')">3. DIPJ 설정</button>
+        <button class="btn-outline" onclick="setMode('outline')">4. Finger Outline</button>
+        <button class="btn-expand" id="expandBtn" onclick="expandUCurve()" disabled>7. U-Curve 확장</button>
+        <button class="btn-stim" id="stimBtn" onclick="generateStimulusPoints()" disabled>자극점 생성</button>
+        <button class="btn-final" id="finalBtn" onclick="showFinalStimuli()" disabled>Final Stimuli</button>
+        <button class="btn-reset" onclick="resetCanvas()">초기화</button>
+    </div>
+
+    <div class="canvas-wrapper">
+        <canvas id="canvas"></canvas>
+    </div>
+</div>
+
+<script>
+    const canvas = document.getElementById('canvas');
+    const ctx = canvas.getContext('2d');
+    const status = document.getElementById('status');
+    const stimBtn = document.getElementById('stimBtn');
+    const expandBtn = document.getElementById('expandBtn');
+    const finalBtn = document.getElementById('finalBtn');
+    let img = new Image();
+    let mode = 'none';
+    let points = [];
+    let isStimulusGenerated = false;
+    let isCurveExpanded = false;
+    let isFinalView = false;
+
+    const RULER_SIZE = 30; 
+    let guideLines = { 
+        topY: null, midY: null, bottomY: null, 
+        leftX: null, midX: null, rightX: null, 
+        dipjY: null, outlines: [], uPoints: [] 
+    };
+
+    document.getElementById('upload').addEventListener('change', (e) => {
+        const reader = new FileReader();
+        reader.onload = (event) => {
+            img.onload = () => {
+                canvas.width = img.width + RULER_SIZE;
+                canvas.height = img.height + RULER_SIZE;
+                drawEverything();
+                status.innerText = `이미지 로드 완료 (${img.width}x${img.height} px)`;
+            };
+            img.src = event.target.result;
+        };
+        reader.readAsDataURL(e.target.files[0]);
+    });
+
+    function drawRuler() {
+        ctx.fillStyle = "#34495e";
+        ctx.font = "10px Arial";
+        ctx.strokeStyle = "#34495e";
+        ctx.lineWidth = 1;
+        for (let x = 0; x <= img.width; x += 10) {
+            let posX = x + RULER_SIZE;
+            ctx.beginPath(); ctx.moveTo(posX, RULER_SIZE);
+            if (x % 100 === 0) { ctx.lineTo(posX, 0); ctx.fillText(x, posX + 2, 10); }
+            else if (x % 50 === 0) ctx.lineTo(posX, 10);
+            else ctx.lineTo(posX, 20);
+            ctx.stroke();
+        }
+        for (let y = 0; y <= img.height; y += 10) {
+            let posY = y + RULER_SIZE;
+            ctx.beginPath(); ctx.moveTo(RULER_SIZE, posY);
+            if (y % 100 === 0) {
+                ctx.lineTo(0, posY); ctx.save(); ctx.translate(10, posY + 2); ctx.rotate(-Math.PI / 2);
+                ctx.fillText(y, 0, 0); ctx.restore();
+            }
+            else if (y % 50 === 0) ctx.lineTo(10, posY);
+            else ctx.lineTo(20, posY);
+            ctx.stroke();
+        }
+    }
+
+    function drawEverything() {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        if (img.src) {
+            ctx.drawImage(img, RULER_SIZE, RULER_SIZE);
+            drawRuler();
+            if (!isFinalView) renderAllGuides();
+            
+            points.forEach((p, index) => {
+                ctx.fillStyle = "white";
+                ctx.beginPath(); ctx.arc(p.x + RULER_SIZE, p.y + RULER_SIZE, 3, 0, Math.PI * 2); ctx.fill();
+                ctx.strokeStyle = "black"; ctx.lineWidth = 0.5; ctx.stroke();
+                if(mode === 'u-curve') {
+                    ctx.fillStyle = "black";
+                    ctx.font = "10px Arial";
+                    ctx.fillText(`V${index+1}`, p.x + RULER_SIZE + 5, p.y + RULER_SIZE);
+                }
+            });
+        }
+    }
+
+    canvas.onclick = (e) => {
+        if (mode === 'none' || !img.src) return;
+        const rect = canvas.getBoundingClientRect();
+        const rawX = (e.clientX - rect.left) * (canvas.width / rect.width);
+        const rawY = (e.clientY - rect.top) * (canvas.height / rect.height);
+        if (rawX < RULER_SIZE || rawY < RULER_SIZE) return;
+
+        const x = rawX - RULER_SIZE;
+        const y = rawY - RULER_SIZE;
+        const currentClickPoint = {x, y};
+
+        points.push(currentClickPoint);
+        drawEverything();
+
+        if (mode === 'u-curve') {
+            status.innerText = `U-Curve: V${points.length}/V5 지점 선택됨`;
+            if (points.length === 5) {
+                guideLines.uPoints = [...points]; 
+                finalizeSelection();
+            }
+        } else if (mode === 'dipj' && points.length === 1) {
+            guideLines.dipjY = points[0].y;
+            finalizeSelection();
+        } else if (points.length === 2) {
+            if (mode === 'vertical') {
+                guideLines.topY = Math.min(points[0].y, points[1].y);
+                guideLines.bottomY = Math.max(points[0].y, points[1].y);
+                guideLines.midY = (guideLines.topY + guideLines.bottomY) / 2;
+            } else if (mode === 'horizontal') {
+                guideLines.leftX = Math.min(points[0].x, points[1].x);
+                guideLines.rightX = Math.max(points[0].x, points[1].x);
+                guideLines.midX = (guideLines.leftX + guideLines.rightX) / 2;
+            } else if (mode === 'outline') {
+                guideLines.outlines = [Math.min(points[0].x, points[1].x), Math.max(points[0].x, points[1].x)];
+            }
+            finalizeSelection();
+        }
+    };
+
+    function finalizeSelection() {
+        drawEverything();
+        checkReady();
+        points = [];
+        mode = 'none';
+        isStimulusGenerated = false; 
+        isFinalView = false;
+    }
+
+    function checkReady() {
+        if (guideLines.topY !== null && guideLines.leftX !== null && guideLines.outlines.length === 2 && guideLines.dipjY !== null) {
+            stimBtn.disabled = false;
+        }
+        if (guideLines.uPoints.length === 5 && guideLines.dipjY !== null && guideLines.outlines.length === 2) {
+            expandBtn.disabled = false;
+            finalBtn.disabled = false;
+        }
+    }
+
+    function drawHLine(y) { ctx.beginPath(); ctx.moveTo(RULER_SIZE, y + RULER_SIZE); ctx.lineTo(canvas.width, y + RULER_SIZE); ctx.stroke(); }
+    function drawVLine(x) { ctx.beginPath(); ctx.moveTo(x + RULER_SIZE, RULER_SIZE); ctx.lineTo(x + RULER_SIZE, canvas.height); ctx.stroke(); }
+    
+    function drawStimulusPoint(x, y, label) {
+        ctx.fillStyle = "yellow";
+        ctx.beginPath(); ctx.arc(x + RULER_SIZE, y + RULER_SIZE, 4, 0, Math.PI * 2); ctx.fill();
+        ctx.fillStyle = "black";
+        ctx.font = "bold 12px Segoe UI, sans-serif";
+        ctx.textAlign = "left";
+        ctx.fillText(label, x + RULER_SIZE + 6, y + RULER_SIZE + 4);
+    }
+
+    function setMode(newMode) { 
+        if (!img.src) return; 
+        mode = newMode; 
+        points = []; 
+        isStimulusGenerated = false; 
+        isFinalView = false;
+        if (newMode === 'u-curve') {
+            status.innerText = "V1부터 V5까지 순서대로 클릭하세요.";
+        } else {
+            status.innerText = "설정 위치를 클릭하세요."; 
+        }
+        drawEverything();
+    }
+
+    function renderAllGuides() {
+        if (isStimulusGenerated || isFinalView) return;
+
+        if (guideLines.uPoints.length === 5) {
+            ctx.strokeStyle = "#f39c12"; ctx.lineWidth = 3; ctx.setLineDash([]);
+            ctx.beginPath();
+            const up = guideLines.uPoints;
+            ctx.moveTo(up[0].x + RULER_SIZE, up[0].y + RULER_SIZE);
+            for (let i = 0; i < up.length - 1; i++) {
+                const midX = (up[i].x + up[i+1].x) / 2;
+                const midY = (up[i].y + up[i+1].y) / 2;
+                ctx.quadraticCurveTo(up[i].x + RULER_SIZE, up[i].y + RULER_SIZE, midX + RULER_SIZE, midY + RULER_SIZE);
+            }
+            ctx.lineTo(up[4].x + RULER_SIZE, up[4].y + RULER_SIZE);
+            ctx.stroke();
+
+            ctx.fillStyle = "#f39c12";
+            up.forEach((p, i) => {
+                ctx.beginPath(); ctx.arc(p.x + RULER_SIZE, p.y + RULER_SIZE, 4, 0, Math.PI * 2); ctx.fill();
+                ctx.fillStyle = "black";
+                ctx.fillText(`V${i+1}`, p.x + RULER_SIZE + 5, p.y + RULER_SIZE);
+                ctx.fillStyle = "#f39c12";
+            });
+        }
+
+        if (isCurveExpanded) {
+            expandUCurve(true);
+        }
+
+        if (guideLines.topY !== null) {
+            ctx.lineWidth = 4; ctx.setLineDash([15, 10]); ctx.strokeStyle = "#e74c3c";
+            drawHLine(guideLines.topY); drawHLine(guideLines.bottomY);
+            ctx.setLineDash([]); ctx.strokeStyle = "#f1c40f"; drawHLine(guideLines.midY);
+        }
+        if (guideLines.leftX !== null) {
+            ctx.lineWidth = 4; ctx.setLineDash([15, 10]); ctx.strokeStyle = "#3498db";
+            drawVLine(guideLines.leftX); drawVLine(guideLines.rightX);
+            ctx.setLineDash([]); ctx.strokeStyle = "#2ecc71"; drawVLine(guideLines.midX);
+        }
+        if (guideLines.dipjY !== null) {
+            ctx.lineWidth = 3; ctx.setLineDash([]); ctx.strokeStyle = "#27ae60"; drawHLine(guideLines.dipjY);
+        }
+        if (guideLines.outlines.length === 2) {
+            ctx.lineWidth = 3; ctx.setLineDash([]); ctx.strokeStyle = "#8e44ad"; guideLines.outlines.forEach(x => drawVLine(x));
+        }
+    }
+
+    function expandUCurve(onlyDraw = false) {
+        if (guideLines.uPoints.length < 5) return;
+        if (!onlyDraw) { isCurveExpanded = true; isFinalView = false; }
+        
+        const up = guideLines.uPoints;
+        const leftLimitX = guideLines.outlines[0];
+        const rightLimitX = guideLines.outlines[1];
+        const proximalLimitY = guideLines.bottomY + (guideLines.dipjY - guideLines.bottomY) * 0.4;
+
+        const extendedUp = up.map((p, index) => {
+            if (index === 0 || index === 4) {
+                return {x: p.x, y: p.y};
+            } else if (index === 2) {
+                return {x: p.x, y: proximalLimitY};
+            } else {
+                let newX = p.x;
+                if (index === 1) { 
+                    newX = leftLimitX + (p.x - up[0].x) * 0.5;
+                } else if (index === 3) { 
+                    newX = rightLimitX - (up[4].x - p.x) * 0.5; 
+                }
+                const minY = Math.min(...up.map(pt => pt.y));
+                const maxY = Math.max(...up.map(pt => pt.y));
+                const ratioY = (p.y - minY) / (maxY - minY);
+                const newY = minY + ratioY * (proximalLimitY - minY);
+                return {x: newX, y: newY};
+            }
+        });
+
+        ctx.strokeStyle = "white"; ctx.lineWidth = 3; ctx.setLineDash([]);
+        ctx.beginPath();
+        ctx.moveTo(extendedUp[0].x + RULER_SIZE, extendedUp[0].y + RULER_SIZE);
+        for (let i = 0; i < extendedUp.length - 1; i++) {
+            const midX = (extendedUp[i].x + extendedUp[i+1].x) / 2;
+            const midY = (extendedUp[i].y + extendedUp[i+1].y) / 2;
+            ctx.quadraticCurveTo(extendedUp[i].x + RULER_SIZE, extendedUp[i].y + RULER_SIZE, midX + RULER_SIZE, midY + RULER_SIZE);
+        }
+        ctx.lineTo(extendedUp[4].x + RULER_SIZE, extendedUp[4].y + RULER_SIZE);
+        ctx.stroke();
+
+        if (!onlyDraw) {
+            status.innerText = "U-Curve 확장 완료";
+            drawEverything();
+        }
+        return extendedUp; 
+    }
+
+    function showFinalStimuli() {
+        isFinalView = true;
+        isStimulusGenerated = false;
+        
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        ctx.drawImage(img, RULER_SIZE, RULER_SIZE);
+        drawRuler();
+
+        // 1. 원본 주황색 커브 그리기
+        if (guideLines.uPoints.length === 5) {
+            ctx.strokeStyle = "#f39c12"; ctx.lineWidth = 3; ctx.setLineDash([]);
+            ctx.beginPath();
+            const up = guideLines.uPoints;
+            ctx.moveTo(up[0].x + RULER_SIZE, up[0].y + RULER_SIZE);
+            for (let i = 0; i < up.length - 1; i++) {
+                const midX = (up[i].x + up[i+1].x) / 2;
+                const midY = (up[i].y + up[i+1].y) / 2;
+                ctx.quadraticCurveTo(up[i].x + RULER_SIZE, up[i].y + RULER_SIZE, midX + RULER_SIZE, midY + RULER_SIZE);
+            }
+            ctx.lineTo(up[4].x + RULER_SIZE, up[4].y + RULER_SIZE);
+            ctx.stroke();
+        }
+
+        // 2. 확장된 흰색 커브 그리기
+        expandUCurve(true);
+
+        // 3. 자극점 생성 및 표시
+        const stimY_upper = (guideLines.topY + guideLines.midY) / 2;
+        const stimY_lower = (guideLines.midY + guideLines.bottomY) / 2;
+        const stimY_DE = guideLines.bottomY + (guideLines.dipjY - guideLines.bottomY) * 0.2;
+        
+        const leftLateralX = guideLines.outlines[0] + (guideLines.leftX - guideLines.outlines[0]) * 0.5;
+        const rightLateralX = guideLines.outlines[1] - (guideLines.outlines[1] - guideLines.rightX) * 0.5;
+        
+        const stimX_leftInner = (guideLines.leftX + guideLines.midX) / 2;
+        const stimX_rightInner = (guideLines.midX + guideLines.rightX) / 2;
+        const stimX_leftSide = (guideLines.outlines[0] + guideLines.leftX) / 2;
+        const stimX_rightSide = (guideLines.rightX + guideLines.outlines[1]) / 2;
+
+        const stimPoints = [
+            {label: 'a', x: leftLateralX, y: stimY_upper}, 
+            {label: 'b', x: leftLateralX, y: stimY_lower},
+            {label: 'c', x: (leftLateralX + stimX_leftInner)/2, y: (stimY_lower + stimY_DE)/2}, 
+            {label: 'd', x: stimX_leftInner, y: stimY_DE},
+            {label: 'e', x: stimX_rightInner, y: stimY_DE}, 
+            {label: 'f', x: (rightLateralX + stimX_rightInner)/2, y: (stimY_lower + stimY_DE)/2},
+            {label: 'g', x: rightLateralX, y: stimY_lower}, 
+            {label: 'h', x: rightLateralX, y: stimY_upper}
+        ];
+
+        stimPoints.forEach(p => drawStimulusPoint(p.x, p.y, p.label));
+        status.innerText = "Final Stimuli View: 원본/확장 커브 및 자극점 통합 표시";
+    }
+
+    function generateStimulusPoints() {
+        isStimulusGenerated = true; 
+        isFinalView = false;
+        drawEverything();
+        if(isCurveExpanded) expandUCurve(true);
+
+        const stimY_upper = (guideLines.topY + guideLines.midY) / 2;
+        const stimY_lower = (guideLines.midY + guideLines.bottomY) / 2;
+        const stimY_DE = guideLines.bottomY + (guideLines.dipjY - guideLines.bottomY) * 0.2;
+        
+        const leftLateralX = guideLines.outlines[0] + (guideLines.leftX - guideLines.outlines[0]) * 0.5;
+        const rightLateralX = guideLines.outlines[1] - (guideLines.outlines[1] - guideLines.rightX) * 0.5;
+        
+        const stimX_leftInner = (guideLines.leftX + guideLines.midX) / 2;
+        const stimX_rightInner = (guideLines.midX + guideLines.rightX) / 2;
+        const stimX_leftSide = (guideLines.outlines[0] + guideLines.leftX) / 2;
+        const stimX_rightSide = (guideLines.rightX + guideLines.outlines[1]) / 2;
+
+        const stimPoints = [
+            {label: 'a', x: leftLateralX, y: stimY_upper}, 
+            {label: 'b', x: leftLateralX, y: stimY_lower},
+            {label: 'c', x: (leftLateralX + stimX_leftInner)/2, y: (stimY_lower + stimY_DE)/2}, 
+            {label: 'd', x: stimX_leftInner, y: stimY_DE},
+            {label: 'e', x: stimX_rightInner, y: stimY_DE}, 
+            {label: 'f', x: (rightLateralX + stimX_rightInner)/2, y: (stimY_lower + stimY_DE)/2},
+            {label: 'g', x: rightLateralX, y: stimY_lower}, 
+            {label: 'h', x: rightLateralX, y: stimY_upper}
+        ];
+
+        stimPoints.forEach(p => drawStimulusPoint(p.x, p.y, p.label));
+        status.innerText = "자극점 생성 완료";
+    }
+
+    function resetCanvas() {
+        if(img.src) {
+            guideLines = { topY: null, midY: null, bottomY: null, leftX: null, midX: null, rightX: null, dipjY: null, outlines: [], uPoints: [] };
+            points = [];
+            isStimulusGenerated = false;
+            isCurveExpanded = false;
+            isFinalView = false;
+            drawEverything(); 
+            stimBtn.disabled = true; 
+            expandBtn.disabled = true;
+            finalBtn.disabled = true;
+            status.innerText = "초기화되었습니다.";
+        }
+    }
+</script>
+</body>
+</html>
