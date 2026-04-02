@@ -82,11 +82,9 @@
         reader.readAsDataURL(e.target.files[0]);
     });
 
-    // 특정 X 좌표에 대응하는 베지에 곡선 상의 Y 좌표를 찾는 함수
     function getYonBezier(targetX, p0, p1, p2) {
         let closestY = p0.y;
         let minDiff = Infinity;
-        // t를 세밀하게 나누어 targetX와 가장 가까운 x를 가진 t를 찾음
         for (let t = 0; t <= 1; t += 0.001) {
             const invT = 1 - t;
             const x = invT * invT * p0.x + 2 * invT * t * p1.x + t * t * p2.x;
@@ -154,21 +152,16 @@
 
         const x = rawX - RULER_SIZE;
         const y = rawY - RULER_SIZE;
-        const currentClickPoint = {x, y};
-
-        points.push(currentClickPoint);
+        points.push({x, y});
         drawEverything();
 
-        if (mode === 'u-curve') {
-            status.innerText = `U-Curve: V${points.length}/V5 지점 선택됨`;
-            if (points.length === 5) {
-                guideLines.uPoints = [...points]; 
-                finalizeSelection();
-            }
+        if (mode === 'u-curve' && points.length === 5) {
+            guideLines.uPoints = [...points]; 
+            finalizeSelection();
         } else if (mode === 'dipj' && points.length === 1) {
             guideLines.dipjY = points[0].y;
             finalizeSelection();
-        } else if (points.length === 2) {
+        } else if (points.length === 2 && mode !== 'u-curve') {
             if (mode === 'vertical') {
                 guideLines.topY = Math.min(points[0].y, points[1].y);
                 guideLines.bottomY = Math.max(points[0].y, points[1].y);
@@ -194,9 +187,7 @@
     }
 
     function checkReady() {
-        if (guideLines.topY !== null && guideLines.leftX !== null && guideLines.outlines.length === 2 && guideLines.dipjY !== null) {
-            stimBtn.disabled = false;
-        }
+        if (guideLines.topY !== null && guideLines.leftX !== null && guideLines.outlines.length === 2 && guideLines.dipjY !== null) stimBtn.disabled = false;
         if (guideLines.uPoints.length === 5 && guideLines.dipjY !== null && guideLines.outlines.length === 2) {
             expandBtn.disabled = false;
             finalBtn.disabled = false;
@@ -221,17 +212,12 @@
         points = []; 
         isStimulusGenerated = false; 
         isFinalView = false;
-        if (newMode === 'u-curve') {
-            status.innerText = "V1부터 V5까지 순서대로 클릭하세요.";
-        } else {
-            status.innerText = "설정 위치를 클릭하세요."; 
-        }
+        status.innerText = newMode === 'u-curve' ? "V1부터 V5까지 클릭하세요." : "설정 위치를 클릭하세요.";
         drawEverything();
     }
 
     function renderAllGuides() {
         if (isStimulusGenerated || isFinalView) return;
-
         if (guideLines.uPoints.length === 5) {
             ctx.strokeStyle = "#f39c12"; ctx.lineWidth = 3; ctx.setLineDash([]);
             ctx.beginPath();
@@ -244,21 +230,8 @@
             }
             ctx.lineTo(up[4].x + RULER_SIZE, up[4].y + RULER_SIZE);
             ctx.stroke();
-
-            ctx.fillStyle = "#f39c12";
-            up.forEach((p, i) => {
-                ctx.beginPath(); ctx.arc(p.x + RULER_SIZE, p.y + RULER_SIZE, 4, 0, Math.PI * 2); ctx.fill();
-                ctx.fillStyle = "#f39c12";
-                ctx.font = "bold 10px Arial";
-                ctx.fillText(`V${i+1}`, p.x + RULER_SIZE + 5, p.y + RULER_SIZE);
-            });
         }
-
-        if (isCurveExpanded) {
-            expandUCurve(true);
-            return; 
-        }
-
+        if (isCurveExpanded) { expandUCurve(true); return; }
         if (guideLines.topY !== null) {
             ctx.lineWidth = 4; ctx.setLineDash([15, 10]); ctx.strokeStyle = "#e74c3c";
             drawHLine(guideLines.topY); drawHLine(guideLines.bottomY);
@@ -269,169 +242,79 @@
             drawVLine(guideLines.leftX); drawVLine(guideLines.rightX);
             ctx.setLineDash([]); ctx.strokeStyle = "#2ecc71"; drawVLine(guideLines.midX);
         }
-        if (guideLines.dipjY !== null) {
-            ctx.lineWidth = 3; ctx.setLineDash([]); ctx.strokeStyle = "#27ae60"; drawHLine(guideLines.dipjY);
-        }
-        if (guideLines.outlines.length === 2) {
-            ctx.lineWidth = 3; ctx.setLineDash([]); ctx.strokeStyle = "#8e44ad"; guideLines.outlines.forEach(x => drawVLine(x));
-        }
+        if (guideLines.dipjY !== null) { ctx.lineWidth = 3; ctx.setLineDash([]); ctx.strokeStyle = "#27ae60"; drawHLine(guideLines.dipjY); }
+        if (guideLines.outlines.length === 2) { ctx.lineWidth = 3; ctx.setLineDash([]); ctx.strokeStyle = "#8e44ad"; guideLines.outlines.forEach(x => drawVLine(x)); }
     }
 
     function expandUCurve(onlyDraw = false) {
         if (guideLines.uPoints.length < 5) return;
         if (!onlyDraw) { isCurveExpanded = true; isFinalView = false; }
-        
         const up = guideLines.uPoints;
-        const leftLimitX = guideLines.outlines[0];
-        const rightLimitX = guideLines.outlines[1];
-        
+        const leftLimitX = guideLines.outlines[0], rightLimitX = guideLines.outlines[1];
         const dipjY = guideLines.dipjY !== null ? guideLines.dipjY : up[2].y + 50;
         const bottomY = guideLines.bottomY !== null ? guideLines.bottomY : up[2].y;
         const proximalLimitY = bottomY + (dipjY - bottomY) * 0.4;
 
-        const extendedUp = up.map((p, index) => {
-            if (index === 2) {
-                return {x: p.x, y: proximalLimitY};
-            } else {
-                let newX = p.x;
-                if (index === 0 || index === 1) { 
-                    newX = leftLimitX + (p.x - up[0].x) * 0.5;
-                } 
-                else if (index === 3 || index === 4) { 
-                    newX = rightLimitX - (up[4].x - p.x) * 0.5; 
-                }
-
-                const minY = Math.min(...up.map(pt => pt.y));
-                const maxY = Math.max(...up.map(pt => pt.y));
-                const ratioY = (p.y - minY) / (maxY - minY);
-                const newY = minY + ratioY * (proximalLimitY - minY);
-                return {x: newX, y: newY};
-            }
+        const ext = up.map((p, index) => {
+            if (index === 2) return {x: p.x, y: proximalLimitY};
+            let newX = (index < 2) ? leftLimitX + (p.x - up[0].x) * 0.5 : rightLimitX - (up[4].x - p.x) * 0.5;
+            const minY = Math.min(...up.map(pt => pt.y)), maxY = Math.max(...up.map(pt => pt.y));
+            const ratioY = (p.y - minY) / (maxY - minY);
+            return {x: newX, y: minY + ratioY * (proximalLimitY - minY)};
         });
 
-        ctx.strokeStyle = "white"; ctx.lineWidth = 3; ctx.setLineDash([]);
-        ctx.beginPath();
-        ctx.moveTo(extendedUp[0].x + RULER_SIZE, extendedUp[0].y + RULER_SIZE);
-        for (let i = 0; i < extendedUp.length - 1; i++) {
-            const midX = (extendedUp[i].x + extendedUp[i + 1].x) / 2;
-            const midY = (extendedUp[i].y + extendedUp[i + 1].y) / 2;
-            ctx.quadraticCurveTo(extendedUp[i].x + RULER_SIZE, extendedUp[i].y + RULER_SIZE, midX + RULER_SIZE, midY + RULER_SIZE);
+        ctx.strokeStyle = "white"; ctx.lineWidth = 3; ctx.setLineDash([]); ctx.beginPath();
+        ctx.moveTo(ext[0].x + RULER_SIZE, ext[0].y + RULER_SIZE);
+        for (let i = 0; i < ext.length - 1; i++) {
+            const midX = (ext[i].x + ext[i+1].x) / 2, midY = (ext[i].y + ext[i+1].y) / 2;
+            ctx.quadraticCurveTo(ext[i].x + RULER_SIZE, ext[i].y + RULER_SIZE, midX + RULER_SIZE, midY + RULER_SIZE);
         }
-        ctx.lineTo(extendedUp[4].x + RULER_SIZE, extendedUp[4].y + RULER_SIZE);
+        ctx.lineTo(ext[4].x + RULER_SIZE, ext[4].y + RULER_SIZE);
         ctx.stroke();
-
-        if (!onlyDraw) {
-            status.innerText = "U-Curve 확장 완료 (기타 가이드 비활성화됨)";
-            drawEverything();
-        }
-        return extendedUp; 
+        if (!onlyDraw) { status.innerText = "U-Curve 확장 완료"; drawEverything(); }
+        return ext;
     }
 
     function generateStimulusPoints() {
         if (guideLines.uPoints.length < 5) return;
-        isStimulusGenerated = true; 
-        isFinalView = false;
+        isStimulusGenerated = true; isFinalView = false;
         drawEverything();
-        
         const ext = expandUCurve(true);
-        
-        const stimY_upper = (guideLines.topY + guideLines.midY) / 2;
-        const stimY_lower = (guideLines.midY + guideLines.bottomY) / 2;
+        const stimY_upper = (guideLines.topY + guideLines.midY) / 2, stimY_lower = (guideLines.midY + guideLines.bottomY) / 2;
         const stimY_DE = guideLines.bottomY + (guideLines.dipjY - guideLines.bottomY) * 0.2;
-        
-        const leftLateralX = guideLines.outlines[0] + (guideLines.leftX - guideLines.outlines[0]) * 0.5;
-        const rightLateralX = guideLines.outlines[1] - (guideLines.outlines[1] - guideLines.rightX) * 0.5;
-        
-        const stimX_leftInner = (guideLines.leftX + guideLines.midX) / 2;
-        const stimX_rightInner = (guideLines.midX + guideLines.rightX) / 2;
+        const leftLatX = guideLines.outlines[0] + (guideLines.leftX - guideLines.outlines[0]) * 0.5;
+        const rightLatX = guideLines.outlines[1] - (guideLines.outlines[1] - guideLines.rightX) * 0.5;
+        const stimX_LInner = (guideLines.leftX + guideLines.midX) / 2, stimX_RInner = (guideLines.midX + guideLines.rightX) / 2;
 
-        // X 좌표 결정
-        const stimX_c = (leftLateralX + stimX_leftInner) / 2;
-        const stimX_f = (stimX_rightInner + rightLateralX) / 2;
-
-        // 곡선 궤적 상의 Y 좌표 계산 (확장된 U-Curve 기준)
-        // c 점은 왼쪽 곡선 구간 (ext0-ext1-ext2), f 점은 오른쪽 구간 (ext2-ext3-ext4)
+        const stimX_c = (leftLatX + stimX_LInner) / 2;
+        const stimX_f = (stimX_RInner + rightLatX) / 2;
         const stimY_c = getYonBezier(stimX_c, ext[0], ext[1], ext[2]);
         const stimY_f = getYonBezier(stimX_f, ext[2], ext[3], ext[4]);
 
         const stimPoints = [
-            {label: 'a', x: leftLateralX, y: stimY_upper}, 
-            {label: 'b', x: leftLateralX, y: stimY_lower},
-            {label: 'c', x: stimX_c, y: stimY_c}, 
-            {label: 'd', x: stimX_leftInner, y: stimY_DE},
-            {label: 'e', x: stimX_rightInner, y: stimY_DE}, 
-            {label: 'f', x: stimX_f, y: stimY_f},
-            {label: 'g', x: rightLateralX, y: stimY_lower}, 
-            {label: 'h', x: rightLateralX, y: stimY_upper}
+            {label: 'a', x: leftLatX, y: stimY_upper}, {label: 'b', x: leftLatX, y: stimY_lower},
+            {label: 'c', x: stimX_c, y: stimY_c}, {label: 'd', x: stimX_LInner, y: stimY_DE},
+            {label: 'e', x: stimX_RInner, y: stimY_DE}, {label: 'f', x: stimX_f, y: stimY_f},
+            {label: 'g', x: rightLatX, y: stimY_lower}, {label: 'h', x: rightLatX, y: stimY_upper}
         ];
-
         stimPoints.forEach(p => drawStimulusPoint(p.x, p.y, p.label));
-        status.innerText = "자극점 생성 완료 (c, f: X 좌표 고정 및 곡선 위 배치)";
+        status.innerText = "자극점 생성 완료";
     }
 
     function showFinalStimuli() {
         if (guideLines.uPoints.length < 5) return;
-        isFinalView = true;
-        isStimulusGenerated = false;
-        
+        isFinalView = true; isStimulusGenerated = false;
         ctx.clearRect(0, 0, canvas.width, canvas.height);
         ctx.drawImage(img, RULER_SIZE, RULER_SIZE);
         drawRuler();
-
-        ctx.strokeStyle = "#f39c12"; ctx.lineWidth = 3; ctx.setLineDash([]);
-        ctx.beginPath();
-        const up = guideLines.uPoints;
-        ctx.moveTo(up[0].x + RULER_SIZE, up[0].y + RULER_SIZE);
-        for (let i = 0; i < up.length - 1; i++) {
-            const midX = (up[i].x + up[i+1].x) / 2;
-            const midY = (up[i].y + up[i+1].y) / 2;
-            ctx.quadraticCurveTo(up[i].x + RULER_SIZE, up[i].y + RULER_SIZE, midX + RULER_SIZE, midY + RULER_SIZE);
-        }
-        ctx.lineTo(up[4].x + RULER_SIZE, up[4].y + RULER_SIZE);
-        ctx.stroke();
-
-        const ext = expandUCurve(true);
-
-        const stimY_upper = (guideLines.topY + guideLines.midY) / 2;
-        const stimY_lower = (guideLines.midY + guideLines.bottomY) / 2;
-        const stimY_DE = guideLines.bottomY + (guideLines.dipjY - guideLines.bottomY) * 0.2;
-        const leftLateralX = guideLines.outlines[0] + (guideLines.leftX - guideLines.outlines[0]) * 0.5;
-        const rightLateralX = guideLines.outlines[1] - (guideLines.outlines[1] - guideLines.rightX) * 0.5;
-        const stimX_leftInner = (guideLines.leftX + guideLines.midX) / 2;
-        const stimX_rightInner = (guideLines.midX + guideLines.rightX) / 2;
-
-        const stimX_c = (leftLateralX + stimX_leftInner) / 2;
-        const stimX_f = (stimX_rightInner + rightLateralX) / 2;
-        const stimY_c = getYonBezier(stimX_c, ext[0], ext[1], ext[2]);
-        const stimY_f = getYonBezier(stimX_f, ext[2], ext[3], ext[4]);
-
-        const stimPoints = [
-            {label: 'a', x: leftLateralX, y: stimY_upper}, 
-            {label: 'b', x: leftLateralX, y: stimY_lower},
-            {label: 'c', x: stimX_c, y: stimY_c}, 
-            {label: 'd', x: stimX_leftInner, y: stimY_DE},
-            {label: 'e', x: stimX_rightInner, y: stimY_DE}, 
-            {label: 'f', x: stimX_f, y: stimY_f},
-            {label: 'g', x: rightLateralX, y: stimY_lower}, 
-            {label: 'h', x: rightLateralX, y: stimY_upper}
-        ];
-        stimPoints.forEach(p => drawStimulusPoint(p.x, p.y, p.label));
-        status.innerText = "Final Stimuli View: 자극점 및 가이드 통합 표시";
+        generateStimulusPoints();
     }
 
     function resetCanvas() {
-        if(img.src) {
-            guideLines = { topY: null, midY: null, bottomY: null, leftX: null, midX: null, rightX: null, dipjY: null, outlines: [], uPoints: [] };
-            points = [];
-            isStimulusGenerated = false;
-            isCurveExpanded = false;
-            isFinalView = false;
-            drawEverything(); 
-            stimBtn.disabled = true; 
-            expandBtn.disabled = true;
-            finalBtn.disabled = true;
-            status.innerText = "초기화되었습니다.";
-        }
+        guideLines = { topY: null, midY: null, bottomY: null, leftX: null, midX: null, rightX: null, dipjY: null, outlines: [], uPoints: [] };
+        points = []; isStimulusGenerated = isCurveExpanded = isFinalView = false;
+        stimBtn.disabled = expandBtn.disabled = finalBtn.disabled = true;
+        drawEverything(); status.innerText = "초기화되었습니다.";
     }
 </script>
 </body>
