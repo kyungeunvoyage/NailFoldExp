@@ -8,8 +8,13 @@
         body { font-family: 'Segoe UI', sans-serif; display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 100vh; margin: 0; background-color: #f4f7f6; }
         #container { background: white; padding: 30px; border-radius: 20px; box-shadow: 0 10px 30px rgba(0,0,0,0.1); text-align: center; width: 720px; }
         .subject-info-box { background: #fff; border: 2px solid #2e7d32; padding: 15px; border-radius: 10px; margin-bottom: 20px; display: flex; align-items: center; justify-content: center; gap: 15px; }
+        .subject-info-box label { font-weight: bold; font-size: 14px; }
         .setup-info { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 20px; background: #e1f5fe; padding: 15px; border-radius: 10px; font-weight: bold; }
         #admin-display { background: #fff3e0; border: 2px dashed #ff9800; padding: 15px; border-radius: 10px; margin-bottom: 20px; }
+        
+        /* 상태 표시줄 스타일 추가 */
+        #status-display { background: #e3f2fd; border: 2px solid #2196f3; padding: 10px; border-radius: 10px; margin-bottom: 15px; font-weight: bold; color: #0d47a1; }
+        
         .progress-bar { width: 100%; height: 15px; background: #e8eaed; border-radius: 10px; overflow: hidden; margin-bottom: 20px; }
         #progress { width: 0%; height: 100%; background: #0288d1; transition: width 0.1s; }
         button { padding: 12px; font-size: 16px; cursor: pointer; border: none; border-radius: 8px; transition: 0.2s; width: 100%; font-weight: bold; margin-top: 10px; }
@@ -31,20 +36,20 @@
     <br>
     <button onclick="openSubjectWindow()" style="background:#43a047; color:white; width:auto; margin-bottom:15px;">1. Open Subject Window</button>
     
-    <!-- 이하 기존 HTML 구조 동일 -->
     <div class="subject-info-box">
         <label>Subject ID:</label>
-        <input type="text" id="subjectId" value="S01" style="padding:5px; width:60px; text-align:center;">
+        <input type="text" id="subjectId" value="P1" style="padding:5px; width:60px; text-align:center;">
+        <label style="margin-left:10px;">Session No:</label>
+        <input type="text" id="sessionNo" value="S01" style="padding:5px; width:60px; text-align:center;">
     </div>
 
     <div class="session-btn-container">
-        <button onclick="selectSession('LR')" style="background:#1976d2; color:white;">Horizontal Session</button>
-        <button onclick="selectSession('UD')" style="background:#ef6c00; color:white;">Vertical Session</button>
+        <button onclick="startFullExperiment()" style="background:#283593; color:white;">전체 실험 시작 (Start Full Experiment)</button>
     </div>
 
     <div class="setup-info">
         <div>Trial Progress: <span id="trial-count">0</span> / <span id="total-trials">0</span></div>
-        <div>Current Axis: <span id="current-axis-label" style="color:#0288d1;">None</span></div>
+        <div>Current Condition: <span id="current-cond-label" style="color:#0288d1;">None</span></div>
     </div>
 
     <div id="admin-display">
@@ -55,13 +60,15 @@
         </div>
         <div style="font-size: 13px; margin-top: 10px; color: #555;">
             Distance: <span id="admin-dist" style="font-weight:bold;">0</span>mm | 
-            GT (First): <span id="admin-first-pin" style="color: #e65100; font-weight:bold;">?</span>
+            Axis: <span id="admin-axis" style="font-weight:bold;">-</span>
         </div>
     </div>
     
+    <!-- 상태 표시줄 -->
+    <div id="status-display">Waiting for Admin to Start</div>
     <div class="progress-bar"><div id="progress"></div></div>
     
-    <button id="startBtn" onclick="runRandomTrial()" disabled>Select Session First</button>
+    <button id="startBtn" onclick="runRandomTrial()" disabled>Select Start Button First</button>
 
     <div id="ans-grid">
         <div id="dynamic-question" class="question-text">Question?</div>
@@ -78,7 +85,6 @@
     let trialPool = [];
     let experimentalData = [];
     let currentIdx = 0;
-    let selectedAxis = "";
     
     const sessionConditions = ['In-air', 'On-touch'];
     let currentConditionIdx = 0;
@@ -124,12 +130,8 @@
             </body></html>`);
     }
 
-    // selectSession, initiateCondition, generateTrialList, updateAdminPreview 함수는 기존과 동일
-
-    function selectSession(axis) {
-        selectedAxis = axis;
-        currentConditionIdx = 0; 
-        document.getElementById('current-axis-label').innerText = axis === 'LR' ? "Horizontal" : "Vertical";
+    function startFullExperiment() {
+        currentConditionIdx = 0;
         document.getElementById('cond-badge').style.display = 'inline-block';
         initiateCondition();
     }
@@ -137,22 +139,22 @@
     function initiateCondition() {
         const cond = sessionConditions[currentConditionIdx];
         document.getElementById('cond-badge').innerText = "Condition: " + cond;
-        generateTrialList(selectedAxis, cond);
+        document.getElementById('current-cond-label').innerText = cond;
+        generateTrialList(cond);
     }
 
-    function generateTrialList(axis, condition) {
-        const repetitions = 5; 
-        const filteredMap = distanceMap.filter(d => d.axis === axis);
+    function generateTrialList(condition) {
+        const repetitions = 2; 
         trialPool = [];
         for (let i = 0; i < repetitions; i++) {
-            filteredMap.forEach(item => trialPool.push({...item, condition: condition}));
+            distanceMap.forEach(item => {
+                trialPool.push({...item, condition: condition});
+            });
         }
-        
         for (let i = trialPool.length - 1; i > 0; i--) {
             const j = Math.floor(Math.random() * (i + 1));
             [trialPool[i], trialPool[j]] = [trialPool[j], trialPool[i]];
         }
-        
         currentIdx = 0;
         document.getElementById('total-trials').innerText = trialPool.length;
         document.getElementById('trial-count').innerText = "0";
@@ -171,7 +173,7 @@
             document.getElementById('pair-display').innerText = `${nextTrial.p1.toUpperCase()}-${nextTrial.p2.toUpperCase()}`;
             document.getElementById('admin-seq').innerText = `${firstPin.toUpperCase()} → ${secondPin.toUpperCase()}`;
             document.getElementById('admin-dist').innerText = nextTrial.dist;
-            document.getElementById('admin-first-pin').innerText = firstPin.toUpperCase();
+            document.getElementById('admin-axis').innerText = nextTrial.axis; 
             document.getElementById('dynamic-question').innerText = nextTrial.q;
         }
     }
@@ -184,16 +186,23 @@
         document.getElementById('startBtn').disabled = true;
         document.getElementById('ans-grid').style.display = 'none';
 
-        // 2IFC Sequence - 자극 제시 중에는 이미지를 숨기거나 흐리게 처리 (선택 가능)
-        // 여기서는 자극 제시 중(Stim 1, Interval, Stim 2)에는 이미지를 숨기고 질문 시에만 보여줍니다.
+        // 1st Stimulus
+        document.getElementById('status-display').innerText = "첫 번째 자극 제시 중...";
         subjectWindow.updateState("Stimulus 1", "#1b5e20", "#4caf50", false);
-        await progress(200); 
-        subjectWindow.updateState("Interval", "#222", "transparent", false);
-        await progress(1000); 
-        subjectWindow.updateState("Stimulus 2", "#b71c1c", "#f44336", false);
-        await progress(200); 
+        await progress(3000); // 2초  
 
-        // 질문 단계에서 이미지 표시
+        // Ready / Interval
+        document.getElementById('status-display').innerText = "대기 (Interval)...";
+        subjectWindow.updateState("Ready ...", "#222", "transparent", false);
+        await progress(3000); 
+
+        // 2nd Stimulus
+        document.getElementById('status-display').innerText = "두 번째 자극 제시 중...";
+        subjectWindow.updateState("Stimulus 2", "#b71c1c", "#f44336", false);
+        await progress(3000);
+        
+        // Question
+        document.getElementById('status-display').innerText = "피험자 응답 대기 중";
         subjectWindow.updateState(currentTrial.q, "#1565c0", "transparent", true);
         
         window.activeTrialData = { 
@@ -213,36 +222,38 @@
             let timer = setInterval(() => {
                 let p = (Date.now() - start) / ms * 100;
                 document.getElementById('progress').style.width = Math.min(p, 100) + "%";
-                if(p >= 100) { clearInterval(timer); res(); }
-            }, 20);
+                if(p >= 100) { 
+                    clearInterval(timer); 
+                    setTimeout(() => {
+                        document.getElementById('progress').style.width = "0%";
+                        res();
+                    }, 50);
+                }
+            }, 30);
         });
     }
-
-    // logResponse, moveToNextCondition, downloadCSV 함수는 기존과 동일
 
     function logResponse(choice) {
         const info = window.activeTrialData;
         const isCorrect = (choice === info.correct);
+        const subId = document.getElementById('subjectId').value;
+        const sessNo = document.getElementById('sessionNo').value;
         
         experimentalData.push({
-            Condition: info.condition,
-            Trial: currentIdx + 1,
-            Pair: `${info.p1}-${info.p2}`,
-            Distance: info.dist,
-            Axis: info.axis,
-            Choice: choice,
-            IsCorrect: isCorrect ? 1 : 0
+            Subject: subId, Session: sessNo, Condition: info.condition,
+            Trial: currentIdx + 1, Pair: `${info.p1}-${info.p2}`,
+            Distance: info.dist, Axis: info.axis, Choice: choice, IsCorrect: isCorrect ? 1 : 0
         });
 
         const log = document.createElement('div');
         log.style.color = isCorrect ? "#2e7d32" : "#d32f2f";
-        log.innerHTML = `[${info.condition}] T${currentIdx+1} [${info.p1}-${info.p2}]: ${isCorrect ? '✓':'✗'}`;
+        log.innerHTML = `[${info.condition}] T${currentIdx+1} [${info.axis} ${info.p1}-${info.p2}]: ${isCorrect ? '✓':'✗'}`;
         document.getElementById('logContent').prepend(log);
 
         currentIdx++;
         document.getElementById('trial-count').innerText = currentIdx;
         document.getElementById('ans-grid').style.display = 'none';
-        document.getElementById('progress').style.width = "0%";
+        document.getElementById('status-display').innerText = "Waiting for Next Trial";
         
         if(currentIdx < trialPool.length) {
             document.getElementById('startBtn').disabled = false;
@@ -267,14 +278,16 @@
     }
 
     function downloadCSV() {
-        let csv = "\uFEFFCondition,Trial,Pair,Distance,Axis,Choice,IsCorrect\n";
+        const subId = document.getElementById('subjectId').value || "Unknown";
+        const sessNo = document.getElementById('sessionNo').value || "Unknown";
+        let csv = "\uFEFFSubject,Session,Condition,Trial,Pair,Distance,Axis,Choice,IsCorrect\n";
         experimentalData.forEach(r => {
-            csv += `${r.Condition},${r.Trial},${r.Pair},${r.Distance},${r.Axis},${r.Choice},${r.IsCorrect}\n`;
+            csv += `${r.Subject},${r.Session},${r.Condition},${r.Trial},${r.Pair},${r.Distance},${r.Axis},${r.Choice},${r.IsCorrect}\n`;
         });
         const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
         const a = document.createElement("a");
         a.href = URL.createObjectURL(blob);
-        a.download = `2PD_${selectedAxis}_Results.csv`;
+        a.download = `2PD_${subId}_${sessNo}_Results.csv`;
         a.click();
     }
 </script>

@@ -6,6 +6,12 @@
     <style>
         body { font-family: 'Segoe UI', sans-serif; display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 100vh; margin: 0; background-color: #f0f4f8; }
         #container { background: white; padding: 30px; border-radius: 20px; box-shadow: 0 10px 30px rgba(0,0,0,0.1); text-align: center; width: 620px; }
+        
+        .input-group { display: flex; justify-content: center; gap: 15px; margin-bottom: 20px; padding: 15px; background: #f8f9fa; border-radius: 10px; border: 1px solid #dee2e6; }
+        .input-group div { display: flex; flex-direction: column; align-items: flex-start; }
+        .input-group label { font-size: 12px; color: #666; margin-bottom: 4px; font-weight: bold; }
+        .input-group input { padding: 8px; border: 1px solid #ccc; border-radius: 5px; width: 100px; text-align: center; font-size: 14px; }
+
         .setup-info { display: flex; justify-content: space-around; margin-bottom: 20px; background: #ede7f6; padding: 15px; border-radius: 10px; font-weight: bold; }
         #admin-display { background: #fff9c4; border: 2px dashed #fbc02d; padding: 15px; border-radius: 10px; margin-bottom: 20px; }
         #status-display { background: #e3f2fd; border: 2px solid #2196f3; padding: 10px; border-radius: 10px; margin-bottom: 15px; font-weight: bold; color: #0d47a1; }
@@ -23,10 +29,23 @@
 </head>
 <body>
 
-<div id="container">
-    <h2>Force Discrimination (2-AFC)</h2>
+    <div id="container">
+    <h2>Force Discrimination</h2>
     <div id="current-condition-display" class="condition-badge">Condition: Ready</div>
-    <p style="margin-top:0px; color:#666;">Reference Intensity: <strong>0.60g</strong></p>
+    
+    <!-- 피험자 및 세션 정보 입력 칸 추가 -->
+    <div class="input-group">
+        <div>
+            <label for="subID">Subject ID</label>
+            <input type="text" id="subID" placeholder="e.g. P1" value="P1">
+        </div>
+        <div>
+            <label for="sessNo">Session No</label>
+            <input type="text" id="sessNo" placeholder="e.g. S01" value="S01">
+        </div>
+    </div>
+
+    <p style="margin-top:0px; color:#666;">Reference Intensity: <strong>1.00g</strong></p>
     
     <button onclick="openSubjectWindow()" style="background:#9c27b0; color:white; margin-bottom:10px;">1. Subject Window Open</button>
     
@@ -46,10 +65,10 @@
     <button id="startBtn" onclick="runTrial()">다음 시행 시작 (Start Sequence)</button>
 
     <div id="input-section">
-        <p style="font-size:1.1rem; font-weight:bold;">Q. 어떤 자극이 더 강했습니까?<br><span style="font-size:0.9rem; color:#666;">(Which stimulus was STRONGER?)</span></p>
+        <p style="font-size:1.1rem; font-weight:bold;">Q. Which stimulus was STRONGER?<br><span style="font-size:0.9rem; color:#666;">(Which stimulus was STRONGER?)</span></p>
         <div style="display:flex; justify-content:space-between;">
-            <button id="ansBtn1" onclick="logResponse(1)">1번째 자극 (1st)</button>
-            <button id="ansBtn2" onclick="logResponse(2)">2번째 자극 (2nd)</button>
+            <button id="ansBtn1" onclick="logResponse(1)">1st Stimulus</button>
+            <button id="ansBtn2" onclick="logResponse(2)">2nd Stimulus</button>
         </div>
     </div>
 
@@ -57,12 +76,14 @@
     <button onclick="downloadCSV()" style="background:#5f6368; color:white; font-size:14px;">Download CSV Data</button>
 </div>
 
+
 <script>
     let subjectWindow = null;
     const regions = ['A', 'B', 'C', 'D'];
-    const referenceValue = 0.60;
+    const referenceValue = 1.00;
     const pairs = [
-        {comp: 0.16}, {comp: 0.40}, {comp: 0.60}, {comp: 1.00}, {comp: 1.40}
+        //{comp: 0.16}, {comp: 0.40}, {comp: 0.60}, {comp: 1.00}, {comp: 1.40}
+        {comp: 0.40}, {comp: 0.60}, {comp: 1.00}, {comp: 1.40}, {comp: 2.00}
     ];
 
     const sessionConditions = ['In-air', 'On-touch'];
@@ -88,7 +109,7 @@
         regions.forEach(reg => {
             pairs.forEach(p => {
                 // 각 쌍당 2회 반복
-                list.push({ref: referenceValue, comp: p.comp, region: reg, condition: condition});
+                //list.push({ref: referenceValue, comp: p.comp, region: reg, condition: condition});
                 list.push({ref: referenceValue, comp: p.comp, region: reg, condition: condition});
             });
         });
@@ -125,19 +146,19 @@
         document.getElementById('input-section').style.display = 'none';
 
         document.getElementById('status-display').innerText = "첫 번째 자극 제시 중...";
-        subjectWindow.update("자극 1 (Stimulus 1)", "#2196F3");
-        await progress(3000); 
+        subjectWindow.update("Stimulus 1", "#2196F3");
+        await progress(2000); 
 
         document.getElementById('status-display').innerText = "대기 (Interval)...";
-        subjectWindow.update("+", "#333");
+        subjectWindow.update("Ready ... ", "#333");
         await progress(2000);
 
         document.getElementById('status-display').innerText = "두 번째 자극 제시 중...";
-        subjectWindow.update("자극 2 (Stimulus 2)", "#F44336");
-        await progress(3000);
+        subjectWindow.update("Stimulus 2", "#F44336");
+        await progress(2000);
         
         document.getElementById('status-display').innerText = "피험자 응답 대기 중";
-        subjectWindow.update("어느 자극이 더 강했습니까?", "#9C27B0");
+        subjectWindow.update("Which stimulus was STRONGER? 1 or 2", "#9C27B0");
         document.getElementById('input-section').style.display = 'block';
     }
 
@@ -157,8 +178,13 @@
         const chosenStim = (choice === 1) ? firstStim : secondStim;
         const choseComparison = (chosenStim === t.comp) ? 1 : 0;
 
+        // 입력된 ID와 세션 번호 가져오기
+        const subID = document.getElementById('subID').value;
+        const sessNo = document.getElementById('sessNo').value;
+
         experimentalData.push({
-            Subject: "S01", 
+            Subject: subID, 
+            Session: sessNo,
             Condition: t.condition,
             Region: t.region, 
             Ref: t.ref, 
@@ -191,6 +217,11 @@
         currentConditionIdx++;
         if (currentConditionIdx < sessionConditions.length) {
             const nextCond = sessionConditions[currentConditionIdx];
+
+            if(subjectWindow)
+            {
+                subjectWindow.update("Ready for Next Session", "#333");
+            }
             alert(`'${sessionConditions[currentConditionIdx-1]}' 조건이 끝났습니다.\n다음 조건인 '${nextCond}'을 시작합니다.`);
             
             currentIdx = 0;
@@ -209,14 +240,19 @@
     }
 
     function downloadCSV() {
-        let csv = "\uFEFFCondition,Region,Reference,Comparison,FirstStim,SecondStim,UserChoice,ChoseComparison\n";
+        // 파일명 생성을 위한 ID 및 세션 정보 추출
+        const subID = document.getElementById('subID').value || "Unknown";
+        const sessNo = document.getElementById('sessNo').value || "Unknown";
+        
+        let csv = "\uFEFFSubject,Session,Condition,Region,Reference,Comparison,FirstStim,SecondStim,UserChoice,ChoseComparison\n";
         experimentalData.forEach(r => {
-            csv += `${r.Condition},${r.Region},${r.Ref},${r.Comp},${r.First},${r.Second},${r.Choice},${r.ChoseComp}\n`;
+            csv += `${r.Subject},${r.Session},${r.Condition},${r.Region},${r.Ref},${r.Comp},${r.First},${r.Second},${r.Choice},${r.ChoseComp}\n`;
         });
         const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
         const a = document.createElement("a");
         a.href = URL.createObjectURL(blob);
-        a.download = `2AFC_Force_JND_Data_All_Conditions.csv`;
+        // 파일명 반영: 2AFC_Force_JND_P1_S01.csv 형태
+        a.download = `2AFC_Force_JND_${subID}_${sessNo}.csv`;
         a.click();
     }
 
