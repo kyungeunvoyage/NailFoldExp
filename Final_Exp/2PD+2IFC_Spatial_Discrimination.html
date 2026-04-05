@@ -96,6 +96,7 @@
         { p1: 'c', p2: 'f', dist: 12.5, axis: 'LR', q: "Which one was the Left?" },
         { p1: 'b', p2: 'g', dist: 20.0, axis: 'LR', q: "Which one was the Left?" },
         { p1: 'a', p2: 'h', dist: 35.0, axis: 'LR', q: "Which one was the Left?" },
+        
         { p1: 'a', p2: 'b', dist: 3.0, axis: 'UD', q: "Which one was the Proximal?" },
         { p1: 'b', p2: 'd', dist: 3.0, axis: 'UD', q: "Which one was the Proximal?" },
         { p1: 'c', p2: 'd', dist: 3.0, axis: 'UD', q: "Which one was the Proximal?" },
@@ -189,18 +190,18 @@
         // 1st Stimulus
         document.getElementById('status-display').innerText = "첫 번째 자극 제시 중...";
         subjectWindow.updateState("Stimulus 1", "#1b5e20", "#4caf50", false);
-        await progress(3000); // 2초  
+        await progress(2000); // 2초  
 
         // Ready / Interval
         document.getElementById('status-display').innerText = "대기 (Interval)...";
         subjectWindow.updateState("Ready ...", "#222", "transparent", false);
-        await progress(3000); 
+        await progress(2000); 
 
         // 2nd Stimulus
         document.getElementById('status-display').innerText = "두 번째 자극 제시 중...";
         subjectWindow.updateState("Stimulus 2", "#b71c1c", "#f44336", false);
-        await progress(3000);
-        
+        await progress(2000);
+
         // Question
         document.getElementById('status-display').innerText = "피험자 응답 대기 중";
         subjectWindow.updateState(currentTrial.q, "#1565c0", "transparent", true);
