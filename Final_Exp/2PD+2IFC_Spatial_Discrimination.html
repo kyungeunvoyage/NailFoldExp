@@ -4,17 +4,13 @@
     <meta charset="UTF-8">
     <title>2PD+2IFC Spatial Discrimination</title>
     <style>
-        /* 기존 스타일 유지 */
         body { font-family: 'Segoe UI', sans-serif; display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 100vh; margin: 0; background-color: #f4f7f6; }
         #container { background: white; padding: 30px; border-radius: 20px; box-shadow: 0 10px 30px rgba(0,0,0,0.1); text-align: center; width: 720px; }
         .subject-info-box { background: #fff; border: 2px solid #2e7d32; padding: 15px; border-radius: 10px; margin-bottom: 20px; display: flex; align-items: center; justify-content: center; gap: 15px; }
         .subject-info-box label { font-weight: bold; font-size: 14px; }
         .setup-info { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 20px; background: #e1f5fe; padding: 15px; border-radius: 10px; font-weight: bold; }
         #admin-display { background: #fff3e0; border: 2px dashed #ff9800; padding: 15px; border-radius: 10px; margin-bottom: 20px; }
-        
-        /* 상태 표시줄 스타일 추가 */
         #status-display { background: #e3f2fd; border: 2px solid #2196f3; padding: 10px; border-radius: 10px; margin-bottom: 15px; font-weight: bold; color: #0d47a1; }
-        
         .progress-bar { width: 100%; height: 15px; background: #e8eaed; border-radius: 10px; overflow: hidden; margin-bottom: 20px; }
         #progress { width: 0%; height: 100%; background: #0288d1; transition: width 0.1s; }
         button { padding: 12px; font-size: 16px; cursor: pointer; border: none; border-radius: 8px; transition: 0.2s; width: 100%; font-weight: bold; margin-top: 10px; }
@@ -26,6 +22,16 @@
         .session-btn-container { display: flex; gap: 10px; margin-bottom: 20px; }
         .preview-box { font-size: 1.2rem; color: #e65100; font-weight: 800; background: #ffe0b2; padding: 5px 10px; border-radius: 5px; }
         .condition-badge { background: #d32f2f; color: white; padding: 5px 15px; border-radius: 20px; font-size: 0.9rem; margin-bottom: 10px; display: inline-block; font-weight: bold; }
+        
+        .highlight-seq { 
+            font-weight: bold; 
+            color: #d32f2f; 
+            background-color: #ffff00; 
+            padding: 4px 12px; 
+            border-radius: 4px;
+            font-size: 1.4rem;
+            border: 2px solid #ffd600;
+        }
     </style>
 </head>
 <body>
@@ -55,8 +61,10 @@
     <div id="admin-display">
         <div style="font-size: 14px; color: #666; margin-bottom: 10px;">[Admin Monitor] Next Trial Preview</div>
         <div style="display: flex; justify-content: center; gap: 20px; align-items: center;">
-            <div>Target Pair: <span id="pair-display" class="preview-box">-</span></div>
-            <div>Sequence: <span id="admin-seq" style="font-weight:bold; color: #d32f2f;">?</span></div>
+            <span id="pair-display" style="display: none;">-</span>
+            <div style="font-size: 1.1rem;">
+                Sequence: <span id="admin-seq" class="highlight-seq">?</span>
+            </div>
         </div>
         <div style="font-size: 13px; margin-top: 10px; color: #555;">
             Distance: <span id="admin-dist" style="font-weight:bold;">0</span>mm | 
@@ -64,7 +72,6 @@
         </div>
     </div>
     
-    <!-- 상태 표시줄 -->
     <div id="status-display">Waiting for Admin to Start</div>
     <div class="progress-bar"><div id="progress"></div></div>
     
@@ -92,23 +99,25 @@
     const imgSrc = "/Users/kyungeunjung/NailFoldExp/guide_img2.png"; 
 
     const distanceMap = [
-        { p1: 'd', p2: 'e', dist: 2.5, axis: 'LR', q: "Which one was the Left?" },
-        { p1: 'c', p2: 'f', dist: 12.5, axis: 'LR', q: "Which one was the Left?" },
-        { p1: 'b', p2: 'g', dist: 20.0, axis: 'LR', q: "Which one was the Left?" },
-        { p1: 'a', p2: 'h', dist: 35.0, axis: 'LR', q: "Which one was the Left?" },
+        // LR Axis: p1=Left, p2=Right (정답 == Left) 4
+        { p1: 'd', p2: 'e', dist: 2.5, axis: 'LR', q: "Which one was the Left?", correct_val: "Left", incorrect_val: "Right" },
+        { p1: 'c', p2: 'f', dist: 12.5, axis: 'LR', q: "Which one was the Left?", correct_val: "Left", incorrect_val: "Right" },
+        { p1: 'b', p2: 'g', dist: 20.0, axis: 'LR', q: "Which one was the Left?", correct_val: "Left", incorrect_val: "Right" },
+        { p1: 'a', p2: 'h', dist: 35.0, axis: 'LR', q: "Which one was the Left?", correct_val: "Left", incorrect_val: "Right" },
         
-        { p1: 'a', p2: 'b', dist: 3.0, axis: 'UD', q: "Which one was the Proximal?" },
-        { p1: 'b', p2: 'd', dist: 3.0, axis: 'UD', q: "Which one was the Proximal?" },
-        { p1: 'c', p2: 'd', dist: 3.0, axis: 'UD', q: "Which one was the Proximal?" },
-        { p1: 'b', p2: 'c', dist: 3.0, axis: 'UD', q: "Which one was the Proximal?" },
-        { p1: 'g', p2: 'h', dist: 3.0, axis: 'UD', q: "Which one was the Proximal?" },
-        { p1: 'a', p2: 'c', dist: 10.0, axis: 'UD', q: "Which one was the Proximal?" },
-        { p1: 'h', p2: 'f', dist: 3.0, axis: 'UD', q: "Which one was the Proximal?" },
-        { p1: 'h', p2: 'g', dist: 3.0, axis: 'UD', q: "Which one was the Proximal?" },
-        { p1: 'h', p2: 'e', dist: 3.0, axis: 'UD', q: "Which one was the Proximal?" },
-        { p1: 'f', p2: 'e', dist: 3.0, axis: 'UD', q: "Which one was the Proximal?" },
-        { p1: 'g', p2: 'f', dist: 3.0, axis: 'UD', q: "Which one was the Proximal?" },
-        { p1: 'g', p2: 'e', dist: 3.0, axis: 'UD', q: "Which one was the Proximal?" }
+        // UD Axis: p1=Distal, p2=Proximal (정답 == Distal) 12
+        { p1: 'a', p2: 'b', dist: 3.0, axis: 'UD', q: "Which one was the Distal?", correct_val: "Distal", incorrect_val: "Proximal" },
+        { p1: 'a', p2: 'c', dist: 10.0, axis: 'UD', q: "Which one was the Distal?", correct_val: "Distal", incorrect_val: "Proximal" },
+        { p1: 'a', p2: 'd', dist: 10.0, axis: 'UD', q: "Which one was the Distal?", correct_val: "Distal", incorrect_val: "Proximal" },
+        { p1: 'b', p2: 'c', dist: 3.0, axis: 'UD', q: "Which one was the Distal?", correct_val: "Distal", incorrect_val: "Proximal" },
+        { p1: 'b', p2: 'd', dist: 3.0, axis: 'UD', q: "Which one was the Distal?", correct_val: "Distal", incorrect_val: "Proximal" },
+        { p1: 'c', p2: 'd', dist: 3.0, axis: 'UD', q: "Which one was the Distal?", correct_val: "Distal", incorrect_val: "Proximal" },
+        { p1: 'h', p2: 'g', dist: 3.0, axis: 'UD', q: "Which one was the Distal?", correct_val: "Distal", incorrect_val: "Proximal" },
+        { p1: 'h', p2: 'f', dist: 3.0, axis: 'UD', q: "Which one was the Distal?", correct_val: "Distal", incorrect_val: "Proximal" },
+        { p1: 'h', p2: 'e', dist: 3.0, axis: 'UD', q: "Which one was the Distal?", correct_val: "Distal", incorrect_val: "Proximal" },
+        { p1: 'g', p2: 'f', dist: 3.0, axis: 'UD', q: "Which one was the Distal?", correct_val: "Distal", incorrect_val: "Proximal" },
+        { p1: 'g', p2: 'e', dist: 3.0, axis: 'UD', q: "Which one was the Distal?", correct_val: "Distal", incorrect_val: "Proximal" },
+        { p1: 'f', p2: 'e', dist: 3.0, axis: 'UD', q: "Which one was the Distal?", correct_val: "Distal", incorrect_val: "Proximal" }
     ];
 
     function openSubjectWindow() {
@@ -133,6 +142,7 @@
 
     function startFullExperiment() {
         currentConditionIdx = 0;
+        experimentalData = [];
         document.getElementById('cond-badge').style.display = 'inline-block';
         initiateCondition();
     }
@@ -145,17 +155,17 @@
     }
 
     function generateTrialList(condition) {
-        const repetitions = 2; 
         trialPool = [];
-        for (let i = 0; i < repetitions; i++) {
-            distanceMap.forEach(item => {
-                trialPool.push({...item, condition: condition});
-            });
-        }
+        distanceMap.forEach(item => {
+            trialPool.push({ ...item, condition: condition, isP1First: true });
+            trialPool.push({ ...item, condition: condition, isP1First: false });
+        });
+        
         for (let i = trialPool.length - 1; i > 0; i--) {
             const j = Math.floor(Math.random() * (i + 1));
             [trialPool[i], trialPool[j]] = [trialPool[j], trialPool[i]];
         }
+        
         currentIdx = 0;
         document.getElementById('total-trials').innerText = trialPool.length;
         document.getElementById('trial-count').innerText = "0";
@@ -167,12 +177,12 @@
     function updateAdminPreview() {
         if (currentIdx < trialPool.length) {
             const nextTrial = trialPool[currentIdx];
-            window.nextOrderIsP1First = Math.random() > 0.5;
-            const firstPin = window.nextOrderIsP1First ? nextTrial.p1 : nextTrial.p2;
-            const secondPin = window.nextOrderIsP1First ? nextTrial.p2 : nextTrial.p1;
+            const firstPin = nextTrial.isP1First ? nextTrial.p1 : nextTrial.p2;
+            const secondPin = nextTrial.isP1First ? nextTrial.p2 : nextTrial.p1;
 
-            document.getElementById('pair-display').innerText = `${nextTrial.p1.toUpperCase()}-${nextTrial.p2.toUpperCase()}`;
-            document.getElementById('admin-seq').innerText = `${firstPin.toUpperCase()} → ${secondPin.toUpperCase()}`;
+            const seqElem = document.getElementById('admin-seq');
+            if(seqElem) seqElem.innerText = `${firstPin.toUpperCase()} → ${secondPin.toUpperCase()}`;
+            
             document.getElementById('admin-dist').innerText = nextTrial.dist;
             document.getElementById('admin-axis').innerText = nextTrial.axis; 
             document.getElementById('dynamic-question').innerText = nextTrial.q;
@@ -182,27 +192,23 @@
     async function runRandomTrial() {
         if(!subjectWindow) return alert("Open Subject Window First");
         const currentTrial = trialPool[currentIdx];
-        const isP1First = window.nextOrderIsP1First;
+        const isP1First = currentTrial.isP1First;
 
         document.getElementById('startBtn').disabled = true;
         document.getElementById('ans-grid').style.display = 'none';
 
-        // 1st Stimulus
         document.getElementById('status-display').innerText = "첫 번째 자극 제시 중...";
         subjectWindow.updateState("Stimulus 1", "#1b5e20", "#4caf50", false);
-        await progress(2000); // 2초  
+        await progress(2000);
 
-        // Ready / Interval
         document.getElementById('status-display').innerText = "대기 (Interval)...";
         subjectWindow.updateState("Ready ...", "#222", "transparent", false);
         await progress(2000); 
 
-        // 2nd Stimulus
         document.getElementById('status-display').innerText = "두 번째 자극 제시 중...";
         subjectWindow.updateState("Stimulus 2", "#b71c1c", "#f44336", false);
-        await progress(2000);
+        await progress(2000); 
 
-        // Question
         document.getElementById('status-display').innerText = "피험자 응답 대기 중";
         subjectWindow.updateState(currentTrial.q, "#1565c0", "transparent", true);
         
@@ -212,7 +218,10 @@
             axis: currentTrial.axis, 
             p1: currentTrial.p1, 
             p2: currentTrial.p2,
-            correct: isP1First ? "1st" : "2nd" 
+            isP1First: isP1First,
+            correct: isP1First ? "1st" : "2nd",
+            correct_label: currentTrial.correct_val,
+            incorrect_label: currentTrial.incorrect_val
         };
         document.getElementById('ans-grid').style.display = 'grid';
     }
@@ -239,16 +248,32 @@
         const isCorrect = (choice === info.correct);
         const subId = document.getElementById('subjectId').value;
         const sessNo = document.getElementById('sessionNo').value;
+
+        const firstStim = info.isP1First ? info.p1 : info.p2;
+        const secondStim = info.isP1First ? info.p2 : info.p1;
         
+        const userLabelChoice = (choice === info.correct) ? info.correct_label : info.incorrect_label;
+
         experimentalData.push({
-            Subject: subId, Session: sessNo, Condition: info.condition,
-            Trial: currentIdx + 1, Pair: `${info.p1}-${info.p2}`,
-            Distance: info.dist, Axis: info.axis, Choice: choice, IsCorrect: isCorrect ? 1 : 0
+            Subject: subId,
+            Session: sessNo,
+            Condition: info.condition,
+            Trial: currentIdx + 1,
+            Pair: `${info.p1}-${info.p2}`,
+            Stim_1st: firstStim,
+            Stim_2nd: secondStim,
+            Target_Order: info.correct,
+            Target_Label: info.correct_label,
+            User_Order: choice,
+            User_Label: userLabelChoice, 
+            Distance: info.dist,
+            Axis: info.axis,
+            IsCorrect: isCorrect ? 1 : 0
         });
 
         const log = document.createElement('div');
         log.style.color = isCorrect ? "#2e7d32" : "#d32f2f";
-        log.innerHTML = `[${info.condition}] T${currentIdx+1} [${info.axis} ${info.p1}-${info.p2}]: ${isCorrect ? '✓':'✗'}`;
+        log.innerHTML = `[${info.condition}] T${currentIdx+1} [${firstStim.toUpperCase()}→${secondStim.toUpperCase()}]: ${isCorrect ? '✓':'✗'}`;
         document.getElementById('logContent').prepend(log);
 
         currentIdx++;
@@ -281,9 +306,9 @@
     function downloadCSV() {
         const subId = document.getElementById('subjectId').value || "Unknown";
         const sessNo = document.getElementById('sessionNo').value || "Unknown";
-        let csv = "\uFEFFSubject,Session,Condition,Trial,Pair,Distance,Axis,Choice,IsCorrect\n";
+        let csv = "\uFEFFSubject,Session,Condition,Trial,Pair,Stim_1st,Stim_2nd,Target_Order,Target_Label,User_Order,User_Label,Distance,Axis,IsCorrect\n";
         experimentalData.forEach(r => {
-            csv += `${r.Subject},${r.Session},${r.Condition},${r.Trial},${r.Pair},${r.Distance},${r.Axis},${r.Choice},${r.IsCorrect}\n`;
+            csv += `${r.Subject},${r.Session},${r.Condition},${r.Trial},${r.Pair},${r.Stim_1st},${r.Stim_2nd},${r.Target_Order},${r.Target_Label},${r.User_Order},${r.User_Label},${r.Distance},${r.Axis},${r.IsCorrect}\n`;
         });
         const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
         const a = document.createElement("a");
