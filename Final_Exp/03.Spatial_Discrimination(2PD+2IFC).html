@@ -100,24 +100,24 @@
 
     const distanceMap = [
         // LR Axis: p1=Left, p2=Right (정답 == Left) 4
-        { p1: 'd', p2: 'e', dist: 2.5, axis: 'LR', q: "Which one was the Left?", correct_val: "Left", incorrect_val: "Right" },
-        { p1: 'c', p2: 'f', dist: 12.5, axis: 'LR', q: "Which one was the Left?", correct_val: "Left", incorrect_val: "Right" },
-        { p1: 'b', p2: 'g', dist: 20.0, axis: 'LR', q: "Which one was the Left?", correct_val: "Left", incorrect_val: "Right" },
-        { p1: 'a', p2: 'h', dist: 35.0, axis: 'LR', q: "Which one was the Left?", correct_val: "Left", incorrect_val: "Right" },
+        { p1: 'd', p2: 'e', dist: 5.0, axis: 'LR', q: "Which one was the Left?", correct_val: "Left", incorrect_val: "Right" },
+        { p1: 'c', p2: 'f', dist: 8.0, axis: 'LR', q: "Which one was the Left?", correct_val: "Left", incorrect_val: "Right" },
+        { p1: 'b', p2: 'g', dist: 12.0, axis: 'LR', q: "Which one was the Left?", correct_val: "Left", incorrect_val: "Right" },
+        { p1: 'a', p2: 'h', dist: 12.0, axis: 'LR', q: "Which one was the Left?", correct_val: "Left", incorrect_val: "Right" },
         
         // UD Axis: p1=Distal, p2=Proximal (정답 == Distal) 12
-        { p1: 'a', p2: 'b', dist: 3.0, axis: 'UD', q: "Which one was the Distal?", correct_val: "Distal", incorrect_val: "Proximal" },
-        { p1: 'a', p2: 'c', dist: 10.0, axis: 'UD', q: "Which one was the Distal?", correct_val: "Distal", incorrect_val: "Proximal" },
+        { p1: 'a', p2: 'b', dist: 5.0, axis: 'UD', q: "Which one was the Distal?", correct_val: "Distal", incorrect_val: "Proximal" },
+        { p1: 'a', p2: 'c', dist: 8.0, axis: 'UD', q: "Which one was the Distal?", correct_val: "Distal", incorrect_val: "Proximal" },
         { p1: 'a', p2: 'd', dist: 10.0, axis: 'UD', q: "Which one was the Distal?", correct_val: "Distal", incorrect_val: "Proximal" },
-        { p1: 'b', p2: 'c', dist: 3.0, axis: 'UD', q: "Which one was the Distal?", correct_val: "Distal", incorrect_val: "Proximal" },
-        { p1: 'b', p2: 'd', dist: 3.0, axis: 'UD', q: "Which one was the Distal?", correct_val: "Distal", incorrect_val: "Proximal" },
-        { p1: 'c', p2: 'd', dist: 3.0, axis: 'UD', q: "Which one was the Distal?", correct_val: "Distal", incorrect_val: "Proximal" },
-        { p1: 'h', p2: 'g', dist: 3.0, axis: 'UD', q: "Which one was the Distal?", correct_val: "Distal", incorrect_val: "Proximal" },
-        { p1: 'h', p2: 'f', dist: 3.0, axis: 'UD', q: "Which one was the Distal?", correct_val: "Distal", incorrect_val: "Proximal" },
-        { p1: 'h', p2: 'e', dist: 3.0, axis: 'UD', q: "Which one was the Distal?", correct_val: "Distal", incorrect_val: "Proximal" },
-        { p1: 'g', p2: 'f', dist: 3.0, axis: 'UD', q: "Which one was the Distal?", correct_val: "Distal", incorrect_val: "Proximal" },
-        { p1: 'g', p2: 'e', dist: 3.0, axis: 'UD', q: "Which one was the Distal?", correct_val: "Distal", incorrect_val: "Proximal" },
-        { p1: 'f', p2: 'e', dist: 3.0, axis: 'UD', q: "Which one was the Distal?", correct_val: "Distal", incorrect_val: "Proximal" }
+        { p1: 'b', p2: 'c', dist: 2.7, axis: 'UD', q: "Which one was the Distal?", correct_val: "Distal", incorrect_val: "Proximal" },
+        { p1: 'b', p2: 'd', dist: 5.5, axis: 'UD', q: "Which one was the Distal?", correct_val: "Distal", incorrect_val: "Proximal" },
+        { p1: 'c', p2: 'd', dist: 2.0, axis: 'UD', q: "Which one was the Distal?", correct_val: "Distal", incorrect_val: "Proximal" },
+        { p1: 'h', p2: 'g', dist: 5.0, axis: 'UD', q: "Which one was the Distal?", correct_val: "Distal", incorrect_val: "Proximal" },
+        { p1: 'h', p2: 'f', dist: 8.0, axis: 'UD', q: "Which one was the Distal?", correct_val: "Distal", incorrect_val: "Proximal" },
+        { p1: 'h', p2: 'e', dist: 10.0, axis: 'UD', q: "Which one was the Distal?", correct_val: "Distal", incorrect_val: "Proximal" },
+        { p1: 'g', p2: 'f', dist: 2.7, axis: 'UD', q: "Which one was the Distal?", correct_val: "Distal", incorrect_val: "Proximal" },
+        { p1: 'g', p2: 'e', dist: 5.5, axis: 'UD', q: "Which one was the Distal?", correct_val: "Distal", incorrect_val: "Proximal" },
+        { p1: 'f', p2: 'e', dist: 2.0, axis: 'UD', q: "Which one was the Distal?", correct_val: "Distal", incorrect_val: "Proximal" }
     ];
 
     function openSubjectWindow() {
