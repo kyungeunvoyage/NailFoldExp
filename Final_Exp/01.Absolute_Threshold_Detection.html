@@ -25,8 +25,6 @@
         input.subject-input { padding: 12px; width: 100px; font-size: 20px; text-align: center; border: 2px solid #ddd; border-radius: 8px; margin-bottom: 10px; }
         #log-container { margin-top: 25px; text-align: left; font-size: 12px; max-height: 200px; overflow-y: auto; background: #fafafa; padding: 10px; border: 1px solid #eee; }
         .cond-air { color: #03a9f4; }
-        .cond-soft { color: #f44336; }
-        .cond-hard { color: #8e44ad; }
         .cond-mid { color: #f39c12; } 
     </style>
 </head>
@@ -52,7 +50,7 @@
     <div class="progress-bar"><div id="progress"></div><div id="flash"></div></div>
 
     <button id="startBtn" onclick="startTrial()">2. 시행 시작 (Start)</button>
-    <button id="nextBtn" onclick="proceedToNextStage()">실험 완료</button>
+    <button id="nextBtn" onclick="proceedToNextCondition()">다음 컨디션으로 이동</button>
 
     <div id="input-section">
         <input type="number" id="subjectResponse" class="subject-input" placeholder="#" autofocus> <br>
@@ -67,9 +65,11 @@
     let subjectWindow = null;
     const areas = ['A','B','C','D'];
     const forces = ['0.07g', '0.16g', '0.6g', '1.0g', '1.4g'];
-    const TRIAL_DURATION = 10;
+    const TRIAL_DURATION = 13;
     
-    let fullTrialPool = []; 
+    let conditionSequence = []; // ["In-air", "On-touch (Mid)"] 순서 보관
+    let currentConditionIdx = 0;
+    let trialPools = []; // 각 컨디션별 셔플된 트라이얼들 보관
     let currentIdxInSet = 0;
     let experimentalData = [];
     let timerInterval;
@@ -95,23 +95,25 @@
     }
 
     function setupExp() {
-        const conditions = ["In-air", "On-touch (Mid)"];
-        fullTrialPool = [];
+        // 1. 컨디션 순서 결정 (In-air와 On-touch 중 무엇을 먼저 할지 랜덤)
+        conditionSequence = ["In-air", "On-touch (Mid)"].sort(() => Math.random() - 0.5);
         
-        conditions.forEach(condName => {
+        // 2. 각 컨디션별로 독립적인 풀 생성 (각 풀 내에서만 셔플)
+        conditionSequence.forEach((condName, index) => {
+            let base = [];
             areas.forEach(a => {
                 forces.forEach(f => {
-                    fullTrialPool.push({ condition: condName, area: a, force: f });
+                    // 각 조합당 1회씩 하면 20회입니다. 40회를 원하시면 이 루프를 2번 돌리거나 base.push를 두번 하세요.
+                    base.push({ condition: condName, area: a, force: f });
+                    base.push({ condition: condName, area: a, force: f }); // 조합당 2회 = 컨디션당 총 40회
                 });
             });
+            // 해당 컨디션 내의 40개 시행만 셔플
+            trialPools[index] = base.sort(() => Math.random() - 0.5);
         });
 
-        fullTrialPool.sort(() => Math.random() - 0.5);
-
+        currentConditionIdx = 0;
         currentIdxInSet = 0;
-        
-        // 생성된 트라이얼 풀의 길이에 맞춰 자동으로 전체 횟수를 표시합니다.
-        document.getElementById('total-trials-display').innerText = fullTrialPool.length;
         
         updateUI();
     }
@@ -120,9 +122,21 @@
         const condTitle = document.getElementById('condition-title');
         const startBtn = document.getElementById('startBtn');
         const nextBtn = document.getElementById('nextBtn');
+        const totalDisplay = document.getElementById('total-trials-display');
 
-        if (currentIdxInSet < fullTrialPool.length) {
-            const t = fullTrialPool[currentIdxInSet];
+        if (currentConditionIdx >= conditionSequence.length) {
+            condTitle.innerText = "All Experiments Completed!";
+            startBtn.style.display = 'none';
+            nextBtn.style.display = 'none';
+            if(subjectWindow) subjectWindow.updateState('ready', 'Finished');
+            return;
+        }
+
+        const currentPool = trialPools[currentConditionIdx];
+        totalDisplay.innerText = currentPool.length;
+
+        if (currentIdxInSet < currentPool.length) {
+            const t = currentPool[currentIdxInSet];
             condTitle.innerText = `Condition: ${t.condition}`;
             const cName = t.condition.toLowerCase();
             
@@ -137,11 +151,18 @@
             startBtn.disabled = false;
             nextBtn.style.display = 'none';
         } else {
-            condTitle.innerText = "All Experiments Completed!";
+            // 현재 컨디션의 모든 trial이 끝났을 때
+            condTitle.innerText = `${conditionSequence[currentConditionIdx]} Completed!`;
             startBtn.style.display = 'none';
-            nextBtn.style.display = 'none';
-            if(subjectWindow) subjectWindow.updateState('ready', 'Finished');
+            nextBtn.style.display = 'block';
         }
+    }
+
+    function proceedToNextCondition() {
+        currentConditionIdx++;
+        currentIdxInSet = 0;
+        updateUI();
+        if(subjectWindow) subjectWindow.updateState('ready', 'Next Condition');
     }
 
     function startTrial() {
@@ -184,7 +205,8 @@
         const res = resInput.value;
         if (res === "") return;
         
-        const t = fullTrialPool[currentIdxInSet];
+        const currentPool = trialPools[currentConditionIdx];
+        const t = currentPool[currentIdxInSet];
         const isCorrect = (currentTarget == res);
         const subId = document.getElementById('subjectId').value;
         const sessNo = document.getElementById('sessNo').value;
@@ -201,7 +223,7 @@
         });
 
         const log = document.createElement('div');
-        log.innerHTML = `<b>[${sessNo}-${t.condition}]</b> ${t.area}-${t.force} | T:${currentTarget}, R:${res} ${isCorrect ? '✓' : '✗'}`;
+        log.innerHTML = `<b>[${t.condition}]</b> ${t.area}-${t.force} | T:${currentTarget}, R:${res} ${isCorrect ? '✓' : '✗'}`;
         document.getElementById('logContent').prepend(log);
 
         resInput.value = "";

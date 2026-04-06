@@ -67,8 +67,8 @@
     <div id="input-section">
         <p style="font-size:1.1rem; font-weight:bold;">Q. Which stimulus was STRONGER?<br><span style="font-size:0.9rem; color:#666;">(Which stimulus was STRONGER?)</span></p>
         <div style="display:flex; justify-content:space-between;">
-            <button id="ansBtn1" onclick="logResponse(1)">1st Stimulus</button>
-            <button id="ansBtn2" onclick="logResponse(2)">2nd Stimulus</button>
+            <button id="ansBtn1" onclick="logResponse(1)">1번 </button>
+            <button id="ansBtn2" onclick="logResponse(2)">2번 </button>
         </div>
     </div>
 
@@ -147,16 +147,16 @@
         document.getElementById('input-section').style.display = 'none';
 
         document.getElementById('status-display').innerText = "첫 번째 자극 제시 중...";
-        subjectWindow.update("Stimulus 1", "#2196F3");
-        await progress(2000); 
+        subjectWindow.update("Concentrate ..", "#2196F3");
+        await progress(10000); 
 
-        document.getElementById('status-display').innerText = "대기 (Interval)...";
-        subjectWindow.update("Ready ... ", "#333");
-        await progress(3000);
+        //document.getElementById('status-display').innerText = "대기 (Interval)...";
+        //subjectWindow.update("Ready ... ", "#333");
+        //await progress(3000);
 
-        document.getElementById('status-display').innerText = "두 번째 자극 제시 중...";
-        subjectWindow.update("Stimulus 2", "#F44336");
-        await progress(2000);
+        //document.getElementById('status-display').innerText = "두 번째 자극 제시 중...";
+        //subjectWindow.update("Concentrate ..", "#F44336");
+        //await progress(2000);
         
         document.getElementById('status-display').innerText = "피험자 응답 대기 중";
         subjectWindow.update("Which stimulus was STRONGER? 1 or 2", "#9C27B0");
@@ -253,7 +253,7 @@
         const a = document.createElement("a");
         a.href = URL.createObjectURL(blob);
         // 파일명 반영: 2AFC_Force_JND_P1_S01.csv 형태
-        a.download = `2AFC_Force_JND_${subID}_${sessNo}.csv`;
+        a.download = `${subID}_${sessNo}_Force_JND.csv`;
         a.click();
     }
 

@@ -2,7 +2,7 @@
 <html lang="ko">
 <head>
     <meta charset="UTF-8">
-    <title>2PD+2IFC Spatial Discrimination</title>
+    <title>Spatial Discrimination</title>
     <style>
         body { font-family: 'Segoe UI', sans-serif; display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 100vh; margin: 0; background-color: #f4f7f6; }
         #container { background: white; padding: 30px; border-radius: 20px; box-shadow: 0 10px 30px rgba(0,0,0,0.1); text-align: center; width: 720px; }
@@ -96,28 +96,22 @@
     const sessionConditions = ['In-air', 'On-touch'];
     let currentConditionIdx = 0;
 
-    const imgSrc = "/Users/kyungeunjung/NailFoldExp/guide_img2.png"; 
+    // 이미지 경로 설정
+    const imgSrc = "/Users/kyungeunjung/NailFoldExp/LR.png"; 
+    const imgSrc2 = "/Users/kyungeunjung/NailFoldExp/UD.png"; 
+    const imgSrc3 = "/Users/kyungeunjung/NailFoldExp/guide_img2.png"; // Ready 이미지 추가
 
     const distanceMap = [
-        // LR Axis: p1=Left, p2=Right (정답 == Left) 4
-        { p1: 'd', p2: 'e', dist: 5.0, axis: 'LR', q: "Which one was the Left?", correct_val: "Left", incorrect_val: "Right" },
-        { p1: 'c', p2: 'f', dist: 8.0, axis: 'LR', q: "Which one was the Left?", correct_val: "Left", incorrect_val: "Right" },
-        { p1: 'b', p2: 'g', dist: 12.0, axis: 'LR', q: "Which one was the Left?", correct_val: "Left", incorrect_val: "Right" },
-        { p1: 'a', p2: 'h', dist: 12.0, axis: 'LR', q: "Which one was the Left?", correct_val: "Left", incorrect_val: "Right" },
-        
-        // UD Axis: p1=Distal, p2=Proximal (정답 == Distal) 12
-        { p1: 'a', p2: 'b', dist: 5.0, axis: 'UD', q: "Which one was the Distal?", correct_val: "Distal", incorrect_val: "Proximal" },
-        { p1: 'a', p2: 'c', dist: 8.0, axis: 'UD', q: "Which one was the Distal?", correct_val: "Distal", incorrect_val: "Proximal" },
-        { p1: 'a', p2: 'd', dist: 10.0, axis: 'UD', q: "Which one was the Distal?", correct_val: "Distal", incorrect_val: "Proximal" },
-        { p1: 'b', p2: 'c', dist: 2.7, axis: 'UD', q: "Which one was the Distal?", correct_val: "Distal", incorrect_val: "Proximal" },
-        { p1: 'b', p2: 'd', dist: 5.5, axis: 'UD', q: "Which one was the Distal?", correct_val: "Distal", incorrect_val: "Proximal" },
-        { p1: 'c', p2: 'd', dist: 2.0, axis: 'UD', q: "Which one was the Distal?", correct_val: "Distal", incorrect_val: "Proximal" },
-        { p1: 'h', p2: 'g', dist: 5.0, axis: 'UD', q: "Which one was the Distal?", correct_val: "Distal", incorrect_val: "Proximal" },
-        { p1: 'h', p2: 'f', dist: 8.0, axis: 'UD', q: "Which one was the Distal?", correct_val: "Distal", incorrect_val: "Proximal" },
-        { p1: 'h', p2: 'e', dist: 10.0, axis: 'UD', q: "Which one was the Distal?", correct_val: "Distal", incorrect_val: "Proximal" },
-        { p1: 'g', p2: 'f', dist: 2.7, axis: 'UD', q: "Which one was the Distal?", correct_val: "Distal", incorrect_val: "Proximal" },
-        { p1: 'g', p2: 'e', dist: 5.5, axis: 'UD', q: "Which one was the Distal?", correct_val: "Distal", incorrect_val: "Proximal" },
-        { p1: 'f', p2: 'e', dist: 2.0, axis: 'UD', q: "Which one was the Distal?", correct_val: "Distal", incorrect_val: "Proximal" }
+        { p1: 'd', p2: 'e', dist: 5.0, axis: 'LR', q: "Which one was more Left? 1 or 2", correct_val: "Left", incorrect_val: "Right" },
+        { p1: 'c', p2: 'f', dist: 8.0, axis: 'LR', q: "Which one was more Left? 1 or 2", correct_val: "Left", incorrect_val: "Right" },
+        { p1: 'b', p2: 'g', dist: 12.0, axis: 'LR', q: "Which one was more Left? 1 or 2", correct_val: "Left", incorrect_val: "Right" },
+        { p1: 'a', p2: 'h', dist: 12.0, axis: 'LR', q: "Which one was more Left? 1 or 2", correct_val: "Left", incorrect_val: "Right" },
+        { p1: 'a', p2: 'b', dist: 5.0, axis: 'UD', q: "Which one was more Distal? 1 or 2", correct_val: "Distal", incorrect_val: "Proximal" },
+        { p1: 'a', p2: 'c', dist: 8.0, axis: 'UD', q: "Which one was more Distal? 1 or 2", correct_val: "Distal", incorrect_val: "Proximal" },
+        { p1: 'a', p2: 'd', dist: 10.0, axis: 'UD', q: "Which one was more Distal? 1 or 2", correct_val: "Distal", incorrect_val: "Proximal" },
+        { p1: 'b', p2: 'c', dist: 2.7, axis: 'UD', q: "Which one was more Distal? 1 or 2", correct_val: "Distal", incorrect_val: "Proximal" },
+        { p1: 'b', p2: 'd', dist: 5.5, axis: 'UD', q: "Which one was more Distal? 1 or 2", correct_val: "Distal", incorrect_val: "Proximal" },
+        { p1: 'c', p2: 'd', dist: 2.0, axis: 'UD', q: "Which one was more Distal? 1 or 2", correct_val: "Distal", incorrect_val: "Proximal" }
     ];
 
     function openSubjectWindow() {
@@ -127,14 +121,18 @@
                 <div style="text-align:center;">
                     <h1 id="msg" style="font-size:3rem; margin-bottom:20px;">Ready</h1>
                     <div id="indicator" style="width:60px; height:60px; border-radius:50%; margin:0 auto 30px auto; background:transparent;"></div>
-                    <img id="guide-img" src="${imgSrc}" style="width:400px; height:auto; opacity:0.8; border:2px solid #444; border-radius:10px;">
+                    <img id="guide-img" src="${imgSrc}" style="width:400px; height:auto; opacity:0.8; border:2px solid #444; border-radius:10px; display:none;">
+                    <img id="guide-img2" src="${imgSrc2}" style="width:400px; height:auto; opacity:0.8; border:2px solid #444; border-radius:10px; display:none;">
+                    <img id="guide-img3" src="${imgSrc3}" style="width:400px; height:auto; opacity:0.8; border:2px solid #444; border-radius:10px; display:block;">
                 </div>
                 <script>
-                    function updateState(txt, color, indColor, showImg){ 
+                    function updateState(txt, color, indColor, showImg, showImg2, showImg3){ 
                         document.getElementById('msg').innerText = txt; 
                         document.body.style.backgroundColor = color; 
                         document.getElementById('indicator').style.backgroundColor = indColor || 'transparent';
                         document.getElementById('guide-img').style.display = showImg ? 'block' : 'none';
+                        document.getElementById('guide-img2').style.display = showImg2 ? 'block' : 'none';
+                        document.getElementById('guide-img3').style.display = showImg3 ? 'block' : 'none';
                     }
                 <\/script>
             </body></html>`);
@@ -156,16 +154,25 @@
 
     function generateTrialList(condition) {
         trialPool = [];
-        distanceMap.forEach(item => {
-            trialPool.push({ ...item, condition: condition, isP1First: true });
-            trialPool.push({ ...item, condition: condition, isP1First: false });
+        let lrPool = [];
+        distanceMap.filter(item => item.axis === 'LR').forEach(item => {
+            lrPool.push({ ...item, condition: condition, isP1First: true });
+            lrPool.push({ ...item, condition: condition, isP1First: false });
         });
-        
-        for (let i = trialPool.length - 1; i > 0; i--) {
+        for (let i = lrPool.length - 1; i > 0; i--) {
             const j = Math.floor(Math.random() * (i + 1));
-            [trialPool[i], trialPool[j]] = [trialPool[j], trialPool[i]];
+            [lrPool[i], lrPool[j]] = [lrPool[j], lrPool[i]];
         }
-        
+        let udPool = [];
+        distanceMap.filter(item => item.axis === 'UD').forEach(item => {
+            udPool.push({ ...item, condition: condition, isP1First: true });
+            udPool.push({ ...item, condition: condition, isP1First: false });
+        });
+        for (let i = udPool.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [udPool[i], udPool[j]] = [udPool[j], udPool[i]];
+        }
+        trialPool = [...lrPool, ...udPool];
         currentIdx = 0;
         document.getElementById('total-trials').innerText = trialPool.length;
         document.getElementById('trial-count').innerText = "0";
@@ -179,10 +186,8 @@
             const nextTrial = trialPool[currentIdx];
             const firstPin = nextTrial.isP1First ? nextTrial.p1 : nextTrial.p2;
             const secondPin = nextTrial.isP1First ? nextTrial.p2 : nextTrial.p1;
-
             const seqElem = document.getElementById('admin-seq');
             if(seqElem) seqElem.innerText = `${firstPin.toUpperCase()} → ${secondPin.toUpperCase()}`;
-            
             document.getElementById('admin-dist').innerText = nextTrial.dist;
             document.getElementById('admin-axis').innerText = nextTrial.axis; 
             document.getElementById('dynamic-question').innerText = nextTrial.q;
@@ -197,31 +202,39 @@
         document.getElementById('startBtn').disabled = true;
         document.getElementById('ans-grid').style.display = 'none';
 
-        document.getElementById('status-display').innerText = "첫 번째 자극 제시 중...";
-        subjectWindow.updateState("Stimulus 1", "#1b5e20", "#4caf50", false);
-        await progress(2000);
+        // --- 축 전환 안내 로직 ---
+        const isFirstLR = (currentTrial.axis === 'LR' && currentIdx === 0);
+        const lrCount = trialPool.filter(t => t.axis === 'LR').length;
+        const isFirstUD = (currentTrial.axis === 'UD' && currentIdx === lrCount);
 
-        document.getElementById('status-display').innerText = "대기 (Interval)...";
-        subjectWindow.updateState("Ready ...", "#222", "transparent", false);
-        await progress(2000); 
+        if (isFirstLR || isFirstUD) {
+            let sessionMsg = currentTrial.axis === 'LR' ? "(Left / Right) Task" : "(Distal / Proximal) Task";
+            document.getElementById('status-display').innerText = "새로운 세션 준비 중...";
+            // 전환 안내 시에는 모든 이미지를 숨깁니다.
+            subjectWindow.updateState(sessionMsg, "#fbc02d", "transparent", false, false, false);
+            await new Promise(res => setTimeout(res, 2000)); 
+        }
 
-        document.getElementById('status-display').innerText = "두 번째 자극 제시 중...";
-        subjectWindow.updateState("Stimulus 2", "#b71c1c", "#f44336", false);
-        await progress(2000); 
+        let axisInfo = currentTrial.axis === 'LR' ? "" : "";
+        let displayMsg = `Concentrate..\n[${axisInfo}]`;
+        let isLR = (currentTrial.axis === 'LR');
+        let isUD = (currentTrial.axis === 'UD');
+
+        document.getElementById('status-display').innerText = "자극 제시 중: " + axisInfo;
+        // 자극 중: 해당 축 이미지 노출 (Ready 이미지는 끔)
+        subjectWindow.updateState(displayMsg, "#1b5e20", "#4caf50", isLR, isUD, false);
+        await progress(8000);
 
         document.getElementById('status-display').innerText = "피험자 응답 대기 중";
-        subjectWindow.updateState(currentTrial.q, "#1565c0", "transparent", true);
+        // 질문 중: 해당 축 이미지 노출 (Ready 이미지는 끔)
+        subjectWindow.updateState(currentTrial.q, "#1565c0", "transparent", isLR, isUD, false);
         
         window.activeTrialData = { 
             condition: currentTrial.condition,
-            dist: currentTrial.dist, 
-            axis: currentTrial.axis, 
-            p1: currentTrial.p1, 
-            p2: currentTrial.p2,
-            isP1First: isP1First,
+            dist: currentTrial.dist, axis: currentTrial.axis, 
+            p1: currentTrial.p1, p2: currentTrial.p2, isP1First: isP1First,
             correct: isP1First ? "1st" : "2nd",
-            correct_label: currentTrial.correct_val,
-            incorrect_label: currentTrial.incorrect_val
+            correct_label: currentTrial.correct_val, incorrect_label: currentTrial.incorrect_val
         };
         document.getElementById('ans-grid').style.display = 'grid';
     }
@@ -248,27 +261,16 @@
         const isCorrect = (choice === info.correct);
         const subId = document.getElementById('subjectId').value;
         const sessNo = document.getElementById('sessionNo').value;
-
         const firstStim = info.isP1First ? info.p1 : info.p2;
         const secondStim = info.isP1First ? info.p2 : info.p1;
-        
         const userLabelChoice = (choice === info.correct) ? info.correct_label : info.incorrect_label;
 
         experimentalData.push({
-            Subject: subId,
-            Session: sessNo,
-            Condition: info.condition,
-            Trial: currentIdx + 1,
-            Pair: `${info.p1}-${info.p2}`,
-            Stim_1st: firstStim,
-            Stim_2nd: secondStim,
-            Target_Order: info.correct,
-            Target_Label: info.correct_label,
-            User_Order: choice,
-            User_Label: userLabelChoice, 
-            Distance: info.dist,
-            Axis: info.axis,
-            IsCorrect: isCorrect ? 1 : 0
+            Subject: subId, Session: sessNo, Condition: info.condition, Trial: currentIdx + 1,
+            Pair: `${info.p1}-${info.p2}`, Stim_1st: firstStim, Stim_2nd: secondStim,
+            Target_Order: info.correct, Target_Label: info.correct_label,
+            User_Order: choice, User_Label: userLabelChoice, 
+            Distance: info.dist, Axis: info.axis, IsCorrect: isCorrect ? 1 : 0
         });
 
         const log = document.createElement('div');
@@ -281,6 +283,9 @@
         document.getElementById('ans-grid').style.display = 'none';
         document.getElementById('status-display').innerText = "Waiting for Next Trial";
         
+        // 응답 완료 후 다음 버튼 누르기 전 대기 상태: Ready 이미지 표시
+        subjectWindow.updateState("Ready", "#222", "transparent", false, false, true);
+
         if(currentIdx < trialPool.length) {
             document.getElementById('startBtn').disabled = false;
             updateAdminPreview();
@@ -299,7 +304,7 @@
             alert("모든 실험 조건 종료.");
             document.getElementById('startBtn').innerText = "All Finished";
             document.getElementById('startBtn').disabled = true;
-            subjectWindow.updateState("Experiment Completed", "#222", "transparent", false);
+            subjectWindow.updateState("Experiment Completed", "#222", "transparent", false, false, false);
         }
     }
 
@@ -313,7 +318,7 @@
         const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
         const a = document.createElement("a");
         a.href = URL.createObjectURL(blob);
-        a.download = `2PD_${subId}_${sessNo}_Results.csv`;
+        a.download = `${subId}_${sessNo}_Spatial_Discrimination.csv`;
         a.click();
     }
 </script>
