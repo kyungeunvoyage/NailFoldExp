@@ -280,22 +280,36 @@
         isStimulusGenerated = true; isFinalView = false;
         drawEverything();
         const ext = expandUCurve(true);
-        const stimY_upper = (guideLines.topY + guideLines.midY) / 2, stimY_lower = (guideLines.midY + guideLines.bottomY) / 2;
-        const stimY_DE = guideLines.bottomY + (guideLines.dipjY - guideLines.bottomY) * 0.2;
-        const leftLatX = guideLines.outlines[0] + (guideLines.leftX - guideLines.outlines[0]) * 0.5;
-        const rightLatX = guideLines.outlines[1] - (guideLines.outlines[1] - guideLines.rightX) * 0.5;
-        const stimX_LInner = (guideLines.leftX + guideLines.midX) / 2, stimX_RInner = (guideLines.midX + guideLines.rightX) / 2;
 
-        const stimX_c = (leftLatX + stimX_LInner) / 2;
-        const stimX_f = (stimX_RInner + rightLatX) / 2;
+        // 1. 기본 Y축 및 X축 기준점 계산
+        const stimY_upper = (guideLines.topY + guideLines.midY) / 2;
+        const stimY_lower = (guideLines.midY + guideLines.bottomY) / 2;
+        const stimY_DE = guideLines.bottomY + (guideLines.dipjY - guideLines.bottomY) * 0.2;
+        
+        const leftLatX = guideLines.outlines[0] + (guideLines.leftX - guideLines.outlines[0]) * 0.5; // a, b의 X
+        const rightLatX = guideLines.outlines[1] - (guideLines.outlines[1] - guideLines.rightX) * 0.5; // g, h의 X
+        
+        const stimX_LInner = (guideLines.leftX + guideLines.midX) / 2; // d의 X
+        const stimX_RInner = (guideLines.midX + guideLines.rightX) / 2; // e의 X
+
+        // 2. c점과 f점의 X좌표를 인접한 점(b-d, e-g)의 정중앙으로 설정
+        const stimX_c = (leftLatX + stimX_LInner) / 2; // b와 d의 중간
+        const stimX_f = (stimX_RInner + rightLatX) / 2; // e와 g의 중간
+
+        // 3. Bezier 곡선 위에서 해당 X에 맞는 Y값 추출
+        // c는 왼쪽 곡선(ext[0], [1], [2]), f는 오른쪽 곡선(ext[2], [3], [4]) 기준
         const stimY_c = getYonBezier(stimX_c, ext[0], ext[1], ext[2]);
         const stimY_f = getYonBezier(stimX_f, ext[2], ext[3], ext[4]);
 
         const stimPoints = [
-            {label: 'a', x: leftLatX, y: stimY_upper}, {label: 'b', x: leftLatX, y: stimY_lower},
-            {label: 'c', x: stimX_c, y: stimY_c}, {label: 'd', x: stimX_LInner, y: stimY_DE},
-            {label: 'e', x: stimX_RInner, y: stimY_DE}, {label: 'f', x: stimX_f, y: stimY_f},
-            {label: 'g', x: rightLatX, y: stimY_lower}, {label: 'h', x: rightLatX, y: stimY_upper}
+            {label: 'a', x: leftLatX, y: stimY_upper}, 
+            {label: 'b', x: leftLatX, y: stimY_lower},
+            {label: 'c', x: stimX_c, y: stimY_c}, 
+            {label: 'd', x: stimX_LInner, y: stimY_DE},
+            {label: 'e', x: stimX_RInner, y: stimY_DE}, 
+            {label: 'f', x: stimX_f, y: stimY_f},
+            {label: 'g', x: rightLatX, y: stimY_lower}, 
+            {label: 'h', x: rightLatX, y: stimY_upper}
         ];
         stimPoints.forEach(p => drawStimulusPoint(p.x, p.y, p.label));
         status.innerText = "자극점 생성 완료";

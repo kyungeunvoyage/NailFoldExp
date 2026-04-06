@@ -6,7 +6,9 @@
     <style>
         body { font-family: 'Segoe UI', sans-serif; display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 100vh; margin: 0; background-color: #f4f7f6; }
         #container { background: white; padding: 30px; border-radius: 20px; box-shadow: 0 10px 30px rgba(0,0,0,0.1); text-align: center; width: 550px; }
-        .subject-info-box { background: #fff; border: 2px solid #1a73e8; padding: 15px; border-radius: 10px; margin-bottom: 20px; display: flex; align-items: center; justify-content: center; gap: 10px; }
+        .subject-info-box { background: #fff; border: 2px solid #1a73e8; padding: 15px; border-radius: 10px; margin-bottom: 20px; display: flex; align-items: center; justify-content: center; gap: 15px; }
+        .subject-info-box label { font-weight: bold; font-size: 14px; }
+        .subject-info-box input { padding: 8px; border: 1px solid #ccc; border-radius: 5px; width: 80px; text-align: center; }
         .setup-info { display: flex; justify-content: space-around; margin-bottom: 20px; background: #e3f2fd; padding: 15px; border-radius: 10px; font-weight: bold; }
         #target-display { background: #fff9c4; border: 2px dashed #fbc02d; padding: 20px; border-radius: 10px; margin-bottom: 20px; }
         #target-number { font-size: 50px; color: #d32f2f; font-weight: bold; }
@@ -25,27 +27,32 @@
         .cond-air { color: #03a9f4; }
         .cond-soft { color: #f44336; }
         .cond-hard { color: #8e44ad; }
+        .cond-mid { color: #f39c12; } 
     </style>
 </head>
 <body>
 
 <div id="container">
     <button id="popBtn" onclick="openSubjectWindow()">1. 피험자용 창 열기 (Subject Window)</button>
-    <div class="subject-info-box"><label>Subject ID:</label><input type="text" id="subjectId" value="S01"></div>
+    <div class="subject-info-box">
+        <label>Subject ID:</label>
+        <input type="text" id="subjectId" value="P1">
+        <label style="margin-left:10px;">Session No:</label>
+        <input type="text" id="sessNo" value="S01">
+    </div>
     
     <h2 id="condition-title">Condition: Ready</h2>
     <div class="setup-info">
-        <div>Session: <span id="current-session">1</span> / 2</div>
         <div>Area: <span id="current-area">-</span></div>
         <div>Force: <span id="current-force">-</span></div>
-        <div>Trial: <span id="trial-count">0</span> / 15</div>
+        <div>Trial: <span id="trial-count">0</span> / <span id="total-trials-display">-</span></div>
     </div>
 
     <div id="target-display"><div style="font-size: 14px; color: #666;">Target (Admin Only)</div><div id="target-number">?</div></div>
     <div class="progress-bar"><div id="progress"></div><div id="flash"></div></div>
 
     <button id="startBtn" onclick="startTrial()">2. 시행 시작 (Start)</button>
-    <button id="nextBtn" onclick="proceedToNextStage()">다음 단계로 진행 (Next Condition)</button>
+    <button id="nextBtn" onclick="proceedToNextStage()">실험 완료</button>
 
     <div id="input-section">
         <input type="number" id="subjectResponse" class="subject-input" placeholder="#" autofocus> <br>
@@ -59,14 +66,10 @@
 <script>
     let subjectWindow = null;
     const areas = ['A','B','C','D'];
-    //const forces = ['0.07g', '0.16g', '0.6g', '1.4g', '2.0g'];
     const forces = ['0.07g', '0.16g', '0.6g', '1.0g', '1.4g'];
-    const TRIAL_DURATION = 15;
+    const TRIAL_DURATION = 10;
     
-    let sessionSequence = []; 
-    let currentStageIdx = 0;  
-    let trialPools = {};      
-    let currentSessionIdx = 1;
+    let fullTrialPool = []; 
     let currentIdxInSet = 0;
     let experimentalData = [];
     let timerInterval;
@@ -92,18 +95,24 @@
     }
 
     function setupExp() {
-        let s1_conds = ["In-air", "On-touch (Soft)", "On-touch (Hard)"].sort(() => Math.random() - 0.5);
-        let s2_conds = ["On-touch (Soft)", "On-touch (Hard)"].sort(() => Math.random() - 0.5);
-        sessionSequence = s1_conds.concat(s2_conds);
+        const conditions = ["In-air", "On-touch (Mid)"];
+        fullTrialPool = [];
         
-        sessionSequence.forEach((condName, idx) => {
-            let base = [];
-            areas.forEach(a => forces.forEach(f => base.push({ condition: condName, area: a, force: f })));
-            trialPools[idx] = base.sort(() => Math.random() - 0.5);
+        conditions.forEach(condName => {
+            areas.forEach(a => {
+                forces.forEach(f => {
+                    fullTrialPool.push({ condition: condName, area: a, force: f });
+                });
+            });
         });
 
-        currentStageIdx = 0;
+        fullTrialPool.sort(() => Math.random() - 0.5);
+
         currentIdxInSet = 0;
+        
+        // 생성된 트라이얼 풀의 길이에 맞춰 자동으로 전체 횟수를 표시합니다.
+        document.getElementById('total-trials-display').innerText = fullTrialPool.length;
+        
         updateUI();
     }
 
@@ -112,44 +121,32 @@
         const startBtn = document.getElementById('startBtn');
         const nextBtn = document.getElementById('nextBtn');
 
-        if (currentStageIdx >= sessionSequence.length) {
-            condTitle.innerText = "All Experiments Finished!";
-            startBtn.disabled = true;
-            startBtn.style.display = 'block';
-            nextBtn.style.display = 'none';
-            return;
-        }
-
-        currentSessionIdx = (currentStageIdx < 3) ? 1 : 2;
-        const currentPool = trialPools[currentStageIdx];
-        
-        // 스테이지 종료 여부 확인
-        if (currentIdxInSet < 15) {
-            const t = currentPool[currentIdxInSet];
+        if (currentIdxInSet < fullTrialPool.length) {
+            const t = fullTrialPool[currentIdxInSet];
             condTitle.innerText = `Condition: ${t.condition}`;
             const cName = t.condition.toLowerCase();
-            condTitle.className = cName.includes("air") ? "cond-air" : (cName.includes("soft") ? "cond-soft" : "cond-hard");
+            
+            if (cName.includes("air")) condTitle.className = "cond-air";
+            else if (cName.includes("mid")) condTitle.className = "cond-mid";
             
             document.getElementById('current-area').innerText = t.area;
             document.getElementById('current-force').innerText = t.force;
             document.getElementById('trial-count').innerText = currentIdxInSet + 1;
-            document.getElementById('current-session').innerText = currentSessionIdx;
 
             startBtn.style.display = 'block';
             startBtn.disabled = false;
             nextBtn.style.display = 'none';
         } else {
-            // 해당 조건의 모든 Trial 종료 시
-            condTitle.innerText = `${sessionSequence[currentStageIdx]} Completed!`;
+            condTitle.innerText = "All Experiments Completed!";
             startBtn.style.display = 'none';
-            nextBtn.style.display = 'block';
+            nextBtn.style.display = 'none';
+            if(subjectWindow) subjectWindow.updateState('ready', 'Finished');
         }
     }
 
     function startTrial() {
         if (!subjectWindow || subjectWindow.closed) { alert("Open Subject Window!"); return; }
         
-        // 타겟 숫자 생성 및 표시
         currentTarget = Math.floor(Math.random() * 4) + 5;
         document.getElementById('target-number').innerText = currentTarget;
         
@@ -162,7 +159,6 @@
         timerInterval = setInterval(() => {
             timeLeft -= 0.1;
             
-            // 매 초마다 플래시 효과
             if (Math.floor(timeLeft) < lastSec) {
                 const flash = document.getElementById('flash');
                 flash.classList.remove('flash-active');
@@ -188,13 +184,14 @@
         const res = resInput.value;
         if (res === "") return;
         
-        const currentPool = trialPools[currentStageIdx];
-        const t = currentPool[currentIdxInSet];
+        const t = fullTrialPool[currentIdxInSet];
         const isCorrect = (currentTarget == res);
+        const subId = document.getElementById('subjectId').value;
+        const sessNo = document.getElementById('sessNo').value;
         
         experimentalData.push({
-            SubjectID: document.getElementById('subjectId').value, 
-            Session: currentSessionIdx, 
+            SubjectID: subId, 
+            Session: sessNo, 
             Condition: t.condition, 
             Area: t.area, 
             Force: t.force, 
@@ -204,10 +201,9 @@
         });
 
         const log = document.createElement('div');
-        log.innerHTML = `<b>[S${currentSessionIdx}-${t.condition}]</b> ${t.area}-${t.force} | T:${currentTarget}, R:${res} ${isCorrect ? '✓' : '✗'}`;
+        log.innerHTML = `<b>[${sessNo}-${t.condition}]</b> ${t.area}-${t.force} | T:${currentTarget}, R:${res} ${isCorrect ? '✓' : '✗'}`;
         document.getElementById('logContent').prepend(log);
 
-        // 초기화
         resInput.value = "";
         document.getElementById('input-section').style.display = 'none';
         document.getElementById('progress').style.width = "0%";
@@ -218,20 +214,10 @@
         updateUI();
     }
 
-    function proceedToNextStage() {
-        currentStageIdx++;
-        currentIdxInSet = 0;
-        
-        // 버튼 상태 초기화
-        document.getElementById('nextBtn').style.display = 'none';
-        document.getElementById('startBtn').style.display = 'block';
-        document.getElementById('startBtn').disabled = false;
-        
-        updateUI();
-        subjectWindow.updateState('ready', 'Prepare for Next Condition');
-    }
-
     function downloadCSV() {
+        const subId = document.getElementById('subjectId').value || "Unknown";
+        const sessNo = document.getElementById('sessNo').value || "Unknown";
+        
         let csv = "\uFEFFSubjectID,Session,Condition,Area,Force,Target,Response,IsCorrect\n";
         experimentalData.forEach(r => { 
             csv += `${r.SubjectID},${r.Session},${r.Condition},${r.Area},${r.Force},${r.Target},${r.Response},${r.Correct}\n`; 
@@ -239,8 +225,7 @@
         const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
         const a = document.createElement("a");
         a.href = URL.createObjectURL(blob);
-        a.download = `${document.getElementById('subjectId').value}_Exp1_AbsoluteThresholdDetection.csv`;
-        //P2_Exp1_AbsoluteThresholdDetection
+        a.download = `${subId}_${sessNo}_Exp1_AbsoluteThresholdDetection.csv`;
         a.click();
     }
 

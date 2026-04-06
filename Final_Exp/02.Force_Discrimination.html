@@ -45,7 +45,7 @@
         </div>
     </div>
 
-    <p style="margin-top:0px; color:#666;">Reference Intensity: <strong>1.00g</strong></p>
+    <!--<p style="margin-top:0px; color:#666;">Reference Intensity: <strong>1.00g</strong></p>-->
     
     <button onclick="openSubjectWindow()" style="background:#9c27b0; color:white; margin-bottom:10px;">1. Subject Window Open</button>
     
@@ -79,6 +79,7 @@
 
 <script>
     let subjectWindow = null;
+    //const regions = ['A', 'B', 'C', 'D','E','F','G','H'];
     const regions = ['A', 'B', 'C', 'D'];
     const referenceValue = 1.00;
     const pairs = [
@@ -151,7 +152,7 @@
 
         document.getElementById('status-display').innerText = "대기 (Interval)...";
         subjectWindow.update("Ready ... ", "#333");
-        await progress(2000);
+        await progress(3000);
 
         document.getElementById('status-display').innerText = "두 번째 자극 제시 중...";
         subjectWindow.update("Stimulus 2", "#F44336");
