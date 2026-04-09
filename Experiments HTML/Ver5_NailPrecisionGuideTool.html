@@ -1,0 +1,346 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <title>Nail Precision Guide Tool</title>
+    <style>
+        body { font-family: 'Segoe UI', sans-serif; display: flex; flex-direction: column; align-items: center; background: #f0f2f5; margin: 0; padding: 20px; }
+        .container { background: white; padding: 20px; border-radius: 12px; box-shadow: 0 4px 20px rgba(0,0,0,0.1); text-align: center; }
+        .canvas-wrapper { position: relative; margin-top: 30px; display: inline-block; padding-top: 30px; padding-left: 30px; background: #eee; border-radius: 8px; }
+        canvas { border: 1px solid #ddd; cursor: crosshair; display: block; background-color: white; }
+        .controls { margin-bottom: 15px; display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; }
+        button { padding: 12px 20px; border: none; border-radius: 8px; cursor: pointer; font-weight: bold; transition: 0.2s; }
+        .btn-v { background: #e74c3c; color: white; } 
+        .btn-h { background: #3498db; color: white; } 
+        .btn-u { background: #f39c12; color: white; } 
+        .btn-dipj { background: #27ae60; color: white; }
+        .btn-outline { background: #8e44ad; color: white; } 
+        .btn-stim { background: #ff4757; color: white; }
+        .btn-reset { background: #95a5a6; color: white; }
+        .btn-expand { background: #16a085; color: white; } 
+        .btn-final { background: #2c3e50; color: white; }
+        button:hover { opacity: 0.8; transform: translateY(-1px); }
+        .status-bar { background: #34495e; color: white; padding: 10px; border-radius: 6px; margin-bottom: 10px; min-width: 450px; font-weight: 500; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h2>Nail & Finger Stimulus Point Tool</h2>
+    <div class="status-bar" id="status">이미지를 업로드하세요.</div>
+
+    <div class="controls">
+        <input type="file" id="upload" accept="image/*">
+        <button class="btn-u" onclick="setMode('u-curve')">0. U-Curve (V1-V5 클릭)</button>
+        <button class="btn-v" onclick="setMode('vertical')">1. 상/하 가이드</button>
+        <button class="btn-h" onclick="setMode('horizontal')">2. 좌/우 가이드</button>
+        <button class="btn-dipj" onclick="setMode('dipj')">3. DIPJ 설정</button>
+        <button class="btn-outline" onclick="setMode('outline')">4. Finger Outline</button>
+        <button class="btn-expand" id="expandBtn" onclick="expandUCurve()" disabled>7. U-Curve 확장</button>
+        <button class="btn-stim" id="stimBtn" onclick="generateStimulusPoints()" disabled>자극점 생성</button>
+        <button class="btn-final" id="finalBtn" onclick="showFinalStimuli()" disabled>Final Stimuli</button>
+        <button class="btn-reset" onclick="resetCanvas()">초기화</button>
+    </div>
+
+    <div class="canvas-wrapper">
+        <canvas id="canvas"></canvas>
+    </div>
+</div>
+
+<script>
+    const canvas = document.getElementById('canvas');
+    const ctx = canvas.getContext('2d');
+    const status = document.getElementById('status');
+    const stimBtn = document.getElementById('stimBtn');
+    const expandBtn = document.getElementById('expandBtn');
+    const finalBtn = document.getElementById('finalBtn');
+    let img = new Image();
+    let mode = 'none';
+    let points = [];
+    let isStimulusGenerated = false;
+    let isCurveExpanded = false;
+    let isFinalView = false;
+
+    const RULER_SIZE = 30; 
+    let guideLines = { 
+        topY: null, midY: null, bottomY: null, 
+        leftX: null, midX: null, rightX: null, 
+        dipjY: null, outlines: [], uPoints: [] 
+    };
+
+    document.getElementById('upload').addEventListener('change', (e) => {
+        const reader = new FileReader();
+        reader.onload = (event) => {
+            img.onload = () => {
+                canvas.width = img.width + RULER_SIZE;
+                canvas.height = img.height + RULER_SIZE;
+                drawEverything();
+                status.innerText = `이미지 로드 완료 (${img.width}x${img.height} px)`;
+            };
+            img.src = event.target.result;
+        };
+        reader.readAsDataURL(e.target.files[0]);
+    });
+
+    function getBezierPoint(t, p0, p1, p2) {
+        const invT = 1 - t;
+        return {
+            x: invT * invT * p0.x + 2 * invT * t * p1.x + t * t * p2.x,
+            y: invT * invT * p0.y + 2 * invT * t * p1.y + t * t * p2.y
+        };
+    }
+
+    function drawRuler() {
+        ctx.fillStyle = "#34495e";
+        ctx.font = "10px Arial";
+        ctx.strokeStyle = "#34495e";
+        ctx.lineWidth = 1;
+        for (let x = 0; x <= img.width; x += 10) {
+            let posX = x + RULER_SIZE;
+            ctx.beginPath(); ctx.moveTo(posX, RULER_SIZE);
+            if (x % 100 === 0) { ctx.lineTo(posX, 0); ctx.fillText(x, posX + 2, 10); }
+            else if (x % 50 === 0) ctx.lineTo(posX, 10);
+            else ctx.lineTo(posX, 20);
+            ctx.stroke();
+        }
+        for (let y = 0; y <= img.height; y += 10) {
+            let posY = y + RULER_SIZE;
+            ctx.beginPath(); ctx.moveTo(RULER_SIZE, posY);
+            if (y % 100 === 0) {
+                ctx.lineTo(0, posY); ctx.save(); ctx.translate(10, posY + 2); ctx.rotate(-Math.PI / 2);
+                ctx.fillText(y, 0, 0); ctx.restore();
+            }
+            else if (y % 50 === 0) ctx.lineTo(10, posY);
+            else ctx.lineTo(20, posY);
+            ctx.stroke();
+        }
+    }
+
+    function drawEverything() {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        if (img.src) {
+            ctx.drawImage(img, RULER_SIZE, RULER_SIZE);
+            drawRuler();
+            // 가이드 렌더링 호출
+            renderAllGuides();
+            
+            // 모드 진행 중일 때만 포인트 표시
+            if (mode !== 'none') {
+                points.forEach((p, index) => {
+                    ctx.fillStyle = "white";
+                    ctx.beginPath(); ctx.arc(p.x + RULER_SIZE, p.y + RULER_SIZE, 3, 0, Math.PI * 2); ctx.fill();
+                    ctx.strokeStyle = "black"; ctx.lineWidth = 0.5; ctx.stroke();
+                    if(mode === 'u-curve') {
+                        ctx.fillStyle = "#f39c12"; 
+                        ctx.font = "bold 10px Arial";
+                        ctx.fillText(`V${index+1}`, p.x + RULER_SIZE + 5, p.y + RULER_SIZE);
+                    }
+                });
+            }
+
+            // 자극점 생성 상태라면 자극점 표시
+            if (isStimulusGenerated) {
+                renderStimulusPointsOnly();
+            }
+        }
+    }
+
+    canvas.onclick = (e) => {
+        if (mode === 'none' || !img.src) return;
+        const rect = canvas.getBoundingClientRect();
+        const rawX = (e.clientX - rect.left) * (canvas.width / rect.width);
+        const rawY = (e.clientY - rect.top) * (canvas.height / rect.height);
+        if (rawX < RULER_SIZE || rawY < RULER_SIZE) return;
+
+        const x = rawX - RULER_SIZE;
+        const y = rawY - RULER_SIZE;
+        points.push({x, y});
+        drawEverything();
+
+        if (mode === 'u-curve' && points.length === 5) {
+            guideLines.uPoints = [...points]; 
+            finalizeSelection();
+        } else if (mode === 'dipj' && points.length === 1) {
+            guideLines.dipjY = points[0].y;
+            finalizeSelection();
+        } else if (points.length === 2 && mode !== 'u-curve') {
+            if (mode === 'vertical') {
+                guideLines.topY = Math.min(points[0].y, points[1].y);
+                guideLines.bottomY = Math.max(points[0].y, points[1].y);
+                guideLines.midY = (guideLines.topY + guideLines.bottomY) / 2;
+            } else if (mode === 'horizontal') {
+                guideLines.leftX = Math.min(points[0].x, points[1].x);
+                guideLines.rightX = Math.max(points[0].x, points[1].x);
+                guideLines.midX = (guideLines.leftX + guideLines.rightX) / 2;
+            } else if (mode === 'outline') {
+                guideLines.outlines = [Math.min(points[0].x, points[1].x), Math.max(points[0].x, points[1].x)];
+            }
+            finalizeSelection();
+        }
+    };
+
+    function finalizeSelection() {
+        drawEverything();
+        checkReady();
+        points = [];
+        mode = 'none';
+        isStimulusGenerated = false; 
+        isFinalView = false;
+    }
+
+    function checkReady() {
+        if (guideLines.topY !== null && guideLines.leftX !== null && guideLines.outlines.length === 2 && guideLines.dipjY !== null) stimBtn.disabled = false;
+        if (guideLines.uPoints.length === 5 && guideLines.dipjY !== null && guideLines.outlines.length === 2) {
+            expandBtn.disabled = false;
+            finalBtn.disabled = false;
+        }
+    }
+
+    function drawHLine(y) { ctx.beginPath(); ctx.moveTo(RULER_SIZE, y + RULER_SIZE); ctx.lineTo(canvas.width, y + RULER_SIZE); ctx.stroke(); }
+    function drawVLine(x) { ctx.beginPath(); ctx.moveTo(x + RULER_SIZE, RULER_SIZE); ctx.lineTo(x + RULER_SIZE, canvas.height); ctx.stroke(); }
+    
+    function drawStimulusPoint(x, y, label) {
+        ctx.fillStyle = "yellow";
+        ctx.beginPath(); ctx.arc(x + RULER_SIZE, y + RULER_SIZE, 4, 0, Math.PI * 2); ctx.fill();
+        ctx.fillStyle = "black";
+        ctx.font = "bold 12px Segoe UI, sans-serif";
+        ctx.textAlign = "left";
+        ctx.fillText(label, x + RULER_SIZE + 6, y + RULER_SIZE + 4);
+    }
+
+    function setMode(newMode) { 
+        if (!img.src) return; 
+        mode = newMode; 
+        points = []; 
+        isStimulusGenerated = false; 
+        isFinalView = false;
+        status.innerText = newMode === 'u-curve' ? "V1부터 V5까지 클릭하세요." : "설정 위치를 클릭하세요.";
+        drawEverything();
+    }
+
+    function renderAllGuides() {
+        if (isFinalView) return;
+
+        // 1. 주황색 초기 U-Curve 그리기 (자극점 생성 후에도 항상 표시)
+        if (guideLines.uPoints.length === 5) {
+            ctx.strokeStyle = "#f39c12"; ctx.lineWidth = 3; ctx.setLineDash([]);
+            ctx.beginPath();
+            const up = guideLines.uPoints;
+            ctx.moveTo(up[0].x + RULER_SIZE, up[0].y + RULER_SIZE);
+            for (let i = 0; i < up.length - 1; i++) {
+                const midX = (up[i].x + up[i+1].x) / 2;
+                const midY = (up[i].y + up[i+1].y) / 2;
+                ctx.quadraticCurveTo(up[i].x + RULER_SIZE, up[i].y + RULER_SIZE, midX + RULER_SIZE, midY + RULER_SIZE);
+            }
+            ctx.lineTo(up[4].x + RULER_SIZE, up[4].y + RULER_SIZE);
+            ctx.stroke();
+        }
+
+        // 2. 흰색 확장 U-Curve 그리기 (확장 완료 혹은 자극점 생성 시 표시)
+        if (isCurveExpanded || isStimulusGenerated) {
+            expandUCurve(true);
+        }
+
+        // 3. 자극점 생성 중이 아닐 때만 다른 가이드라인 표시
+        if (!isStimulusGenerated) {
+            if (guideLines.topY !== null) {
+                ctx.lineWidth = 4; ctx.setLineDash([15, 10]); ctx.strokeStyle = "#e74c3c";
+                drawHLine(guideLines.topY); drawHLine(guideLines.bottomY);
+                ctx.setLineDash([]); ctx.strokeStyle = "#f1c40f"; drawHLine(guideLines.midY);
+            }
+            if (guideLines.leftX !== null) {
+                ctx.lineWidth = 4; ctx.setLineDash([15, 10]); ctx.strokeStyle = "#3498db";
+                drawVLine(guideLines.leftX); drawVLine(guideLines.rightX);
+                ctx.setLineDash([]); ctx.strokeStyle = "#2ecc71"; drawVLine(guideLines.midX);
+            }
+            if (guideLines.dipjY !== null) { ctx.lineWidth = 3; ctx.setLineDash([]); ctx.strokeStyle = "#27ae60"; drawHLine(guideLines.dipjY); }
+            if (guideLines.outlines.length === 2) { ctx.lineWidth = 3; ctx.setLineDash([]); ctx.strokeStyle = "#8e44ad"; guideLines.outlines.forEach(x => drawVLine(x)); }
+        }
+    }
+
+    function expandUCurve(onlyDraw = false) {
+        if (guideLines.uPoints.length < 5) return;
+        if (!onlyDraw) { isCurveExpanded = true; isFinalView = false; isStimulusGenerated = false; }
+        
+        const up = guideLines.uPoints;
+        const leftLimitX = guideLines.outlines[0], rightLimitX = guideLines.outlines[1];
+        const dipjY = guideLines.dipjY !== null ? guideLines.dipjY : up[2].y + 50;
+        const bottomY = guideLines.bottomY !== null ? guideLines.bottomY : up[2].y;
+        const proximalLimitY = bottomY + (dipjY - bottomY) * 0.4;
+
+        const ext = up.map((p, index) => {
+            if (index === 2) return {x: p.x, y: proximalLimitY};
+            let newX = (index < 2) ? leftLimitX + (p.x - up[0].x) * 0.5 : rightLimitX - (up[4].x - p.x) * 0.5;
+            const minY = Math.min(...up.map(pt => pt.y)), maxY = Math.max(...up.map(pt => pt.y));
+            const ratioY = (p.y - minY) / (maxY - minY);
+            return {x: newX, y: minY + ratioY * (proximalLimitY - minY)};
+        });
+
+        ctx.strokeStyle = "white"; ctx.lineWidth = 3; ctx.setLineDash([]); ctx.beginPath();
+        ctx.moveTo(ext[0].x + RULER_SIZE, ext[0].y + RULER_SIZE);
+        for (let i = 0; i < ext.length - 1; i++) {
+            const midX = (ext[i].x + ext[i+1].x) / 2, midY = (ext[i].y + ext[i+1].y) / 2;
+            ctx.quadraticCurveTo(ext[i].x + RULER_SIZE, ext[i].y + RULER_SIZE, midX + RULER_SIZE, midY + RULER_SIZE);
+        }
+        ctx.lineTo(ext[4].x + RULER_SIZE, ext[4].y + RULER_SIZE);
+        ctx.stroke();
+        
+        if (!onlyDraw) { status.innerText = "U-Curve 확장 완료"; drawEverything(); }
+        return ext;
+    }
+
+    // 자극점 좌표 계산 및 그리기
+    function renderStimulusPointsOnly() {
+        const ext = expandUCurve(true);
+        const stimY_target = guideLines.midY; 
+        const stimY_DE = guideLines.bottomY + (guideLines.dipjY - guideLines.bottomY) * 0.2;
+        
+        const leftLatX = guideLines.outlines[0] + (guideLines.leftX - guideLines.outlines[0]) * 0.5; 
+        const rightLatX = guideLines.outlines[1] - (guideLines.outlines[1] - guideLines.rightX) * 0.5; 
+        
+        const stimX_LInner = (guideLines.leftX + guideLines.midX) / 2; 
+        const stimX_RInner = (guideLines.midX + guideLines.rightX) / 2; 
+
+        const pointB = getBezierPoint(0.5, ext[0], ext[1], ext[2]);
+        const pointE = getBezierPoint(0.5, ext[2], ext[3], ext[4]);
+
+        const stimPoints = [
+            {label: 'a', x: leftLatX, y: stimY_target},
+            {label: 'b', x: pointB.x, y: pointB.y},
+            {label: 'c', x: stimX_LInner, y: stimY_DE},
+            {label: 'd', x: stimX_RInner, y: stimY_DE},
+            {label: 'e', x: pointE.x, y: pointE.y},
+            {label: 'f', x: rightLatX, y: stimY_target}
+        ];
+
+        stimPoints.forEach(p => drawStimulusPoint(p.x, p.y, p.label));
+    }
+
+    function generateStimulusPoints() {
+        if (guideLines.uPoints.length < 5) return;
+        isStimulusGenerated = true; 
+        isFinalView = false;
+        drawEverything();
+        status.innerText = "자극점이 생성되었습니다. (곡선과 점만 표시)";
+    }
+
+    function showFinalStimuli() {
+        if (guideLines.uPoints.length < 5) return;
+        isFinalView = true; 
+        isStimulusGenerated = false;
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        ctx.drawImage(img, RULER_SIZE, RULER_SIZE);
+        drawRuler();
+        // 최종 뷰에서도 자극점 렌더링을 위해 다시 계산
+        renderStimulusPointsOnly();
+    }
+
+    function resetCanvas() {
+        guideLines = { topY: null, midY: null, bottomY: null, leftX: null, midX: null, rightX: null, dipjY: null, outlines: [], uPoints: [] };
+        points = []; isStimulusGenerated = isCurveExpanded = isFinalView = false;
+        stimBtn.disabled = expandBtn.disabled = finalBtn.disabled = true;
+        drawEverything(); status.innerText = "초기화되었습니다.";
+    }
+</script>
+</body>
+</html>
