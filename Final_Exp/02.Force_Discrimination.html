@@ -33,7 +33,6 @@
     <h2>Force Discrimination</h2>
     <div id="current-condition-display" class="condition-badge">Condition: Ready</div>
     
-    <!-- 피험자 및 세션 정보 입력 칸 추가 -->
     <div class="input-group">
         <div>
             <label for="subID">Subject ID</label>
@@ -45,8 +44,6 @@
         </div>
     </div>
 
-    <!--<p style="margin-top:0px; color:#666;">Reference Intensity: <strong>1.00g</strong></p>-->
-    
     <button onclick="openSubjectWindow()" style="background:#9c27b0; color:white; margin-bottom:10px;">1. Subject Window Open</button>
     
     <div class="setup-info">
@@ -79,18 +76,19 @@
 
 <script>
     let subjectWindow = null;
-    //const regions = ['A', 'B', 'C', 'D','E','F','G','H'];
-    const regions = ['A', 'B', 'C', 'D'];
-    const referenceValue = 1.00;
-    const pairs = [
-        //{comp: 0.16}, {comp: 0.40}, {comp: 0.60}, {comp: 1.00}, {comp: 1.40}
-        {comp: 0.40}, {comp: 0.60}, {comp: 1.00}, {comp: 1.40}, {comp: 2.00}
+    const regions = ['A', 'B', 'C', 'D','E','F'];
+    
+    // --- 수정된 자극 설정 부분 ---
+    const stimConfigs = [
+        { ref: 1.00, comps: [0.60, 1.40] },
+        { ref: 26.0, comps: [10.0, 15.0, 60.0] }
     ];
+    // -----------------------
 
     const sessionConditions = ['In-air', 'On-touch'];
     let currentConditionIdx = 0;
 
-    let trialPool = []; // 현재 컨디션의 트라이얼들
+    let trialPool = []; 
     let currentIdx = 0;
     let experimentalData = [];
     let firstStim = 0, secondStim = 0;
@@ -104,25 +102,25 @@
             </body>`);
     }
 
-    // 특정 컨디션에 대한 트라이얼 풀 생성
+    // --- 수정된 풀 생성 로직: 모든 Reference-Comparison 조합 포함 ---
     function createTrialPool(condition) {
         let list = [];
         regions.forEach(reg => {
-            pairs.forEach(p => {
-                // 각 쌍당 2회 반복
-                //list.push({ref: referenceValue, comp: p.comp, region: reg, condition: condition});
-                list.push({ref: referenceValue, comp: p.comp, region: reg, condition: condition});
+            stimConfigs.forEach(config => {
+                config.comps.forEach(cVal => {
+                    list.push({ref: config.ref, comp: cVal, region: reg, condition: condition});
+                });
             });
         });
         return list.sort(() => Math.random() - 0.5);
     }
+    // --------------------------------------------------------
 
     function setupExp() {
         currentConditionIdx = 0;
         currentIdx = 0;
         trialPool = createTrialPool(sessionConditions[currentConditionIdx]);
         
-        // UI 초기화
         document.getElementById('total-trials').innerText = trialPool.length;
         document.getElementById('current-condition-display').innerText = "Condition: " + sessionConditions[currentConditionIdx];
         prepareTrial();
@@ -149,14 +147,6 @@
         document.getElementById('status-display').innerText = "첫 번째 자극 제시 중...";
         subjectWindow.update("Concentrate ..", "#2196F3");
         await progress(10000); 
-
-        //document.getElementById('status-display').innerText = "대기 (Interval)...";
-        //subjectWindow.update("Ready ... ", "#333");
-        //await progress(3000);
-
-        //document.getElementById('status-display').innerText = "두 번째 자극 제시 중...";
-        //subjectWindow.update("Concentrate ..", "#F44336");
-        //await progress(2000);
         
         document.getElementById('status-display').innerText = "피험자 응답 대기 중";
         subjectWindow.update("Which stimulus was STRONGER? 1 or 2", "#9C27B0");
@@ -179,7 +169,6 @@
         const chosenStim = (choice === 1) ? firstStim : secondStim;
         const choseComparison = (chosenStim === t.comp) ? 1 : 0;
 
-        // 입력된 ID와 세션 번호 가져오기
         const subID = document.getElementById('subID').value;
         const sessNo = document.getElementById('sessNo').value;
 
@@ -204,12 +193,10 @@
         document.getElementById('progress').style.width = "0%";
         currentIdx++;
         
-        // 현재 컨디션 종료 체크
         if (currentIdx < trialPool.length) {
             document.getElementById('startBtn').disabled = false;
             prepareTrial();
         } else {
-            // 다음 컨디션으로 전환 혹은 실험 종료
             moveToNextCondition();
         }
     }
@@ -228,7 +215,6 @@
             currentIdx = 0;
             trialPool = createTrialPool(nextCond);
             
-            // UI 업데이트
             document.getElementById('total-trials').innerText = trialPool.length;
             document.getElementById('current-condition-display').innerText = "Condition: " + nextCond;
             document.getElementById('startBtn').disabled = false;
@@ -241,7 +227,6 @@
     }
 
     function downloadCSV() {
-        // 파일명 생성을 위한 ID 및 세션 정보 추출
         const subID = document.getElementById('subID').value || "Unknown";
         const sessNo = document.getElementById('sessNo').value || "Unknown";
         
@@ -252,7 +237,6 @@
         const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
         const a = document.createElement("a");
         a.href = URL.createObjectURL(blob);
-        // 파일명 반영: 2AFC_Force_JND_P1_S01.csv 형태
         a.download = `${subID}_${sessNo}_Force_JND.csv`;
         a.click();
     }
