@@ -289,31 +289,75 @@
         return ext;
     }
 
-    // 자극점 좌표 계산 및 그리기
-    function renderStimulusPointsOnly() {
-        const ext = expandUCurve(true);
-        const stimY_target = guideLines.midY; 
-        const stimY_DE = guideLines.bottomY + (guideLines.dipjY - guideLines.bottomY) * 0.2;
+    function getVOnCurveByX(targetX, p0, p1, p2) {
+        // 2차 방정식의 계수: at^2 + bt + c = 0
+        const a = p0.x - 2 * p1.x + p2.x;
+        const b = 2 * (p1.x - p0.x);
+        const c = p0.x - targetX;
+
+        let t = 0.5; // 기본값
+
+        if (Math.abs(a) < 0.0001) { // 직선에 가까운 경우
+            t = -c / b;
+        } else {
+            // 근의 공식 사용
+            const disc = b * b - 4 * a * c;
+            if (disc >= 0) {
+                const t1 = (-b + Math.sqrt(disc)) / (2 * a);
+                const t2 = (-b - Math.sqrt(disc)) / (2 * a);
+                // t는 0과 1 사이의 값이어야 함
+                t = (t1 >= 0 && t1 <= 1) ? t1 : t2;
+            }
+        }
+
+        // 찾아낸 t를 사용하여 정확한 y좌표 계산
+        const invT = 1 - t;
+        const finalY = invT * invT * p0.y + 2 * invT * t * p1.y + t * t * p2.y;
         
+        return { x: targetX, y: finalY };
+    }
+
+
+
+    // 자극점 좌표 계산 및 그리기
+
+    function renderStimulusPointsOnly() {
+        const ext = expandUCurve(true); // 확장된 5개 가이드 포인트
+
+        // 1. 기초가 되는 좌표 변수들을 먼저 계산 
         const leftLatX = guideLines.outlines[0] + (guideLines.leftX - guideLines.outlines[0]) * 0.5; 
         const rightLatX = guideLines.outlines[1] - (guideLines.outlines[1] - guideLines.rightX) * 0.5; 
         
         const stimX_LInner = (guideLines.leftX + guideLines.midX) / 2; 
         const stimX_RInner = (guideLines.midX + guideLines.rightX) / 2; 
 
-        const pointB = getBezierPoint(0.5, ext[0], ext[1], ext[2]);
-        const pointE = getBezierPoint(0.5, ext[2], ext[3], ext[4]);
+        // 2. 위에서 계산된 변수들을 바탕으로 targetX 게산
+        const b2_targetX = (leftLatX + stimX_LInner) / 2;
+        const e2_targetX = (rightLatX + stimX_RInner) / 2;
 
+        const stimY_target = guideLines.midY; 
+        const stimY_DE = guideLines.bottomY + (guideLines.dipjY - guideLines.bottomY) * 0.2;
+
+        // 3. 베지에 곡선 위의 정확한 y좌표를 역산
+        const pointB = getVOnCurveByX(b2_targetX, ext[0], ext[1], ext[2]);
+        const pointE = getVOnCurveByX(e2_targetX, ext[2], ext[3], ext[4]);
+
+        // 4. 자극점 배열 구성
         const stimPoints = [
             {label: 'a', x: leftLatX, y: stimY_target},
-            {label: 'b', x: pointB.x, y: pointB.y},
+            {label: 'b', x: b2_targetX, y: pointB.y},
             {label: 'c', x: stimX_LInner, y: stimY_DE},
             {label: 'd', x: stimX_RInner, y: stimY_DE},
-            {label: 'e', x: pointE.x, y: pointE.y},
+            {label: 'e', x: e2_targetX, y: pointE.y},
             {label: 'f', x: rightLatX, y: stimY_target}
         ];
 
+        // 5. 그리기
         stimPoints.forEach(p => drawStimulusPoint(p.x, p.y, p.label));
+
+        console.log("leftLatX:", leftLatX, "stimX_LInner:", stimX_LInner);
+        console.log("b2_targetX:", b2_targetX); // 이 값이 기대하는 x값(예: 150.5)인지 확인
+        console.log("pointB 객체:", pointB);    // pointB.x가 위 b2_targetX와 일치하는지 확인
     }
 
     function generateStimulusPoints() {

@@ -2,7 +2,7 @@
 <html lang="ko">
 <head>
     <meta charset="UTF-8">
-    <title>Force Discrimination - 2AFC JND (In-air & On-touch)</title>
+    <title>Force Discrimination</title>
     <style>
         body { font-family: 'Segoe UI', sans-serif; display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 100vh; margin: 0; background-color: #f0f4f8; }
         #container { background: white; padding: 30px; border-radius: 20px; box-shadow: 0 10px 30px rgba(0,0,0,0.1); text-align: center; width: 620px; }
@@ -82,8 +82,6 @@
     const stimConfigs = [
         //{ ref: 1.00, comps: [0.40, 0.60, 1.00, 1.40] },
         //미니로 하려면 위에꺼는 빼고
-
-        //24개 밖에 안됨. 
         { ref: 26.0, comps: [10.0, 15.0, 26.0, 60.0] }
     ];
     // -----------------------
@@ -111,7 +109,9 @@
         regions.forEach(reg => {
             stimConfigs.forEach(config => {
                 config.comps.forEach(cVal => {
-                    list.push({ref: config.ref, comp: cVal, region: reg, condition: condition});
+                    for(let i=0; i<2; i++) { 
+                        list.push({ref: config.ref, comp: cVal, region: reg, condition: condition});
+                    }
                 });
             });
         });
@@ -240,7 +240,7 @@
         const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
         const a = document.createElement("a");
         a.href = URL.createObjectURL(blob);
-        a.download = `${subID}_${sessNo}_Force_JND.csv`;
+        a.download = `${subID}_ForceDiscrimination.csv`;
         a.click();
     }
 
