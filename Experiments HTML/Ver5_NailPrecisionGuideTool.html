@@ -118,30 +118,34 @@
 
     function drawEverything() {
         ctx.clearRect(0, 0, canvas.width, canvas.height);
-        if (img.src) {
-            ctx.drawImage(img, RULER_SIZE, RULER_SIZE);
-            drawRuler();
-            // 가이드 렌더링 호출
-            renderAllGuides();
-            
-            // 모드 진행 중일 때만 포인트 표시
-            if (mode !== 'none') {
-                points.forEach((p, index) => {
-                    ctx.fillStyle = "white";
-                    ctx.beginPath(); ctx.arc(p.x + RULER_SIZE, p.y + RULER_SIZE, 3, 0, Math.PI * 2); ctx.fill();
-                    ctx.strokeStyle = "black"; ctx.lineWidth = 0.5; ctx.stroke();
-                    if(mode === 'u-curve') {
-                        ctx.fillStyle = "#f39c12"; 
-                        ctx.font = "bold 10px Arial";
-                        ctx.fillText(`V${index+1}`, p.x + RULER_SIZE + 5, p.y + RULER_SIZE);
-                    }
-                });
-            }
+        if (!img.src) return;
 
-            // 자극점 생성 상태라면 자극점 표시
-            if (isStimulusGenerated) {
-                renderStimulusPointsOnly();
-            }
+        // 1. 이미지와 자 그리기
+        ctx.drawImage(img, RULER_SIZE, RULER_SIZE);
+        drawRuler();
+
+        // 2. 가이드라인 및 곡선 그리기
+        if (!isFinalView) {
+            renderAllGuides();
+        }
+
+        // 3. 점 그리기 (모드 중인 점 혹은 생성된 자극점)
+        if (mode !== 'none') {
+            points.forEach((p, index) => {
+                ctx.fillStyle = "white";
+                ctx.beginPath(); ctx.arc(p.x + RULER_SIZE, p.y + RULER_SIZE, 3, 0, Math.PI * 2); ctx.fill();
+                ctx.strokeStyle = "black"; ctx.lineWidth = 0.5; ctx.stroke();
+                if(mode === 'u-curve') {
+                    ctx.fillStyle = "#f39c12"; 
+                    ctx.font = "bold 10px Arial";
+                    ctx.fillText(`V${index+1}`, p.x + RULER_SIZE + 5, p.y + RULER_SIZE);
+                }
+            });
+        }
+
+        // 자극점 생성 상태거나 최종 뷰일 때 자극점 표시
+        if (isStimulusGenerated || isFinalView) {
+            renderStimulusPointsOnly();
         }
     }
 
@@ -289,75 +293,109 @@
         return ext;
     }
 
-    function getVOnCurveByX(targetX, p0, p1, p2) {
-        // 2차 방정식의 계수: at^2 + bt + c = 0
-        const a = p0.x - 2 * p1.x + p2.x;
-        const b = 2 * (p1.x - p0.x);
-        const c = p0.x - targetX;
+    function getVOnCurveByY(targetY, p0, p1, p2) {
+        const a = p0.y - 2 * p1.y + p2.y;
+        const b = 2 * (p1.y - p0.y);
+        const c = p0.y - targetY;
 
-        let t = 0.5; // 기본값
-
-        if (Math.abs(a) < 0.0001) { // 직선에 가까운 경우
-            t = -c / b;
+        let t = 0.5;
+        if (Math.abs(a) < 0.0001) {
+            t = (Math.abs(b) < 0.0001) ? 0.5 : -c / b;
         } else {
-            // 근의 공식 사용
             const disc = b * b - 4 * a * c;
             if (disc >= 0) {
                 const t1 = (-b + Math.sqrt(disc)) / (2 * a);
                 const t2 = (-b - Math.sqrt(disc)) / (2 * a);
-                // t는 0과 1 사이의 값이어야 함
                 t = (t1 >= 0 && t1 <= 1) ? t1 : t2;
             }
         }
-
-        // 찾아낸 t를 사용하여 정확한 y좌표 계산
         const invT = 1 - t;
-        const finalY = invT * invT * p0.y + 2 * invT * t * p1.y + t * t * p2.y;
-        
-        return { x: targetX, y: finalY };
+        const finalX = invT * invT * p0.x + 2 * invT * t * p1.x + t * t * p2.x;
+        return { x: finalX, y: targetY };
     }
 
+    function getYOnWhiteCurve(targetX, ext) {
+        // 흰색 선(Spline)은 마디(segment)별로 그려집니다.
+        // 각 마디의 시작, 제어, 끝점을 흰색 선 그리기 로직과 동일하게 설정합니다.
+        
+        // 마디 0: V1(ext0) ~ 중간점(mid01) -> 실제로는 직선에 가까운 곡선
+        const mid01 = { x: (ext[0].x + ext[1].x) / 2, y: (ext[0].y + ext[1].y) / 2 };
+        if (targetX <= mid01.x) {
+            return getVOnCurveByX(targetX, ext[0], ext[0], mid01).y;
+        }
 
+        // 마디 1: mid01 ~ mid12 (제어점: V2(ext1)) -> 점 b가 주로 위치하는 구간
+        const mid12 = { x: (ext[1].x + ext[2].x) / 2, y: (ext[1].y + ext[2].y) / 2 };
+        if (targetX <= mid12.x) {
+            return getVOnCurveByX(targetX, mid01, ext[1], mid12).y;
+        }
 
-    // 자극점 좌표 계산 및 그리기
+        // 마디 2: mid12 ~ mid23 (제어점: V3(ext2))
+        const mid23 = { x: (ext[2].x + ext[3].x) / 2, y: (ext[2].y + ext[3].y) / 2 };
+        if (targetX <= mid23.x) {
+            return getVOnCurveByX(targetX, mid12, ext[2], mid23).y;
+        }
+
+        // 마디 3: mid23 ~ mid34 (제어점: V4(ext3)) -> 점 e가 주로 위치하는 구간
+        const mid34 = { x: (ext[3].x + ext[4].x) / 2, y: (ext[3].y + ext[4].y) / 2 };
+        if (targetX <= mid34.x) {
+            return getVOnCurveByX(targetX, mid23, ext[3], mid34).y;
+        }
+
+        // 마디 4: mid34 ~ V5(ext4)
+        return getVOnCurveByX(targetX, mid34, ext[4], ext[4]).y;
+    }
+
+    // 주어진 Y값(높이)을 넣으면 흰색 곡선 위의 X좌표를 찾아주는 함수
+    function getXOnWhiteCurveByY(targetY, ext) {
+        const mid01 = { x: (ext[0].x + ext[1].x) / 2, y: (ext[0].y + ext[1].y) / 2 };
+        const mid12 = { x: (ext[1].x + ext[2].x) / 2, y: (ext[1].y + ext[2].y) / 2 };
+        const mid23 = { x: (ext[2].x + ext[3].x) / 2, y: (ext[2].y + ext[3].y) / 2 };
+        const mid34 = { x: (ext[3].x + ext[4].x) / 2, y: (ext[3].y + ext[4].y) / 2 };
+
+        // y값의 범위에 따라 적절한 마디에서 x를 역산 (getVOnCurveByY 함수 필요)
+        if (targetY <= mid01.y) return getVOnCurveByY(targetY, ext[0], ext[0], mid01).x;
+        if (targetY <= mid12.y) return getVOnCurveByY(targetY, mid01, ext[1], mid12).x;
+        if (targetY <= mid23.y) return getVOnCurveByY(targetY, mid12, ext[2], mid23).x;
+        if (targetY <= mid34.y) return getVOnCurveByY(targetY, mid23, ext[3], mid34).x;
+        return getVOnCurveByY(targetY, mid34, ext[4], ext[4]).x;
+    }
+
+    // 2. 자극점 생성 함수 업데이트
 
     function renderStimulusPointsOnly() {
-        const ext = expandUCurve(true); // 확장된 5개 가이드 포인트
+        const ext = expandUCurve(true);
 
-        // 1. 기초가 되는 좌표 변수들을 먼저 계산 
-        const leftLatX = guideLines.outlines[0] + (guideLines.leftX - guideLines.outlines[0]) * 0.5; 
-        const rightLatX = guideLines.outlines[1] - (guideLines.outlines[1] - guideLines.rightX) * 0.5; 
-        
-        const stimX_LInner = (guideLines.leftX + guideLines.midX) / 2; 
-        const stimX_RInner = (guideLines.midX + guideLines.rightX) / 2; 
-
-        // 2. 위에서 계산된 변수들을 바탕으로 targetX 게산
-        const b2_targetX = (leftLatX + stimX_LInner) / 2;
-        const e2_targetX = (rightLatX + stimX_RInner) / 2;
-
-        const stimY_target = guideLines.midY; 
+        // a, c, d, f의 높이와 위치는 그대로 유지
+        const stimY_target = guideLines.midY;
         const stimY_DE = guideLines.bottomY + (guideLines.dipjY - guideLines.bottomY) * 0.2;
+        const leftLatX = guideLines.outlines[0] + (guideLines.leftX - guideLines.outlines[0]) * 0.5;
+        const stimX_LInner = (guideLines.leftX + guideLines.midX) / 2;
 
-        // 3. 베지에 곡선 위의 정확한 y좌표를 역산
-        const pointB = getVOnCurveByX(b2_targetX, ext[0], ext[1], ext[2]);
-        const pointE = getVOnCurveByX(e2_targetX, ext[2], ext[3], ext[4]);
+        // --- b 점 계산 수정 ---
+        // 흰색 곡선의 마디 공식 (V1 ~ mid12)
+        const mid01 = { x: (ext[0].x + ext[1].x) / 2, y: (ext[0].y + ext[1].y) / 2 };
+        const mid12 = { x: (ext[1].x + ext[2].x) / 2, y: (ext[1].y + ext[2].y) / 2 };
+        
+        // 이 마디의 시작(mid01)과 끝(mid12) 사이의 t=0.5 지점을 찾습니다.
+        const pointB = getBezierPoint(0.5, mid01, ext[1], mid12);
+        
+        // --- e 점 계산 수정 ---
+        const mid23 = { x: (ext[2].x + ext[3].x) / 2, y: (ext[2].y + ext[3].y) / 2 };
+        const mid34 = { x: (ext[3].x + ext[4].x) / 2, y: (ext[3].y + ext[4].y) / 2 };
+        const pointE = getBezierPoint(0.5, mid23, ext[3], mid34);
 
-        // 4. 자극점 배열 구성
         const stimPoints = [
             {label: 'a', x: leftLatX, y: stimY_target},
-            {label: 'b', x: b2_targetX, y: pointB.y},
+            {label: 'b', x: pointB.x, y: pointB.y}, // 곡선 흐름상의 중간
+            //{label: 'b', x: (leftLatX+stimX_LInner)/2, y: pointB.y}, // 곡선 흐름상의 중간
             {label: 'c', x: stimX_LInner, y: stimY_DE},
-            {label: 'd', x: stimX_RInner, y: stimY_DE},
-            {label: 'e', x: e2_targetX, y: pointE.y},
-            {label: 'f', x: rightLatX, y: stimY_target}
+            {label: 'd', x: (guideLines.rightX + guideLines.midX) / 2, y: stimY_DE},
+            {label: 'e', x: pointE.x, y: pointE.y}, // 곡선 흐름상의 중간
+            {label: 'f', x: guideLines.outlines[1] - (guideLines.outlines[1] - guideLines.rightX) * 0.5, y: stimY_target}
         ];
 
-        // 5. 그리기
         stimPoints.forEach(p => drawStimulusPoint(p.x, p.y, p.label));
-
-        console.log("leftLatX:", leftLatX, "stimX_LInner:", stimX_LInner);
-        console.log("b2_targetX:", b2_targetX); // 이 값이 기대하는 x값(예: 150.5)인지 확인
-        console.log("pointB 객체:", pointB);    // pointB.x가 위 b2_targetX와 일치하는지 확인
     }
 
     function generateStimulusPoints() {
