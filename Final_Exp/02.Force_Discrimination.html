@@ -2,7 +2,7 @@
 <html lang="ko">
 <head>
     <meta charset="UTF-8">
-    <title>Force Discrimination</title>
+    <title>Force Discrimination - 2AFC JND (In-air & On-touch)</title>
     <style>
         body { font-family: 'Segoe UI', sans-serif; display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 100vh; margin: 0; background-color: #f0f4f8; }
         #container { background: white; padding: 30px; border-radius: 20px; box-shadow: 0 10px 30px rgba(0,0,0,0.1); text-align: center; width: 620px; }
@@ -80,9 +80,8 @@
     
     //------------------------
     const stimConfigs = [
-        //{ ref: 1.00, comps: [0.40, 0.60, 1.00, 1.40] },
-        //미니로 하려면 위에꺼는 빼고
-        { ref: 26.0, comps: [10.0, 15.0, 60.0] }
+        { ref: 26.0, comps: [10.0, 15.0, 60.0] },
+        { ref: 1.00, comps: [0.40, 0.60, 1.40] }
     ];
     // -----------------------
 
@@ -103,19 +102,26 @@
             </body>`);
     }
 
-    // --- 수정된 풀 생성 로직: 모든 Reference-Comparison 조합 포함 ---
+    // --- 수정된 풀 생성 로직: Reference 그룹별로 섞은 후 순차적으로 합침 ---
     function createTrialPool(condition) {
-        let list = [];
-        regions.forEach(reg => {
-            stimConfigs.forEach(config => {
+        let fullList = [];
+        
+        stimConfigs.forEach(config => {
+            let groupList = [];
+            regions.forEach(reg => {
                 config.comps.forEach(cVal => {
                     for(let i=0; i<2; i++) { 
-                        list.push({ref: config.ref, comp: cVal, region: reg, condition: condition});
+                        groupList.push({ref: config.ref, comp: cVal, region: reg, condition: condition});
                     }
                 });
             });
+            // 해당 Reference 그룹 내에서만 랜덤 셔플
+            groupList.sort(() => Math.random() - 0.5);
+            // 전체 리스트에 추가 (이전 그룹 뒤에 붙음)
+            fullList = fullList.concat(groupList);
         });
-        return list.sort(() => Math.random() - 0.5);
+        
+        return fullList;
     }
     // --------------------------------------------------------
 
