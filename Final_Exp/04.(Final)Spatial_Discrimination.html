@@ -1,0 +1,264 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <title>Spatial Discrimination - Updated Flow</title>
+    <style>
+        body { font-family: 'Segoe UI', sans-serif; display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 100vh; margin: 0; background-color: #f4f7f6; }
+        #container { background: white; padding: 30px; border-radius: 20px; box-shadow: 0 10px 30px rgba(0,0,0,0.1); text-align: center; width: 720px; }
+        .subject-info-box { background: #fff; border: 2px solid #2e7d32; padding: 15px; border-radius: 10px; margin-bottom: 20px; display: flex; align-items: center; justify-content: center; gap: 15px; }
+        .subject-info-box label { font-weight: bold; font-size: 14px; }
+        .setup-info { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 20px; background: #e1f5fe; padding: 15px; border-radius: 10px; font-weight: bold; }
+        #admin-display { background: #fff3e0; border: 2px dashed #ff9800; padding: 15px; border-radius: 10px; margin-bottom: 20px; }
+        #status-display { background: #e3f2fd; border: 2px solid #2196f3; padding: 10px; border-radius: 10px; margin-bottom: 15px; font-weight: bold; color: #0d47a1; }
+        .progress-bar { width: 100%; height: 15px; background: #e8eaed; border-radius: 10px; overflow: hidden; margin-bottom: 20px; }
+        #progress { width: 0%; height: 100%; background: #0288d1; transition: width 0.1s; }
+        button { padding: 12px; font-size: 16px; cursor: pointer; border: none; border-radius: 8px; transition: 0.2s; width: 100%; font-weight: bold; margin-top: 10px; }
+        #startBtn { background: #0288d1; color: white; }
+        #ans-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-top: 20px; display: none; }
+        .ans-btn { background: #1976d2; color: white; font-size: 1.2rem; }
+        .question-text { grid-column: span 2; font-weight: bold; margin-bottom: 10px; color: #d32f2f; font-size: 1.4rem; }
+        #log-container { margin-top: 25px; text-align: left; font-size: 12px; max-height: 150px; overflow-y: auto; background: #fafafa; padding: 10px; border: 1px solid #eee; }
+        .session-btn-container { display: flex; gap: 10px; margin-bottom: 20px; }
+        .condition-badge { background: #d32f2f; color: white; padding: 5px 15px; border-radius: 20px; font-size: 0.9rem; margin-bottom: 10px; display: inline-block; font-weight: bold; }
+        .highlight-seq { font-weight: bold; color: #d32f2f; background-color: #ffff00; padding: 4px 12px; border-radius: 4px; font-size: 1.4rem; border: 2px solid #ffd600; }
+    </style>
+</head>
+<body>
+
+<div id="container">
+    <h2>Spatial Discrimination</h2>
+    <div id="cond-badge" class="condition-badge" style="display:none;">Force: Ready</div>
+    <br>
+    <button onclick="openSubjectWindow()" style="background:#43a047; color:white; width:auto; margin-bottom:15px;">1. Open Subject Window</button>
+    
+    <div class="subject-info-box">
+        <label>Subject ID:</label>
+        <input type="text" id="subjectId" value="P1" style="padding:5px; width:60px; text-align:center;">
+        <label style="margin-left:10px;">Session No:</label>
+        <input type="text" id="sessionNo" value="S01" style="padding:5px; width:60px; text-align:center;">
+    </div>
+
+    <div class="session-btn-container">
+        <button onclick="startFullExperiment('1.0g')" style="background:#283593; color:white;">Start 1.0g Session</button>
+        <button onclick="startFullExperiment('26.0g')" style="background:#b71c1c; color:white;">Start 26.0g Session</button>
+    </div>
+
+    <div class="setup-info">
+        <div>Trial Progress: <span id="trial-count">0</span> / <span id="total-trials">0</span></div>
+        <div>Current Force: <span id="current-cond-label" style="color:#0288d1;">None</span></div>
+    </div>
+
+    <div id="admin-display">
+        <div style="font-size: 14px; color: #666; margin-bottom: 10px;">[Admin Monitor] Next Trial Preview</div>
+        <div style="display: flex; justify-content: center; gap: 20px; align-items: center;">
+            <div style="font-size: 1.1rem;">
+                Sequence: <span id="admin-seq" class="highlight-seq">?</span>
+            </div>
+        </div>
+        <div style="font-size: 13px; margin-top: 10px; color: #555;">
+            Pair Group: <span id="admin-axis" style="font-weight:bold;">-</span>
+        </div>
+    </div>
+    
+    <div id="status-display">Waiting for Admin to Start</div>
+    <div class="progress-bar"><div id="progress"></div></div>
+    
+    <button id="startBtn" onclick="runRandomTrial()" disabled>Select Force Session First</button>
+
+    <div id="ans-grid">
+        <div id="dynamic-question" class="question-text">Question?</div>
+        <button class="ans-btn" onclick="logResponse('1st')">1 (First)</button>
+        <button class="ans-btn" onclick="logResponse('2nd')">2 (Second)</button>
+    </div>
+
+    <div id="log-container"><strong>Logs:</strong><div id="logContent"></div></div>
+    <button onclick="downloadCSV()" style="background:#455a64; color:white;">Download CSV Result</button>
+</div>
+
+<script>
+    let subjectWindow = null;
+    let trialPool = [];
+    let experimentalData = [];
+    let currentIdx = 0;
+    let currentForce = "";
+
+    const imgSrc = "/Users/kyungeunjung/NailFoldExp/ETC/WE.png"; 
+    const imgSrc2 = "/Users/kyungeunjung/NailFoldExp/ETC/NS.png"; 
+    const imgSrc3 = "/Users/kyungeunjung/NailFoldExp/ETC/NESW.png"; 
+
+    // 새로운 자극 구조 정의
+    const stimulusGroups = [
+        { group: 'ab', points: ['a', 'b', 'a1', 'a2'], axis: 'North/South', q: "Which feels more North?" },
+        { group: 'ef', points: ['e', 'f', 'e1', 'e2'], axis: 'North/South', q: "Which feels more North?" },
+        { group: 'cd', points: ['c', 'd', 'c1', 'c2'], axis: 'West/East', q: "Which feels more West?" }
+    ];
+
+    function openSubjectWindow() {
+        subjectWindow = window.open("", "SubjectWindow", "width=800,height=900");
+        subjectWindow.document.write(`
+            <html><body style="background:#222; color:white; display:flex; flex-direction:column; align-items:center; justify-content:center; height:100vh; font-family:sans-serif; overflow:hidden; margin:0;">
+                <div style="text-align:center;">
+                    <h1 id="msg" style="font-size:3rem; margin-bottom:20px;">Ready</h1>
+                    <div id="indicator" style="width:60px; height:60px; border-radius:50%; margin:0 auto 30px auto; background:transparent;"></div>
+                    <img id="guide-img" src="${imgSrc}" style="width:400px; height:auto; opacity:0.8; border:2px solid #444; border-radius:10px; display:none;">
+                    <img id="guide-img2" src="${imgSrc2}" style="width:400px; height:auto; opacity:0.8; border:2px solid #444; border-radius:10px; display:none;">
+                    <img id="guide-img3" src="${imgSrc3}" style="width:400px; height:auto; opacity:0.8; border:2px solid #444; border-radius:10px; display:block;">
+                </div>
+                <script>
+                    function updateState(txt, color, indColor, showImg, showImg2, showImg3){ 
+                        document.getElementById('msg').innerText = txt; 
+                        document.body.style.backgroundColor = color; 
+                        document.getElementById('indicator').style.backgroundColor = indColor || 'transparent';
+                        document.getElementById('guide-img').style.display = showImg ? 'block' : 'none';
+                        document.getElementById('guide-img2').style.display = showImg2 ? 'block' : 'none';
+                        document.getElementById('guide-img3').style.display = showImg3 ? 'block' : 'none';
+                    }
+                <\/script>
+            </body></html>`);
+    }
+
+    function startFullExperiment(force) {
+        currentForce = force;
+        document.getElementById('cond-badge').style.display = 'inline-block';
+        document.getElementById('cond-badge').innerText = "Force: " + force;
+        document.getElementById('current-cond-label').innerText = force;
+        generateTrialList();
+    }
+
+    function generateTrialList() {
+        trialPool = [];
+        const repetitions = 2; // 각 조합당 2번 반복
+
+        stimulusGroups.forEach(grp => {
+            const basePoint = grp.points[0]; // a, e, c
+            grp.points.forEach(p => {
+                for(let r=0; r<repetitions; r++) {
+                    // 순서 랜덤화를 위해 p1, p2 결정
+                    let isBaseFirst = Math.random() > 0.5;
+                    trialPool.push({
+                        p1: isBaseFirst ? basePoint : p,
+                        p2: isBaseFirst ? p : basePoint,
+                        group: grp.group,
+                        axis: grp.axis,
+                        question: grp.q,
+                        target: basePoint // 질문에 부합하는 정답 (North인 a, e 또는 West인 c)
+                    });
+                }
+            });
+        });
+
+        // 전체 셔플
+        for (let i = trialPool.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [trialPool[i], trialPool[j]] = [trialPool[j], trialPool[i]];
+        }
+
+        currentIdx = 0;
+        document.getElementById('total-trials').innerText = trialPool.length;
+        document.getElementById('trial-count').innerText = "0";
+        document.getElementById('startBtn').disabled = false;
+        document.getElementById('startBtn').innerText = "실험 시작 (Start)";
+        updateAdminPreview();
+    }
+
+    function updateAdminPreview() {
+        if (currentIdx < trialPool.length) {
+            const nextTrial = trialPool[currentIdx];
+            document.getElementById('admin-seq').innerText = `${nextTrial.p1.toUpperCase()} → ${nextTrial.p2.toUpperCase()}`;
+            document.getElementById('admin-axis').innerText = nextTrial.group.toUpperCase() + " (" + nextTrial.axis + ")";
+            document.getElementById('dynamic-question').innerText = nextTrial.question;
+        }
+    }
+
+    async function runRandomTrial() {
+        if(!subjectWindow) return alert("Open Subject Window First");
+        const currentTrial = trialPool[currentIdx];
+
+        document.getElementById('startBtn').disabled = true;
+        document.getElementById('ans-grid').style.display = 'none';
+
+        // 자극 제시 알림 (Subject Window)
+        let isNS = (currentTrial.axis === 'North/South');
+        let isWE = (currentTrial.axis === 'West/East');
+
+        document.getElementById('status-display').innerText = "자극 제시 중...";
+        subjectWindow.updateState("Concentrate..", "#1b5e20", "#4caf50", isWE, isNS, false);
+        await progress(8000);
+
+        document.getElementById('status-display').innerText = "피험자 응답 대기 중";
+        subjectWindow.updateState(currentTrial.question, "#1565c0", "transparent", isWE, isNS, false);
+        
+        window.activeTrialData = currentTrial;
+        document.getElementById('ans-grid').style.display = 'grid';
+    }
+
+    function progress(ms) {
+        return new Promise(res => {
+            let start = Date.now();
+            let timer = setInterval(() => {
+                let p = (Date.now() - start) / ms * 100;
+                document.getElementById('progress').style.width = Math.min(p, 100) + "%";
+                if(p >= 100) { 
+                    clearInterval(timer); 
+                    setTimeout(() => {
+                        document.getElementById('progress').style.width = "0%";
+                        res();
+                    }, 50);
+                }
+            }, 30);
+        });
+    }
+
+    function logResponse(choice) {
+        const info = window.activeTrialData;
+        const subId = document.getElementById('subjectId').value;
+        const sessNo = document.getElementById('sessionNo').value;
+        
+        // 정답 체크: 선택한 순서(1st/2nd)의 포인트가 target과 일치하는지
+        const chosenPoint = (choice === '1st') ? info.p1 : info.p2;
+        const isCorrect = (chosenPoint === info.target);
+
+        experimentalData.push({
+            Subject: subId, Session: sessNo, Force: currentForce, Trial: currentIdx + 1,
+            Group: info.group, Stim_1st: info.p1, Stim_2nd: info.p2,
+            User_Choice: choice, Correct_Point: info.target, IsCorrect: isCorrect ? 1 : 0
+        });
+
+        const log = document.createElement('div');
+        log.style.color = isCorrect ? "#2e7d32" : "#d32f2f";
+        log.innerHTML = `T${currentIdx+1} [${info.p1.toUpperCase()}→${info.p2.toUpperCase()}]: ${choice} 선택 ${isCorrect ? '✓':'✗'}`;
+        document.getElementById('logContent').prepend(log);
+
+        currentIdx++;
+        document.getElementById('trial-count').innerText = currentIdx;
+        document.getElementById('ans-grid').style.display = 'none';
+        document.getElementById('status-display').innerText = "Waiting for Next Trial";
+        
+        subjectWindow.updateState("Ready", "#222", "transparent", false, false, true);
+
+        if(currentIdx < trialPool.length) {
+            document.getElementById('startBtn').disabled = false;
+            updateAdminPreview();
+        } else {
+            alert(currentForce + " 세션 종료.");
+            document.getElementById('startBtn').innerText = "Session Finished";
+            subjectWindow.updateState("Session Completed", "#222", "transparent", false, false, false);
+        }
+    }
+
+    function downloadCSV() {
+        const subId = document.getElementById('subjectId').value || "Unknown";
+        let csv = "\uFEFFSubject,Session,Force,Trial,Group,Stim_1st,Stim_2nd,User_Choice,Correct_Point,IsCorrect\n";
+        experimentalData.forEach(r => {
+            csv += `${r.Subject},${r.Session},${r.Force},${r.Trial},${r.Group},${r.Stim_1st},${r.Stim_2nd},${r.User_Choice},${r.Correct_Point},${r.IsCorrect}\n`;
+        });
+        const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+        const a = document.createElement("a");
+        a.href = URL.createObjectURL(blob);
+        a.download = `${subId}_Spatial_Discrimination_Force_${currentForce}.csv`;
+        a.click();
+    }
+</script>
+</body>
+</html>
