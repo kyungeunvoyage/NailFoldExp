@@ -2,7 +2,7 @@
 <html lang="ko">
 <head>
     <meta charset="UTF-8">
-    <title>Spatial Discrimination</title>
+    <title>Spatial Discrimination - Point Comparison</title>
     <style>
         body { font-family: 'Segoe UI', sans-serif; display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 100vh; margin: 0; background-color: #f4f7f6; }
         #container { background: white; padding: 30px; border-radius: 20px; box-shadow: 0 10px 30px rgba(0,0,0,0.1); text-align: center; width: 720px; }
@@ -17,17 +17,17 @@
         #startBtn { background: #0288d1; color: white; }
         #ans-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-top: 20px; display: none; }
         .ans-btn { background: #1976d2; color: white; font-size: 1.2rem; }
-        .question-text { grid-column: span 2; font-weight: bold; margin-bottom: 10px; color: #d32f2f; font-size: 1.4rem; }
+        .question-text { grid-column: span 2; font-weight: bold; margin-bottom: 10px; color: #d32f2f; font-size: 1.2rem; line-height: 1.4; }
         #log-container { margin-top: 25px; text-align: left; font-size: 12px; max-height: 150px; overflow-y: auto; background: #fafafa; padding: 10px; border: 1px solid #eee; }
         .condition-badge { background: #d32f2f; color: white; padding: 5px 15px; border-radius: 20px; font-size: 0.9rem; margin-bottom: 10px; display: inline-block; font-weight: bold; }
         .highlight-seq { font-weight: bold; color: #d32f2f; background-color: #ffff00; padding: 4px 12px; border-radius: 4px; font-size: 1.4rem; border: 2px solid #ffd600; }
-        .dist-input { padding: 5px; width: 45px; text-align: center; }
+        .dist-input { padding: 5px; width: 60px; text-align: center; }
     </style>
 </head>
 <body>
 
 <div id="container">
-    <h2>Spatial Discrimination</h2>
+    <h2>Spatial Discrimination (Reference: g0)</h2>
     <div id="cond-badge" class="condition-badge" style="display:none;">Ready</div>
     <br>
     <button onclick="openSubjectWindow()" style="background:#43a047; color:white; width:auto; margin-bottom:15px;">1. Open Subject Window</button>
@@ -35,13 +35,8 @@
     <div class="subject-info-box">
         <label>Subject ID:</label>
         <input type="text" id="subjectId" value="P1" style="padding:5px; width:60px; text-align:center;">
-        
-        <label style="margin-left:10px;">ab Dist (mm):</label>
-        <input type="text" id="dist_ab" class="dist-input" value="0">
-        <label>cd Dist (mm):</label>
+        <label style="margin-left:10px;">cd Dist (mm):</label>
         <input type="text" id="dist_cd" class="dist-input" value="0">
-        <label>ef Dist (mm):</label>
-        <input type="text" id="dist_ef" class="dist-input" value="0">
     </div>
 
     <button onclick="initiateFullExperiment()" style="background:#283593; color:white;">전체 실험 시작 (Start Full Experiment)</button>
@@ -58,9 +53,6 @@
                 Sequence: <span id="admin-seq" class="highlight-seq">?</span>
             </div>
         </div>
-        <div style="font-size: 13px; margin-top: 10px; color: #555;">
-            Pair Group: <span id="admin-axis" style="font-weight:bold;">-</span>
-        </div>
     </div>
     
     <div id="status-display">Waiting for Admin to Start</div>
@@ -69,9 +61,9 @@
     <button id="startBtn" onclick="runRandomTrial()" disabled>Click Start Experiment Button First</button>
 
     <div id="ans-grid">
-        <div id="dynamic-question" class="question-text">Question?</div>
-        <button class="ans-btn" onclick="logResponse('1st')">1 (First)</button>
-        <button class="ans-btn" onclick="logResponse('2nd')">2 (Second)</button>
+        <div id="dynamic-question" class="question-text">The second stimulus was to the _________ of the first stimulus?</div>
+        <button class="ans-btn" onclick="logResponse('Left')">Left</button>
+        <button class="ans-btn" onclick="logResponse('Right')">Right</button>
     </div>
 
     <div id="log-container"><strong>Logs:</strong><div id="logContent"></div></div>
@@ -86,40 +78,29 @@
     let currentForce = "";
     let forceOrder = []; 
     let currentForceIdx = 0;
-    let previousAxis = ""; // 이전 축 정보를 저장하기 위한 변수
 
-    const imgSrc = "/Users/kyungeunjung/NailFoldExp/ETC/WE.png"; 
+    const imgSrc = "/Users/kyungeunjung/NailFoldExp/ETC/LR.png"; 
     const imgSrc2 = "/Users/kyungeunjung/NailFoldExp/ETC/NS.png"; 
-    const imgSrc3 = "/Users/kyungeunjung/NailFoldExp/ETC/NESW.png"; 
+    const imgSrc3 = "/Users/kyungeunjung/NailFoldExp/ETC/guide_img2.png"; 
 
-    const stimulusGroups = [
-        { group: 'ab', points: ['a', 'b', 'a1', 'a2'], axis: 'North/South', q: "Which feels more North?" },
-        { group: 'ef', points: ['e', 'f', 'e1', 'e2'], axis: 'North/South', q: "Which feels more North?" },
-        { group: 'cd', points: ['c', 'd', 'c1', 'c2'], axis: 'West/East', q: "Which feels more West?" }
-        //Relative to the first stimulus, the second stimulus was to the _________ of the first stimulus? (Left/Right)
-        //the second stimulus was to the _________ of the first stimulus? (Left/Right)
-
-    ];
+    // g-3 ~ g3 지점 정의 (g0는 기준점)
+    const points = ['g-3', 'g-2', 'g-1', 'g0', 'g1', 'g2', 'g3'];
 
     function openSubjectWindow() {
         subjectWindow = window.open("", "SubjectWindow", "width=800,height=900");
         subjectWindow.document.write(`
             <html><body style="background:#222; color:white; display:flex; flex-direction:column; align-items:center; justify-content:center; height:100vh; font-family:sans-serif; overflow:hidden; margin:0;">
-                <div style="text-align:center;">
+                <div style="text-align:center; display:flex; flex-direction:column; align-items:center; justify-content:center;">
                     <h1 id="msg" style="font-size:3rem; margin-bottom:20px;">Ready</h1>
-                    <div id="indicator" style="width:60px; height:60px; border-radius:50%; margin:0 auto 30px auto; background:transparent;"></div>
+                    <div id="indicator" style="width:60px; height:60px; border-radius:50%; margin-bottom:30px; background:transparent;"></div>
                     <img id="guide-img" src="${imgSrc}" style="width:400px; height:auto; opacity:0.8; border:2px solid #444; border-radius:10px; display:none;">
-                    <img id="guide-img2" src="${imgSrc2}" style="width:400px; height:auto; opacity:0.8; border:2px solid #444; border-radius:10px; display:none;">
-                    <img id="guide-img3" src="${imgSrc3}" style="width:400px; height:auto; opacity:0.8; border:2px solid #444; border-radius:10px; display:block;">
                 </div>
                 <script>
-                    function updateState(txt, color, indColor, showImg, showImg2, showImg3){ 
+                    function updateState(txt, color, indColor, showImgVisible){ 
                         document.getElementById('msg').innerText = txt; 
                         document.body.style.backgroundColor = color; 
                         document.getElementById('indicator').style.backgroundColor = indColor || 'transparent';
-                        document.getElementById('guide-img').style.display = showImg ? 'block' : 'none';
-                        document.getElementById('guide-img2').style.display = showImg2 ? 'block' : 'none';
-                        document.getElementById('guide-img3').style.display = showImg3 ? 'block' : 'none';
+                        document.getElementById('guide-img').style.display = showImgVisible ? 'block' : 'none';
                     }
                 <\/script>
             </body></html>`);
@@ -134,7 +115,6 @@
 
     function startSession(force) {
         currentForce = force;
-        previousAxis = ""; // 세션 시작 시 축 기록 초기화
         document.getElementById('cond-badge').style.display = 'inline-block';
         document.getElementById('cond-badge').innerText = "Force: " + force;
         document.getElementById('current-cond-label').innerText = force;
@@ -144,34 +124,42 @@
 
     function generateTrialList() {
         trialPool = [];
-        const repetitions = 2;
-        let shuffledGroups = [...stimulusGroups];
-        for (let i = shuffledGroups.length - 1; i > 0; i--) {
-            const j = Math.floor(Math.random() * (i + 1));
-            [shuffledGroups[i], shuffledGroups[j]] = [shuffledGroups[j], shuffledGroups[i]];
-        }
-        shuffledGroups.forEach(grp => {
-            let currentGroupTrials = [];
-            const basePoint = grp.points[0];
-            grp.points.forEach(p => {
-                for(let r=0; r<repetitions; r++) {
-                    let isBaseFirst = Math.random() > 0.5;
-                    currentGroupTrials.push({
-                        p1: isBaseFirst ? basePoint : p,
-                        p2: isBaseFirst ? p : basePoint,
-                        group: grp.group,
-                        axis: grp.axis,
-                        question: grp.q,
-                        target: basePoint
-                    });
+        const repetitions = 5; // 각 포인트당 g0와의 조합 반복 횟수
+        const comparisons = ['g-4','g-3', 'g-2', 'g-1', 'g1', 'g2', 'g3', 'g4'];
+
+        comparisons.forEach(p => {
+            for(let r=0; r<repetitions; r++) {
+                // g0가 첫 번째일지 두 번째일지 랜덤 결정
+                let isG0First = Math.random() > 0.5;
+                let p1 = isG0First ? 'g0' : p;
+                let p2 = isG0First ? p : 'g0';
+                
+                // 실제 정답 계산 (비교군 p가 g0 기준 왼쪽인지 오른쪽인지)
+                // 질문: "The second stimulus was to the ____ of the first stimulus?"
+                let correctLabel = "";
+                if (isG0First) {
+                    // g0 -> p 인 경우, p의 위치가 정답
+                    correctLabel = p.includes('-') ? "Left" : "Right";
+                } else {
+                    // p -> g0 인 경우, g0의 위치가 정답 (p가 g-3이면 g0는 Right)
+                    correctLabel = p.includes('-') ? "Right" : "Left";
                 }
-            });
-            for (let i = currentGroupTrials.length - 1; i > 0; i--) {
-                const j = Math.floor(Math.random() * (i + 1));
-                [currentGroupTrials[i], currentGroupTrials[j]] = [currentGroupTrials[j], currentGroupTrials[i]];
+
+                trialPool.push({
+                    p1: p1,
+                    p2: p2,
+                    comparison_point: p,
+                    correct_answer: correctLabel
+                });
             }
-            trialPool = trialPool.concat(currentGroupTrials);
         });
+
+        // 셔플
+        for (let i = trialPool.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [trialPool[i], trialPool[j]] = [trialPool[j], trialPool[i]];
+        }
+
         currentIdx = 0;
         document.getElementById('total-trials').innerText = trialPool.length;
         document.getElementById('trial-count').innerText = "0";
@@ -183,9 +171,7 @@
     function updateAdminPreview() {
         if (currentIdx < trialPool.length) {
             const nextTrial = trialPool[currentIdx];
-            document.getElementById('admin-seq').innerText = `${nextTrial.p1.toUpperCase()} → ${nextTrial.p2.toUpperCase()}`;
-            document.getElementById('admin-axis').innerText = nextTrial.group.toUpperCase() + " (" + nextTrial.axis + ")";
-            document.getElementById('dynamic-question').innerText = nextTrial.question;
+            document.getElementById('admin-seq').innerText = `${nextTrial.p1} → ${nextTrial.p2}`;
         }
     }
 
@@ -196,25 +182,14 @@
         document.getElementById('startBtn').disabled = true;
         document.getElementById('ans-grid').style.display = 'none';
 
-        let isNS = (currentTrial.axis === 'North/South');
-        let isWE = (currentTrial.axis === 'West/East');
-
-        // --- 축 전환 알림 로직 추가 ---
-        if (previousAxis !== "" && previousAxis !== currentTrial.axis) {
-            document.getElementById('status-display').innerText = "축 전환 알림 중...";
-            // Ready 창에 어떤 태스크인지 알림 (해당 이미지 가이드와 함께)
-            let msg = `Next Task: ${currentTrial.axis}`;
-            subjectWindow.updateState(msg, "#fbc02d", "transparent", isWE, isNS, false);
-            await new Promise(res => setTimeout(res, 4000)); // 4초 대기
-        }
-        previousAxis = currentTrial.axis;
-
         document.getElementById('status-display').innerText = "자극 제시 중...";
-        subjectWindow.updateState("Concentrate..", "#1b5e20", "#4caf50", isWE, isNS, false);
+        // 자극 제시 단계: 가이드 이미지 숨김 (false)
+        subjectWindow.updateState("Concentrate..", "#1b5e20", "#4caf50", false);
         await progress(7000);
 
         document.getElementById('status-display').innerText = "피험자 응답 대기 중";
-        subjectWindow.updateState(currentTrial.question, "#1565c0", "transparent", isWE, isNS, false);
+        // 질문 단계: 가이드 이미지 표시 (true)
+        subjectWindow.updateState("The second stimulus was to the _________ of the first stimulus?", "#1565c0", "transparent", true);
         
         window.activeTrialData = currentTrial;
         document.getElementById('ans-grid').style.display = 'grid';
@@ -237,22 +212,28 @@
         });
     }
 
-    function logResponse(choice) {
+    function logResponse(userChoice) {
         const info = window.activeTrialData;
         const subId = document.getElementById('subjectId').value;
-        const distValue = document.getElementById('dist_' + info.group).value;
-        const chosenPoint = (choice === '1st') ? info.p1 : info.p2;
-        const isCorrect = (chosenPoint === info.target);
+        const distValue = document.getElementById('dist_cd').value;
+        const isCorrect = (userChoice === info.correct_answer);
 
         experimentalData.push({
-            Subject: subId, Force: currentForce, Trial_Total: experimentalData.length + 1,
-            Group: info.group, Distance: distValue, Stim_1st: info.p1, Stim_2nd: info.p2,
-            User_Choice: choice, Correct_Point: info.target, IsCorrect: isCorrect ? 1 : 0
+            Subject: subId, 
+            Force: currentForce, 
+            Trial_Total: experimentalData.length + 1,
+            CD_Distance: distValue, 
+            Stim_1st: info.p1, 
+            Stim_2nd: info.p2,
+            Comparison_Target: info.comparison_point,
+            User_Response: userChoice, 
+            Target_Response: info.correct_answer, 
+            IsCorrect: isCorrect ? 1 : 0
         });
 
         const log = document.createElement('div');
         log.style.color = isCorrect ? "#2e7d32" : "#d32f2f";
-        log.innerHTML = `[${currentForce}] T${currentIdx+1}: ${info.p1.toUpperCase()}→${info.p2.toUpperCase()} (${isCorrect ? '✓':'✗'})`;
+        log.innerHTML = `[${currentForce}] T${currentIdx+1}: ${info.p1}→${info.p2} | User: ${userChoice} (${isCorrect ? '✓':'✗'})`;
         document.getElementById('logContent').prepend(log);
 
         currentIdx++;
@@ -260,7 +241,8 @@
         document.getElementById('ans-grid').style.display = 'none';
         document.getElementById('status-display').innerText = "Waiting for Next Trial";
         
-        subjectWindow.updateState("Ready", "#222", "transparent", false, false, true);
+        // Ready 단계: 가이드 이미지 숨김 (false)
+        subjectWindow.updateState("Ready", "#222", "transparent", false);
 
         if(currentIdx < trialPool.length) {
             document.getElementById('startBtn').disabled = false;
@@ -278,21 +260,21 @@
         } else {
             alert("전체 종료.");
             document.getElementById('startBtn').innerText = "All Finished";
-            subjectWindow.updateState("Experiment Completed", "#222", "transparent", false, false, false);
+            subjectWindow.updateState("Experiment Completed", "#222", "transparent", false);
         }
     }
 
     function downloadCSV() {
         if (experimentalData.length === 0) return alert("데이터 없음");
         const subId = document.getElementById('subjectId').value || "Unknown";
-        let csv = "\uFEFFSubject,Force,Trial_Total,Group,Distance,Stim_1st,Stim_2nd,User_Choice,Correct_Point,IsCorrect\n";
+        let csv = "\uFEFFSubject,Force,Trial_Total,CD_Distance,Stim_1st,Stim_2nd,Comparison_Target,User_Response,Target_Response,IsCorrect\n";
         experimentalData.forEach(r => {
-            csv += `${r.Subject},${r.Force},${r.Trial_Total},${r.Group},${r.Distance},${r.Stim_1st},${r.Stim_2nd},${r.User_Choice},${r.Correct_Point},${r.IsCorrect}\n`;
+            csv += `${r.Subject},${r.Force},${r.Trial_Total},${r.CD_Distance},${r.Stim_1st},${r.Stim_2nd},${r.Comparison_Target},${r.User_Response},${r.Target_Response},${r.IsCorrect}\n`;
         });
         const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
         const a = document.createElement("a");
         a.href = URL.createObjectURL(blob);
-        a.download = `${subId}_SpatialDiscrimination_Full.csv`;
+        a.download = `${subId}_SpatialDiscrimination.csv`;
         a.click();
     }
 </script>
