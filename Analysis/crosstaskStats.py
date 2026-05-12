@@ -37,7 +37,7 @@ warnings.filterwarnings("ignore")
 # CONFIG — adjust these glob patterns if needed
 # ============================================================
 PATTERNS = {
-    'AT': '/Users/kyungeunjung/NailFoldExp/Data/(AT)CurData/P*_AbsoluteThresholdDetection.csv',
+    'AT': '/Users/kyungeunjung/NailFoldExp/Data/(ATD)CurData/P*_AbsoluteThresholdDetection.csv',
     'FD': '/Users/kyungeunjung/NailFoldExp/Data/(FD)CurData/P*_ForceDiscrimination.csv',
     'SD': '/Users/kyungeunjung/NailFoldExp/Data/(SD)CurData/P*_SpatialDiscrimination.csv',
 }
@@ -123,6 +123,7 @@ if at_raw is not None:
                                   values='detection_threshold_g')
     det_wide.columns = [f'AT_threshold_{c}' for c in det_wide.columns]
     det_wide = det_wide.reset_index()
+    det_wide = det_wide.rename(columns={'SubjectID': 'Subject'})
     print(f"    {len(det_wide)} subjects, columns: {list(det_wide.columns)}")
 else:
     det_wide = pd.DataFrame(columns=['Subject'])
