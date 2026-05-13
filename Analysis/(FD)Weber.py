@@ -85,6 +85,28 @@ print(f"    Reference values: {sorted(df['Reference_n'].unique())}")
 print(f"    Weber ratios: {sorted(df['weber_ratio'].round(2).unique())}")
 
 
+def force_pair_label(ref, wr, source_df=df, comp_filter=None):
+    """Return compact label of (min–max) force pairs for a given (ref, weber_ratio).
+
+    comp_filter: None | 'heavier' | 'lighter' to restrict by comparison direction.
+    Same `weber_ratio` can map to multiple physical pairs (e.g. ref=1, wr=0.4 →
+    {(0.6, 1), (1, 1.4)}), so the label joins them with ' / '.
+    """
+    sub = source_df[
+        (source_df["Reference_n"] == ref)
+        & (np.isclose(source_df["weber_ratio"], wr, atol=1e-3))
+    ]
+    if comp_filter == "heavier":
+        sub = sub[sub["Comparison_n"] > sub["Reference_n"]]
+    elif comp_filter == "lighter":
+        sub = sub[sub["Comparison_n"] < sub["Reference_n"]]
+    pairs = set()
+    for _, r in sub.iterrows():
+        a, b = sorted([r["Reference_n"], r["Comparison_n"]])
+        pairs.add((round(a, 2), round(b, 2)))
+    return " / ".join(f"{a:g}–{b:g}" for a, b in sorted(pairs))
+
+
 # ============================================================
 # 2. DATA-DRIVEN WEBER SCATTER (replaces hardcoded version)
 # ============================================================
@@ -115,12 +137,26 @@ for ref, sub in subj_agg.groupby("Reference_n"):
     ax.scatter(sub["weber_ratio"] + jitter, sub["accuracy"],
                s=25, alpha=0.25, color=color, edgecolor="none", zorder=2)
 
-# (b) Group mean ± SEM
+# (b) Group mean ± SEM, annotated with the actual force pair(s)
 for ref, sub in grp_agg.groupby("Reference_n"):
     color = palette.get(ref, "gray")
     ax.errorbar(sub["weber_ratio"], sub["mean_acc"], yerr=sub["sem_acc"],
                 marker="o", color=color, ms=10, lw=2, capsize=4,
                 label=f"ref = {ref:g} g", zorder=4)
+    for _, row in sub.iterrows():
+        lbl = force_pair_label(ref, row["weber_ratio"])
+        if not lbl:
+            continue
+        ax.annotate(
+            lbl,
+            (row["weber_ratio"], row["mean_acc"]),
+            xytext=(6, 8),
+            textcoords="offset points",
+            fontsize=8,
+            color=color,
+            ha="left",
+            zorder=5,
+        )
 
 ax.axhline(0.75, ls="--", color="red", alpha=0.7, label="75% threshold criterion")
 ax.axhline(0.50, ls=":",  color="gray", alpha=0.7, label="Chance (2-AFC)")
@@ -206,6 +242,21 @@ for ax, ref in zip(axes, sorted(df["Reference_n"].unique())):
         ax.errorbar(dsub["weber_ratio"], dsub["mean_acc"], yerr=dsub["sem_acc"],
                     marker=marker, color=color, ms=9, lw=2, capsize=4,
                     label=f"Comparison {direction} than ref")
+        # annotate each dot with the actual force pair for this direction
+        y_off = 9 if direction == "heavier" else -14
+        for _, row in dsub.iterrows():
+            lbl = force_pair_label(ref, row["weber_ratio"], comp_filter=direction)
+            if not lbl:
+                continue
+            ax.annotate(
+                lbl,
+                (row["weber_ratio"], row["mean_acc"]),
+                xytext=(6, y_off),
+                textcoords="offset points",
+                fontsize=8,
+                color=color,
+                ha="left",
+            )
     ax.axhline(0.75, ls="--", color="red", alpha=0.6)
     ax.axhline(0.50, ls=":",  color="gray", alpha=0.6)
     ax.set_xlabel("Weber ratio |ΔF| / F_ref")
@@ -258,6 +309,19 @@ for ref, sub in grp_agg.groupby("Reference_n"):
     ax.errorbar(sub["weber_ratio"], sub["mean_acc"], yerr=sub["sem_acc"],
                 marker="o", color=color, ms=10, lw=0, capsize=4,
                 label=f"ref={ref:g}g (data)")
+    for _, row in sub.iterrows():
+        lbl = force_pair_label(ref, row["weber_ratio"])
+        if not lbl:
+            continue
+        ax.annotate(
+            lbl,
+            (row["weber_ratio"], row["mean_acc"]),
+            xytext=(6, 8),
+            textcoords="offset points",
+            fontsize=8,
+            color=color,
+            ha="left",
+        )
     # plot fit
     if not np.isnan(k):
         ax.plot(x_smooth, psychometric(x_smooth, k, slope),
