@@ -1,0 +1,121 @@
+﻿SubjectID,Gender,Condition,Area,Force,Target,Response,IsCorrect
+P41,M,On-touch (Mid),A,1.0g,7,4,0
+P41,M,On-touch (Mid),F,0.6g,7,4,0
+P41,M,On-touch (Mid),A,0.07g,6,0,0
+P41,M,On-touch (Mid),A,0.07g,8,0,0
+P41,M,On-touch (Mid),D,0.16g,7,3,0
+P41,M,On-touch (Mid),C,0.16g,5,2,0
+P41,M,On-touch (Mid),F,0.07g,6,2,0
+P41,M,On-touch (Mid),D,0.07g,7,0,0
+P41,M,On-touch (Mid),E,0.6g,7,10,0
+P41,M,On-touch (Mid),D,0.6g,7,7,1
+P41,M,On-touch (Mid),E,1.0g,7,7,1
+P41,M,On-touch (Mid),A,0.6g,8,5,0
+P41,M,On-touch (Mid),F,1.4g,8,9,0
+P41,M,On-touch (Mid),E,0.07g,5,0,0
+P41,M,On-touch (Mid),B,1.0g,6,7,0
+P41,M,On-touch (Mid),D,1.4g,7,7,1
+P41,M,On-touch (Mid),A,1.0g,8,8,1
+P41,M,On-touch (Mid),E,0.16g,6,2,0
+P41,M,On-touch (Mid),E,0.6g,7,4,0
+P41,M,On-touch (Mid),D,1.0g,5,8,0
+P41,M,On-touch (Mid),E,0.07g,7,0,0
+P41,M,On-touch (Mid),A,0.6g,5,2,0
+P41,M,On-touch (Mid),F,1.0g,7,6,0
+P41,M,On-touch (Mid),A,0.16g,8,4,0
+P41,M,On-touch (Mid),C,0.16g,5,2,0
+P41,M,On-touch (Mid),B,0.07g,8,0,0
+P41,M,On-touch (Mid),F,1.4g,6,6,1
+P41,M,On-touch (Mid),B,1.4g,6,6,1
+P41,M,On-touch (Mid),A,1.4g,8,8,1
+P41,M,On-touch (Mid),E,1.4g,7,7,1
+P41,M,On-touch (Mid),B,0.6g,8,8,1
+P41,M,On-touch (Mid),F,0.16g,6,3,0
+P41,M,On-touch (Mid),D,1.4g,5,7,0
+P41,M,On-touch (Mid),B,1.0g,5,5,1
+P41,M,On-touch (Mid),B,0.16g,7,2,0
+P41,M,On-touch (Mid),B,0.16g,7,3,0
+P41,M,On-touch (Mid),C,1.4g,8,8,1
+P41,M,On-touch (Mid),C,1.0g,8,10,0
+P41,M,On-touch (Mid),C,0.6g,5,7,0
+P41,M,On-touch (Mid),F,0.07g,6,0,0
+P41,M,On-touch (Mid),D,1.0g,5,7,0
+P41,M,On-touch (Mid),F,0.16g,5,1,0
+P41,M,On-touch (Mid),C,1.4g,7,7,1
+P41,M,On-touch (Mid),B,1.4g,7,7,1
+P41,M,On-touch (Mid),E,1.0g,8,9,0
+P41,M,On-touch (Mid),C,0.6g,6,8,0
+P41,M,On-touch (Mid),C,0.07g,6,0,0
+P41,M,On-touch (Mid),D,0.6g,5,6,0
+P41,M,On-touch (Mid),E,1.4g,8,8,1
+P41,M,On-touch (Mid),A,1.4g,6,8,0
+P41,M,On-touch (Mid),B,0.07g,7,0,0
+P41,M,On-touch (Mid),C,1.0g,8,8,1
+P41,M,On-touch (Mid),F,1.0g,6,7,0
+P41,M,On-touch (Mid),C,0.07g,5,0,0
+P41,M,On-touch (Mid),D,0.07g,5,0,0
+P41,M,On-touch (Mid),A,0.16g,8,4,0
+P41,M,On-touch (Mid),D,0.16g,7,0,0
+P41,M,On-touch (Mid),B,0.6g,7,7,1
+P41,M,On-touch (Mid),E,0.16g,7,4,0
+P41,M,On-touch (Mid),F,0.6g,7,5,0
+P41,M,In-air,F,0.6g,5,0,0
+P41,M,In-air,C,1.0g,8,8,1
+P41,M,In-air,A,0.07g,7,0,0
+P41,M,In-air,F,0.16g,8,1,0
+P41,M,In-air,E,0.16g,8,1,0
+P41,M,In-air,A,0.07g,8,0,0
+P41,M,In-air,A,0.16g,5,1,0
+P41,M,In-air,B,1.0g,5,6,0
+P41,M,In-air,F,1.0g,6,6,1
+P41,M,In-air,A,1.4g,8,8,1
+P41,M,In-air,C,1.4g,8,9,0
+P41,M,In-air,D,1.0g,6,6,1
+P41,M,In-air,E,0.07g,8,0,0
+P41,M,In-air,F,0.07g,5,0,0
+P41,M,In-air,C,1.0g,8,5,0
+P41,M,In-air,B,0.6g,7,4,0
+P41,M,In-air,D,0.6g,5,9,0
+P41,M,In-air,B,0.16g,8,2,0
+P41,M,In-air,C,0.6g,8,1,0
+P41,M,In-air,B,1.0g,7,7,1
+P41,M,In-air,E,0.16g,7,2,0
+P41,M,In-air,C,0.16g,8,0,0
+P41,M,In-air,F,1.4g,6,6,1
+P41,M,In-air,D,1.0g,7,8,0
+P41,M,In-air,E,1.4g,8,8,1
+P41,M,In-air,A,1.0g,5,6,0
+P41,M,In-air,C,0.07g,7,0,0
+P41,M,In-air,D,1.4g,6,6,1
+P41,M,In-air,E,1.0g,5,5,1
+P41,M,In-air,A,0.16g,8,2,0
+P41,M,In-air,B,0.07g,8,0,0
+P41,M,In-air,A,0.6g,6,2,0
+P41,M,In-air,B,0.6g,8,4,0
+P41,M,In-air,E,1.0g,8,7,0
+P41,M,In-air,A,0.6g,7,0,0
+P41,M,In-air,E,1.4g,7,5,0
+P41,M,In-air,D,0.07g,5,0,0
+P41,M,In-air,C,0.07g,7,0,0
+P41,M,In-air,E,0.07g,5,0,0
+P41,M,In-air,B,1.4g,5,5,1
+P41,M,In-air,B,0.16g,8,0,0
+P41,M,In-air,A,1.4g,5,5,1
+P41,M,In-air,B,0.07g,7,0,0
+P41,M,In-air,B,1.4g,7,7,1
+P41,M,In-air,C,0.16g,5,0,0
+P41,M,In-air,D,0.16g,5,0,0
+P41,M,In-air,C,0.6g,5,3,0
+P41,M,In-air,F,1.0g,7,7,1
+P41,M,In-air,A,1.0g,7,5,0
+P41,M,In-air,F,1.4g,7,7,1
+P41,M,In-air,E,0.6g,8,4,0
+P41,M,In-air,D,1.4g,7,7,1
+P41,M,In-air,C,1.4g,8,8,1
+P41,M,In-air,D,0.6g,7,4,0
+P41,M,In-air,F,0.07g,6,0,0
+P41,M,In-air,F,0.6g,8,0,0
+P41,M,In-air,E,0.6g,5,2,0
+P41,M,In-air,D,0.07g,6,0,0
+P41,M,In-air,D,0.16g,5,0,0
+P41,M,In-air,F,0.16g,7,0,0

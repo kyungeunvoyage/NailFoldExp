@@ -1,0 +1,812 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Nail Measurement Tool</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans+KR:wght@300;400;500&display=swap');
+
+  :root {
+    --bg: #0f0f0f;
+    --surface: #1a1a1a;
+    --border: #2a2a2a;
+    --accent: #c8f050;
+    --accent2: #50c8f0;
+    --accent3: #f05090;
+    --accent4: #f0a050;
+    --text: #e8e8e8;
+    --muted: #666;
+    --panel-w: 300px;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: 'IBM Plex Sans KR', sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    height: 100vh;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+
+  header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 12px 20px;
+    border-bottom: 1px solid var(--border);
+    background: var(--surface);
+    flex-shrink: 0;
+  }
+
+  header h1 {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 14px;
+    font-weight: 600;
+    letter-spacing: 0.1em;
+    color: var(--accent);
+  }
+
+  header span {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 11px;
+    color: var(--muted);
+  }
+
+  .workspace {
+    display: flex;
+    flex: 1;
+    overflow: hidden;
+  }
+
+  /* LEFT PANEL */
+  .panel {
+    width: var(--panel-w);
+    background: var(--surface);
+    border-right: 1px solid var(--border);
+    display: flex;
+    flex-direction: column;
+    flex-shrink: 0;
+    overflow-y: auto;
+  }
+
+  .panel-section {
+    padding: 16px;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .panel-section h2 {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 10px;
+    font-weight: 500;
+    letter-spacing: 0.15em;
+    color: var(--muted);
+    text-transform: uppercase;
+    margin-bottom: 12px;
+  }
+
+  .id-row {
+    display: flex;
+    gap: 8px;
+  }
+
+  input[type="text"] {
+    flex: 1;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    color: var(--text);
+    padding: 8px 10px;
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 13px;
+    border-radius: 4px;
+    outline: none;
+    transition: border-color 0.2s;
+  }
+  input[type="text"]:focus { border-color: var(--accent); }
+
+  .upload-area {
+    border: 1px dashed var(--border);
+    border-radius: 6px;
+    padding: 20px;
+    text-align: center;
+    cursor: pointer;
+    transition: all 0.2s;
+    background: var(--bg);
+  }
+  .upload-area:hover { border-color: var(--accent); background: #161616; }
+  .upload-area input { display: none; }
+  .upload-area .icon { font-size: 24px; margin-bottom: 8px; }
+  .upload-area p { font-size: 12px; color: var(--muted); line-height: 1.5; }
+  .upload-area p strong { color: var(--accent); font-weight: 500; }
+
+  /* STEP INDICATOR */
+  .steps {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+
+  .step-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 10px;
+    border-radius: 4px;
+    border: 1px solid transparent;
+    transition: all 0.2s;
+    cursor: default;
+  }
+  .step-item.active {
+    border-color: var(--accent);
+    background: rgba(200, 240, 80, 0.05);
+  }
+  .step-item.done {
+    opacity: 0.5;
+  }
+
+  .step-dot {
+    width: 22px;
+    height: 22px;
+    border-radius: 50%;
+    border: 2px solid var(--border);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 10px;
+    font-weight: 600;
+    flex-shrink: 0;
+    transition: all 0.2s;
+  }
+  .step-item.active .step-dot {
+    border-color: var(--accent);
+    color: var(--accent);
+    background: rgba(200,240,80,0.1);
+  }
+  .step-item.done .step-dot {
+    border-color: var(--accent);
+    background: var(--accent);
+    color: var(--bg);
+  }
+
+  .step-info { flex: 1; }
+  .step-label {
+    font-size: 12px;
+    font-weight: 500;
+    line-height: 1;
+    margin-bottom: 2px;
+  }
+  .step-desc {
+    font-size: 10px;
+    color: var(--muted);
+  }
+  .step-color {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    flex-shrink: 0;
+  }
+
+  /* MEASUREMENTS DISPLAY */
+  .measurements {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .measure-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 8px 10px;
+    background: var(--bg);
+    border-radius: 4px;
+    border-left: 3px solid var(--border);
+    transition: border-color 0.2s;
+  }
+  .measure-row.has-value { border-left-color: var(--accent); }
+
+  .measure-label {
+    font-size: 11px;
+    color: var(--muted);
+  }
+  .measure-value {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--accent);
+  }
+
+  /* RATIOS */
+  .ratio-box {
+    background: var(--bg);
+    border-radius: 4px;
+    padding: 10px;
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 11px;
+    line-height: 1.8;
+    color: var(--muted);
+  }
+  .ratio-box span { color: var(--accent2); }
+
+  /* BUTTONS */
+  .btn {
+    width: 100%;
+    padding: 10px;
+    border: none;
+    border-radius: 4px;
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: 0.05em;
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+
+  .btn-primary {
+    background: var(--accent);
+    color: var(--bg);
+  }
+  .btn-primary:hover { background: #d4f560; transform: translateY(-1px); }
+  .btn-primary:disabled { opacity: 0.3; cursor: not-allowed; transform: none; }
+
+  .btn-secondary {
+    background: transparent;
+    color: var(--text);
+    border: 1px solid var(--border);
+  }
+  .btn-secondary:hover { border-color: var(--text); }
+
+  .btn-danger {
+    background: transparent;
+    color: var(--accent3);
+    border: 1px solid var(--accent3);
+  }
+  .btn-danger:hover { background: rgba(240,80,144,0.1); }
+
+  .btn-group { display: flex; flex-direction: column; gap: 6px; }
+
+  /* CSV PREVIEW */
+  .csv-count {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 11px;
+    color: var(--muted);
+    margin-bottom: 8px;
+  }
+  .csv-count span { color: var(--accent); }
+
+  /* CANVAS AREA */
+  .canvas-area {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+    background: #080808;
+    overflow: hidden;
+  }
+
+  .canvas-placeholder {
+    text-align: center;
+    color: var(--muted);
+  }
+  .canvas-placeholder .big-icon { font-size: 48px; margin-bottom: 16px; opacity: 0.3; }
+  .canvas-placeholder p { font-size: 13px; line-height: 1.6; }
+
+  #mainCanvas {
+    display: none;
+    max-width: 100%;
+    max-height: 100%;
+    cursor: crosshair;
+    image-rendering: pixelated;
+  }
+
+  .zoom-controls {
+    position: absolute;
+    bottom: 16px;
+    right: 16px;
+    display: flex;
+    gap: 4px;
+  }
+  .zoom-btn {
+    width: 32px;
+    height: 32px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    color: var(--text);
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 16px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.15s;
+  }
+  .zoom-btn:hover { border-color: var(--accent); color: var(--accent); }
+
+  .crosshair-hint {
+    position: absolute;
+    top: 16px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: rgba(200,240,80,0.1);
+    border: 1px solid var(--accent);
+    color: var(--accent);
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 11px;
+    padding: 6px 14px;
+    border-radius: 20px;
+    pointer-events: none;
+    display: none;
+  }
+
+  /* UNDO */
+  .undo-bar {
+    position: absolute;
+    bottom: 16px;
+    left: 16px;
+  }
+  .undo-bar button {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    color: var(--text);
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 11px;
+    padding: 6px 12px;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+  .undo-bar button:hover { border-color: var(--accent3); color: var(--accent3); }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>NAIL · MEASURE</h1>
+  <span>비율 기반 손톱 측정 도구 v1.0</span>
+</header>
+
+<div class="workspace">
+
+  <!-- LEFT PANEL -->
+  <div class="panel">
+
+    <!-- 피험자 ID -->
+    <div class="panel-section">
+      <h2>피험자 정보</h2>
+      <div class="id-row">
+        <input type="text" id="subjectId" placeholder="예: P01" maxlength="20">
+      </div>
+    </div>
+
+    <!-- 이미지 업로드 -->
+    <div class="panel-section">
+      <h2>이미지 업로드</h2>
+      <div class="upload-area" onclick="document.getElementById('fileInput').click()">
+        <input type="file" id="fileInput" accept="image/*" onchange="loadImage(event)">
+        <div class="icon">📁</div>
+        <p><strong>클릭하여 이미지 선택</strong><br>JPG, PNG 지원</p>
+      </div>
+    </div>
+
+    <!-- 측정 단계 -->
+    <div class="panel-section">
+      <h2>측정 단계</h2>
+      <div class="steps" id="stepsContainer">
+        <div class="step-item" id="step0">
+          <div class="step-dot">1</div>
+          <div class="step-info">
+            <div class="step-label">손톱 왼쪽 끝</div>
+            <div class="step-desc">가로 너비 측정용</div>
+          </div>
+          <div class="step-color" style="background:#c8f050"></div>
+        </div>
+        <div class="step-item" id="step1">
+          <div class="step-dot">2</div>
+          <div class="step-info">
+            <div class="step-label">손톱 오른쪽 끝</div>
+            <div class="step-desc">가로 너비 측정용</div>
+          </div>
+          <div class="step-color" style="background:#c8f050"></div>
+        </div>
+        <div class="step-item" id="step2">
+          <div class="step-dot">3</div>
+          <div class="step-info">
+            <div class="step-label">손톱 상단</div>
+            <div class="step-desc">세로 길이 측정용</div>
+          </div>
+          <div class="step-color" style="background:#50c8f0"></div>
+        </div>
+        <div class="step-item" id="step3">
+          <div class="step-dot">4</div>
+          <div class="step-info">
+            <div class="step-label">손톱 하단</div>
+            <div class="step-desc">세로 길이 측정용</div>
+          </div>
+          <div class="step-color" style="background:#50c8f0"></div>
+        </div>
+        <div class="step-item" id="step4">
+          <div class="step-dot">5</div>
+          <div class="step-info">
+            <div class="step-label">왼쪽 피부띠 경계</div>
+            <div class="step-desc">좌측 피부띠 두께</div>
+          </div>
+          <div class="step-color" style="background:#f05090"></div>
+        </div>
+        <div class="step-item" id="step5">
+          <div class="step-dot">6</div>
+          <div class="step-info">
+            <div class="step-label">오른쪽 피부띠 경계</div>
+            <div class="step-desc">우측 피부띠 두께</div>
+          </div>
+          <div class="step-color" style="background:#f0a050"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 측정값 -->
+    <div class="panel-section">
+      <h2>측정값 (픽셀)</h2>
+      <div class="measurements">
+        <div class="measure-row" id="mWidth">
+          <span class="measure-label">손톱 가로 너비</span>
+          <span class="measure-value" id="vWidth">—</span>
+        </div>
+        <div class="measure-row" id="mHeight">
+          <span class="measure-label">손톱 세로 길이</span>
+          <span class="measure-value" id="vHeight">—</span>
+        </div>
+        <div class="measure-row" id="mLeft">
+          <span class="measure-label">왼쪽 피부띠</span>
+          <span class="measure-value" id="vLeft">—</span>
+        </div>
+        <div class="measure-row" id="mRight">
+          <span class="measure-label">오른쪽 피부띠</span>
+          <span class="measure-value" id="vRight">—</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- 비율 -->
+    <div class="panel-section">
+      <h2>비율</h2>
+      <div class="ratio-box" id="ratioBox">
+        <div>W:H = <span id="rWH">—</span></div>
+        <div>좌피부/W = <span id="rLW">—</span></div>
+        <div>우피부/W = <span id="rRW">—</span></div>
+      </div>
+    </div>
+
+    <!-- CSV -->
+    <div class="panel-section">
+      <h2>데이터 저장</h2>
+      <div class="csv-count">누적 데이터: <span id="csvCount">0</span>개</div>
+      <div class="btn-group">
+        <button class="btn btn-primary" id="saveBtn" onclick="saveRecord()" disabled>현재 측정값 저장</button>
+        <button class="btn btn-secondary" onclick="downloadCSV()">CSV 다운로드</button>
+        <button class="btn btn-danger" onclick="resetPoints()">포인트 초기화</button>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- CANVAS AREA -->
+  <div class="canvas-area" id="canvasArea">
+    <div class="canvas-placeholder" id="placeholder">
+      <div class="big-icon">🖼️</div>
+      <p>왼쪽에서 이미지를 업로드하면<br>여기에 표시됩니다</p>
+    </div>
+    <canvas id="mainCanvas"></canvas>
+    <div class="crosshair-hint" id="hint"></div>
+    <div class="zoom-controls">
+      <div class="zoom-btn" onclick="zoom(1.2)">+</div>
+      <div class="zoom-btn" onclick="zoom(1/1.2)">−</div>
+      <div class="zoom-btn" onclick="resetZoom()">↺</div>
+    </div>
+    <div class="undo-bar">
+      <button onclick="undoPoint()">↩ 마지막 포인트 취소</button>
+    </div>
+  </div>
+
+</div>
+
+<script>
+// ── STATE ──────────────────────────────────────────────────────
+let img = null;
+let points = []; // canvas 좌표 (display)
+let imgPoints = []; // 원본 이미지 좌표
+let currentStep = 0;
+let scale = 1;
+let offsetX = 0, offsetY = 0;
+let canvasW, canvasH;
+let records = [];
+
+const STEPS = 6;
+const COLORS = ['#c8f050','#c8f050','#50c8f0','#50c8f0','#f05090','#f0a050'];
+const HINTS = [
+  '① 손톱 왼쪽 끝 클릭',
+  '② 손톱 오른쪽 끝 클릭',
+  '③ 손톱 상단(큐티클 경계) 클릭',
+  '④ 손톱 하단 경계 클릭',
+  '⑤ 왼쪽 피부띠 안쪽 경계 클릭',
+  '⑥ 오른쪽 피부띠 안쪽 경계 클릭',
+];
+
+const canvas = document.getElementById('mainCanvas');
+const ctx = canvas.getContext('2d');
+
+// ── IMAGE LOAD ─────────────────────────────────────────────────
+function loadImage(event) {
+  const file = event.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = e => {
+    img = new Image();
+    img.onload = () => {
+      document.getElementById('placeholder').style.display = 'none';
+      canvas.style.display = 'block';
+      resetPoints();
+      fitImage();
+    };
+    img.src = e.target.result;
+  };
+  reader.readAsDataURL(file);
+}
+
+function fitImage() {
+  const area = document.getElementById('canvasArea');
+  const aw = area.clientWidth - 40;
+  const ah = area.clientHeight - 40;
+  const scaleX = aw / img.width;
+  const scaleY = ah / img.height;
+  scale = Math.min(scaleX, scaleY, 1);
+  canvasW = img.width * scale;
+  canvasH = img.height * scale;
+  canvas.width = canvasW;
+  canvas.height = canvasH;
+  offsetX = 0; offsetY = 0;
+  redraw();
+}
+
+// ── ZOOM ───────────────────────────────────────────────────────
+function zoom(factor) {
+  scale *= factor;
+  canvasW = img.width * scale;
+  canvasH = img.height * scale;
+  canvas.width = canvasW;
+  canvas.height = canvasH;
+  // rescale display points
+  points = imgPoints.map(p => ({ x: p.x * scale, y: p.y * scale }));
+  redraw();
+}
+
+function resetZoom() { if (img) fitImage(); }
+
+// ── CLICK ──────────────────────────────────────────────────────
+canvas.addEventListener('click', e => {
+  if (!img || currentStep >= STEPS) return;
+  const rect = canvas.getBoundingClientRect();
+  const cx = e.clientX - rect.left;
+  const cy = e.clientY - rect.top;
+  const ix = cx / scale;
+  const iy = cy / scale;
+  points.push({ x: cx, y: cy });
+  imgPoints.push({ x: ix, y: iy });
+  currentStep++;
+  updateStepUI();
+  calculateMeasurements();
+  redraw();
+  if (currentStep < STEPS) showHint(HINTS[currentStep]);
+  else { hideHint(); }
+});
+
+canvas.addEventListener('mousemove', e => {
+  if (!img || currentStep >= STEPS) return;
+  redraw();
+  const rect = canvas.getBoundingClientRect();
+  const cx = e.clientX - rect.left;
+  const cy = e.clientY - rect.top;
+  // crosshair
+  ctx.save();
+  ctx.strokeStyle = COLORS[currentStep];
+  ctx.lineWidth = 1;
+  ctx.setLineDash([4,4]);
+  ctx.globalAlpha = 0.5;
+  ctx.beginPath(); ctx.moveTo(cx,0); ctx.lineTo(cx,canvasH); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(0,cy); ctx.lineTo(canvasW,cy); ctx.stroke();
+  ctx.restore();
+});
+
+// ── DRAW ───────────────────────────────────────────────────────
+function redraw() {
+  if (!img) return;
+  ctx.clearRect(0,0,canvasW,canvasH);
+  ctx.drawImage(img, 0, 0, canvasW, canvasH);
+  drawMeasurementLines();
+  points.forEach((p,i) => drawPoint(p.x, p.y, COLORS[i], i+1));
+}
+
+function drawPoint(x, y, color, label) {
+  ctx.save();
+  ctx.fillStyle = color;
+  ctx.strokeStyle = '#000';
+  ctx.lineWidth = 1.5;
+  ctx.beginPath();
+  ctx.arc(x, y, 7, 0, Math.PI*2);
+  ctx.fill();
+  ctx.stroke();
+  ctx.fillStyle = '#000';
+  ctx.font = 'bold 9px monospace';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText(label, x, y);
+  ctx.restore();
+}
+
+function drawMeasurementLines() {
+  if (points.length >= 2) drawLine(points[0], points[1], '#c8f050', 'W');
+  if (points.length >= 4) drawLine(points[2], points[3], '#50c8f0', 'H');
+  if (points.length >= 5 && points.length >= 1) {
+    // Left skin band: horizontal distance from pt[0] to pt[4]
+    const lp1 = { x: points[4].x, y: points[0].y };
+    drawLine(points[0], lp1, '#f05090', 'L');
+  }
+  if (points.length >= 6 && points.length >= 2) {
+    const rp1 = { x: points[5].x, y: points[1].y };
+    drawLine(points[1], rp1, '#f0a050', 'R');
+  }
+}
+
+function drawLine(a, b, color, label) {
+  ctx.save();
+  ctx.strokeStyle = color;
+  ctx.lineWidth = 1.5;
+  ctx.setLineDash([5,3]);
+  ctx.globalAlpha = 0.8;
+  ctx.beginPath();
+  ctx.moveTo(a.x, a.y);
+  ctx.lineTo(b.x, b.y);
+  ctx.stroke();
+  // mid label
+  const mx = (a.x+b.x)/2, my = (a.y+b.y)/2;
+  const dist = Math.round(Math.sqrt((b.x-a.x)**2+(b.y-a.y)**2) / scale);
+  ctx.setLineDash([]);
+  ctx.globalAlpha = 1;
+  ctx.fillStyle = color;
+  ctx.font = 'bold 10px monospace';
+  ctx.textAlign = 'center';
+  ctx.fillText(`${label}:${dist}px`, mx, my-8);
+  ctx.restore();
+}
+
+// ── MEASUREMENTS ───────────────────────────────────────────────
+function dist(a, b) {
+  return Math.sqrt((b.x-a.x)**2+(b.y-a.y)**2);
+}
+
+function calculateMeasurements() {
+  const ip = imgPoints;
+  let w=null, h=null, l=null, r=null;
+
+  if (ip.length >= 2) w = Math.round(dist(ip[0],ip[1]));
+  if (ip.length >= 4) h = Math.round(dist(ip[2],ip[3]));
+  if (ip.length >= 5) l = Math.round(Math.abs(ip[0].x - ip[4].x));
+  if (ip.length >= 6) r = Math.round(Math.abs(ip[1].x - ip[5].x));
+
+  setVal('vWidth', w, 'mWidth');
+  setVal('vHeight', h, 'mHeight');
+  setVal('vLeft', l, 'mLeft');
+  setVal('vRight', r, 'mRight');
+
+  // ratios
+  if (w && h) document.getElementById('rWH').textContent = (w/h).toFixed(3);
+  if (w && l) document.getElementById('rLW').textContent = (l/w).toFixed(3);
+  if (w && r) document.getElementById('rRW').textContent = (r/w).toFixed(3);
+
+  // enable save if all done
+  document.getElementById('saveBtn').disabled = !(w && h && l && r);
+}
+
+function setVal(id, val, rowId) {
+  const el = document.getElementById(id);
+  const row = document.getElementById(rowId);
+  if (val !== null) {
+    el.textContent = val + 'px';
+    row.classList.add('has-value');
+  } else {
+    el.textContent = '—';
+    row.classList.remove('has-value');
+  }
+}
+
+// ── STEP UI ────────────────────────────────────────────────────
+function updateStepUI() {
+  for (let i=0; i<STEPS; i++) {
+    const el = document.getElementById('step'+i);
+    el.classList.remove('active','done');
+    if (i < currentStep) el.classList.add('done');
+    else if (i === currentStep) el.classList.add('active');
+  }
+  if (currentStep < STEPS) showHint(HINTS[currentStep]);
+}
+
+function showHint(text) {
+  const h = document.getElementById('hint');
+  h.textContent = text;
+  h.style.display = 'block';
+}
+function hideHint() { document.getElementById('hint').style.display = 'none'; }
+
+// ── UNDO ───────────────────────────────────────────────────────
+function undoPoint() {
+  if (points.length === 0) return;
+  points.pop(); imgPoints.pop();
+  currentStep--;
+  updateStepUI();
+  calculateMeasurements();
+  redraw();
+  document.getElementById('saveBtn').disabled = true;
+  // reset ratio if needed
+  if (imgPoints.length < 2) document.getElementById('rWH').textContent = '—';
+  if (imgPoints.length < 5) document.getElementById('rLW').textContent = '—';
+  if (imgPoints.length < 6) document.getElementById('rRW').textContent = '—';
+}
+
+function resetPoints() {
+  points = []; imgPoints = [];
+  currentStep = 0;
+  updateStepUI();
+  calculateMeasurements();
+  ['vWidth','vHeight','vLeft','vRight'].forEach(id => document.getElementById(id).textContent = '—');
+  ['mWidth','mHeight','mLeft','mRight'].forEach(id => document.getElementById(id).classList.remove('has-value'));
+  ['rWH','rLW','rRW'].forEach(id => document.getElementById(id).textContent = '—');
+  document.getElementById('saveBtn').disabled = true;
+  hideHint();
+  if (img) redraw();
+}
+
+// ── CSV ────────────────────────────────────────────────────────
+function saveRecord() {
+  const ip = imgPoints;
+  const id = document.getElementById('subjectId').value.trim() || 'Unknown';
+  const w = Math.round(dist(ip[0],ip[1]));
+  const h = Math.round(dist(ip[2],ip[3]));
+  const l = Math.round(Math.abs(ip[0].x - ip[4].x));
+  const r = Math.round(Math.abs(ip[1].x - ip[5].x));
+
+  records.push({
+    id,
+    nail_width_px: w,
+    nail_height_px: h,
+    left_skin_px: l,
+    right_skin_px: r,
+    ratio_w_h: (w/h).toFixed(4),
+    ratio_left_w: (l/w).toFixed(4),
+    ratio_right_w: (r/w).toFixed(4),
+  });
+
+  document.getElementById('csvCount').textContent = records.length;
+  alert(`✅ "${id}" 저장 완료! (총 ${records.length}개)`);
+}
+
+function downloadCSV() {
+  if (records.length === 0) { alert('저장된 데이터가 없습니다.'); return; }
+  const headers = ['subject_id','nail_width_px','nail_height_px','left_skin_px','right_skin_px','ratio_w_h','ratio_left_w','ratio_right_w'];
+  const rows = records.map(r => headers.map(h => r[h]).join(','));
+  const csv = [headers.join(','), ...rows].join('\n');
+  const blob = new Blob([csv], {type:'text/csv'});
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `nail_measurements_${new Date().toISOString().slice(0,10)}.csv`;
+  a.click();
+}
+
+// ── INIT ───────────────────────────────────────────────────────
+updateStepUI();
+</script>
+</body>
+</html>
