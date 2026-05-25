@@ -91,7 +91,7 @@ rcParams.update({
 
 # --- Paths ---
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
-REPO_ROOT  = os.path.normpath(os.path.join(SCRIPT_DIR, ".."))
+REPO_ROOT  = os.path.normpath(os.path.join(SCRIPT_DIR, "../../"))
 FILE_PATTERN = os.path.join(
     REPO_ROOT, "Data", "(ATD)CurData", "P*_AbsoluteThresholdDetection.csv"
 )
@@ -186,10 +186,10 @@ ax.axhline(80, color=REF_LINE, linestyle="--", linewidth=1.0, alpha=0.8, zorder=
 ax.set_xlabel("Stimulus Force (g)", labelpad=6)
 ax.set_ylabel("Relative Accuracy (%)", labelpad=6)
 ax.set_ylim(-5, 108)
-ax.set_title(
-    f"Absolute Threshold Detection: Relative Accuracy  (N = {num_subjects})",
-    fontsize=10, pad=8, loc="left",
-)
+#ax.set_title(
+#     f"Absolute Threshold Detection: Relative Accuracy  (N = {num_subjects})",
+#     fontsize=10, pad=8, loc="left",
+# )
 
 add_condition_legend(ax)
 
@@ -321,10 +321,10 @@ g.axes.flat[0].text(-0.22, 1.10, "B", transform=g.axes.flat[0].transAxes,
 
 g.fig.set_size_inches(*FIG_B_SIZE)
 plt.subplots_adjust(top=0.88, wspace=0.08)
-plt.suptitle(
-    f"Detection Accuracy by Force, Region, and Condition  (N = {num_subjects})",
-    fontsize=10, y=0.98,
-)
+# plt.suptitle(
+#     f"Detection Accuracy by Force, Region, and Condition  (N = {num_subjects})",
+#     fontsize=10, y=0.98,
+# )
 
 out_facet = os.path.join(OUT_DIR, "ATD_facet_region_by_force.png")
 g.fig.savefig(out_facet, dpi=SAVE_DPI, bbox_inches="tight", facecolor="white")
