@@ -24,20 +24,67 @@ import re
 import warnings
 import numpy as np
 import pandas as pd
+import matplotlib
+matplotlib.use("Agg")
 import matplotlib.pyplot as plt
-import seaborn as sns
+from matplotlib import rcParams
 from scipy.optimize import curve_fit
 from scipy import stats
 
 warnings.filterwarnings("ignore")
-sns.set_theme(style="whitegrid")
+
+# =============================================================================
+# PNAS style + shared figure palette (Stats GEE / ATD C1_Figure)
+# =============================================================================
+SLATE_BLUE = "#56708A"
+OLIVE      = "#686F12"
+WINE       = "#7F212B"
+CREAM      = "#EDE2D0"
+BLACK      = "#1A1A1A"
+REF_LINE   = WINE
+
+REF_PALETTE = {1.0: SLATE_BLUE, 26.0: WINE}
+DIR_PALETTE = {"heavier": OLIVE, "lighter": SLATE_BLUE}
+
+FIG_WEBER_SIZE  = (9.0, 5.5)
+FIG_DIR_SIZE    = (13.0, 5.0)
+FIG_PSYCH_SIZE  = (8.5, 5.5)
+SAVE_DPI        = 200
+
+rcParams.update({
+    "figure.facecolor":      "#FFFFFF",
+    "axes.facecolor":        "#FFFFFF",
+    "font.family":           "sans-serif",
+    "font.sans-serif":       ["Helvetica", "Arial", "DejaVu Sans"],
+    "axes.linewidth":        0.8,
+    "axes.spines.top":       False,
+    "axes.spines.right":     False,
+    "xtick.major.width":     0.8,
+    "ytick.major.width":     0.8,
+    "xtick.major.size":      3.5,
+    "ytick.major.size":      3.5,
+    "xtick.direction":       "out",
+    "ytick.direction":       "out",
+    "legend.frameon":        False,
+    "legend.fontsize":       8,
+    "legend.title_fontsize": 8,
+    "font.size":             9,
+    "axes.titlesize":        10,
+    "axes.labelsize":        9,
+    "axes.grid":             True,
+    "axes.grid.axis":        "y",
+    "grid.alpha":            0.35,
+    "grid.linestyle":        "--",
+    "grid.color":            SLATE_BLUE,
+    "figure.dpi":            150,
+})
 
 
 # ============================================================
 # CONFIG
 # ============================================================
 FILE_PATTERN = "/Users/kyungeunjung/NailFoldExp/Data/(FD)CurData/P*_ForceDiscrimination.csv"
-OUTPUT_DIR = "/Users/kyungeunjung/NailFoldExp/ForceDiscAnalysis"
+OUTPUT_DIR = "/Users/kyungeunjung/NailFoldExp/(New)Analysis/ForceDiscAnalysis"
 os.makedirs(OUTPUT_DIR, exist_ok=True)
 
 
@@ -127,19 +174,19 @@ print("\n[2] Group-level summary:")
 print(grp_agg.round(3).to_string(index=False))
 
 
-fig, ax = plt.subplots(figsize=(9, 5.5))
-palette = {1.0: "#1f77b4", 26.0: "#d62728"}
+fig, ax = plt.subplots(figsize=FIG_WEBER_SIZE, facecolor="#FFFFFF")
+palette = REF_PALETTE
 
 # (a) Per-subject jittered dots (translucent)
 for ref, sub in subj_agg.groupby("Reference_n"):
-    color = palette.get(ref, "gray")
+    color = palette.get(ref, SLATE_BLUE)
     jitter = np.random.uniform(-0.015, 0.015, size=len(sub))
     ax.scatter(sub["weber_ratio"] + jitter, sub["accuracy"],
                s=25, alpha=0.25, color=color, edgecolor="none", zorder=2)
 
 # (b) Group mean ± SEM, annotated with the actual force pair(s)
 for ref, sub in grp_agg.groupby("Reference_n"):
-    color = palette.get(ref, "gray")
+    color = palette.get(ref, SLATE_BLUE)
     ax.errorbar(sub["weber_ratio"], sub["mean_acc"], yerr=sub["sem_acc"],
                 marker="o", color=color, ms=10, lw=2, capsize=4,
                 label=f"ref = {ref:g} g", zorder=4)
@@ -158,18 +205,19 @@ for ref, sub in grp_agg.groupby("Reference_n"):
             zorder=5,
         )
 
-ax.axhline(0.75, ls="--", color="red", alpha=0.7, label="75% threshold criterion")
-ax.axhline(0.50, ls=":",  color="gray", alpha=0.7, label="Chance (2-AFC)")
-ax.set_xlabel("Weber ratio |ΔF| / F_ref", fontsize=12)
-ax.set_ylabel("Accuracy ('chose the stronger')", fontsize=12)
-ax.set_title("Force discrimination as a function of Weber ratio (data-driven)",
-             fontsize=12)
+ax.axhline(0.75, ls="--", color=REF_LINE, alpha=0.8, linewidth=1.0,
+           label="75% threshold criterion")
+ax.axhline(0.50, ls="-", color=BLACK, alpha=0.8, linewidth=0.8,
+           label="Chance (2-AFC)")
+ax.set_xlabel("Weber ratio |ΔF| / F_ref")
+ax.set_ylabel("Accuracy ('chose the stronger')")
+ax.set_title("Force discrimination as a function of Weber ratio (data-driven)")
 ax.set_ylim(-0.02, 1.05)
-ax.legend(fontsize=9, loc="lower right")
-ax.grid(alpha=0.3)
+ax.legend(loc="lower right")
 plt.tight_layout()
 out1 = os.path.join(OUTPUT_DIR, "weber_scatter_data_driven.png")
-plt.savefig(out1, dpi=200, bbox_inches="tight")
+fig.savefig(out1, dpi=SAVE_DPI, bbox_inches="tight", facecolor="white")
+plt.close(fig)
 print(f"    Saved {out1}")
 
 
@@ -233,12 +281,12 @@ dir_grp = (dir_agg.groupby(["Reference_n", "weber_ratio", "direction"])
 print(dir_grp.round(3).to_string(index=False))
 
 
-fig, axes = plt.subplots(1, 2, figsize=(13, 5), sharey=True)
+fig, axes = plt.subplots(1, 2, figsize=FIG_DIR_SIZE, sharey=True, facecolor="#FFFFFF")
 for ax, ref in zip(axes, sorted(df["Reference_n"].unique())):
     sub = dir_grp[dir_grp["Reference_n"] == ref]
     for direction, dsub in sub.groupby("direction"):
         marker = "o" if direction == "heavier" else "s"
-        color = "#2ca02c" if direction == "heavier" else "#9467bd"
+        color = DIR_PALETTE.get(direction, SLATE_BLUE)
         ax.errorbar(dsub["weber_ratio"], dsub["mean_acc"], yerr=dsub["sem_acc"],
                     marker=marker, color=color, ms=9, lw=2, capsize=4,
                     label=f"Comparison {direction} than ref")
@@ -257,17 +305,17 @@ for ax, ref in zip(axes, sorted(df["Reference_n"].unique())):
                 color=color,
                 ha="left",
             )
-    ax.axhline(0.75, ls="--", color="red", alpha=0.6)
-    ax.axhline(0.50, ls=":",  color="gray", alpha=0.6)
+    ax.axhline(0.75, ls="--", color=REF_LINE, alpha=0.8, linewidth=1.0)
+    ax.axhline(0.50, ls="-", color=BLACK, alpha=0.8, linewidth=0.8)
     ax.set_xlabel("Weber ratio |ΔF| / F_ref")
     ax.set_ylabel("Accuracy ('chose the stronger')")
     ax.set_title(f"Reference = {ref:g} g")
     ax.set_ylim(-0.02, 1.05)
-    ax.legend(loc="lower right", fontsize=9)
-    ax.grid(alpha=0.3)
+    ax.legend(loc="lower right")
 plt.tight_layout()
 out2 = os.path.join(OUTPUT_DIR, "direction_specific_accuracy.png")
-plt.savefig(out2, dpi=200, bbox_inches="tight")
+fig.savefig(out2, dpi=SAVE_DPI, bbox_inches="tight", facecolor="white")
+plt.close(fig)
 print(f"    Saved {out2}")
 
 # Interpretation hint
@@ -295,12 +343,12 @@ def fit_psychometric(x, y, p0=(0.5, 5.0), bounds=([0.01, 0.1], [3.0, 100])):
 
 # Group-level fit per reference
 print("\n[5] Psychometric fits (group-level):")
-fig, ax = plt.subplots(figsize=(8.5, 5.5))
+fig, ax = plt.subplots(figsize=FIG_PSYCH_SIZE, facecolor="#FFFFFF")
 x_smooth = np.linspace(0, 1.5, 200)
 
 group_fits = {}
 for ref, sub in grp_agg.groupby("Reference_n"):
-    color = palette.get(ref, "gray")
+    color = REF_PALETTE.get(ref, SLATE_BLUE)
     k, slope = fit_psychometric(sub["weber_ratio"].values, sub["mean_acc"].values)
     group_fits[ref] = (k, slope)
     print(f"    ref={ref:g}g: Weber fraction k={k:.3f}, slope={slope:.2f}")
@@ -328,17 +376,17 @@ for ref, sub in grp_agg.groupby("Reference_n"):
                 color=color, lw=2, alpha=0.8,
                 label=f"ref={ref:g}g fit (k={k:.2f})")
 
-ax.axhline(0.75, ls="--", color="red", alpha=0.6, label="75% criterion")
-ax.axhline(0.50, ls=":",  color="gray", alpha=0.6, label="Chance")
-ax.set_xlabel("Weber ratio |ΔF| / F_ref", fontsize=12)
-ax.set_ylabel("Accuracy", fontsize=12)
-ax.set_title("Psychometric fit per reference (Weber's law check)", fontsize=12)
+ax.axhline(0.75, ls="--", color=REF_LINE, alpha=0.8, linewidth=1.0, label="75% criterion")
+ax.axhline(0.50, ls="-", color=BLACK, alpha=0.8, linewidth=0.8, label="Chance")
+ax.set_xlabel("Weber ratio |ΔF| / F_ref")
+ax.set_ylabel("Accuracy")
+ax.set_title("Psychometric fit per reference (Weber's law check)")
 ax.set_ylim(-0.02, 1.05)
-ax.legend(fontsize=8, loc="lower right")
-ax.grid(alpha=0.3)
+ax.legend(loc="lower right")
 plt.tight_layout()
 out3 = os.path.join(OUTPUT_DIR, "weber_psychometric_fits.png")
-plt.savefig(out3, dpi=200, bbox_inches="tight")
+fig.savefig(out3, dpi=SAVE_DPI, bbox_inches="tight", facecolor="white")
+plt.close(fig)
 print(f"    Saved {out3}")
 
 

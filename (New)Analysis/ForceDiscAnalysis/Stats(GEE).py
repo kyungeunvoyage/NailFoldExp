@@ -30,8 +30,29 @@ import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import matplotlib.patches as mpatches
+from matplotlib import rcParams
 from matplotlib.lines import Line2D
 from pathlib import Path
+
+# =============================================================================
+# PNAS style + shared figure palette (ATD C1_Figure)
+# =============================================================================
+SLATE_BLUE = "#56708A"
+OLIVE      = "#686F12"
+WINE       = "#7F212B"
+CREAM      = "#EDE2D0"
+BLACK      = "#1A1A1A"
+REF_LINE   = WINE
+
+# Semantic mapping for force-discrimination bands
+COLOR_ABOVE_JND = OLIVE       # accuracy ≥ 0.75
+COLOR_MID       = SLATE_BLUE  # 0.50–0.75
+COLOR_REVERSAL  = WINE        # accuracy < 0.50
+COLOR_SPECIAL   = CREAM       # 1–2 g pair
+COLOR_MEAN      = WINE
+
+FIG_SIZE = (12.0, 12.0)
+SAVE_DPI = 200
 
 # ── Stat backend selection ────────────────────────────────────────────────────
 USE_GEE = False
@@ -50,21 +71,38 @@ except ImportError:
     except ImportError:
         print("Neither statsmodels nor scipy found — using: permutation test (fallback)")
 
-# ── 0. Matplotlib style ─────────────────────────────────────────────────────
-plt.rcParams.update({
-    "font.family": "sans-serif",
-    "font.size": 11,
-    "axes.spines.top": False,
-    "axes.spines.right": False,
-    "axes.grid": True,
-    "axes.grid.axis": "y",
-    "grid.alpha": 0.35,
-    "grid.linestyle": "--",
+# ── 0. Matplotlib style (PNAS-like, white background) ───────────────────────
+rcParams.update({
+    "figure.facecolor":      "#FFFFFF",
+    "axes.facecolor":        "#FFFFFF",
+    "font.family":           "sans-serif",
+    "font.sans-serif":       ["Helvetica", "Arial", "DejaVu Sans"],
+    "axes.linewidth":        0.8,
+    "axes.spines.top":       False,
+    "axes.spines.right":     False,
+    "xtick.major.width":     0.8,
+    "ytick.major.width":     0.8,
+    "xtick.major.size":      3.5,
+    "ytick.major.size":      3.5,
+    "xtick.direction":       "out",
+    "ytick.direction":       "out",
+    "legend.frameon":        False,
+    "legend.fontsize":       8,
+    "legend.title_fontsize": 8,
+    "font.size":             9,
+    "axes.titlesize":        10,
+    "axes.labelsize":        9,
+    "axes.grid":             True,
+    "axes.grid.axis":        "y",
+    "grid.alpha":            0.35,
+    "grid.linestyle":        "--",
+    "grid.color":            SLATE_BLUE,
+    "figure.dpi":            150,
 })
 
 # ── 1. Paths ──────────────────────────────────────────────────────────────────
 FILE_PATTERN = "/Users/kyungeunjung/NailFoldExp/Data/(FD)CurData/P*_ForceDiscrimination.csv"
-OUTPUT_DIR   = "/Users/kyungeunjung/NailFoldExp/ForceDiscAnalysis"
+OUTPUT_DIR   = "/Users/kyungeunjung/NailFoldExp/(New)Analysis/ForceDiscAnalysis"
 os.makedirs(OUTPUT_DIR, exist_ok=True)
 
 # ── 2. Load data ──────────────────────────────────────────────────────────────
@@ -214,20 +252,15 @@ low_pvals  = run_gee_pairwise("Low",  low_order)
 high_pvals = run_gee_pairwise("High", high_order)
 
 # ── 7. Color logic ────────────────────────────────────────────────────────────
-TEAL    = "#2a9d8f"   # ≥ 0.75
-SALMON  = "#e76f51"   # < 0.50  (reversal)
-MID     = "#457b9d"   # in between
-PINK    = "#c77dff"   # special: 1-2g pair
-
 def pair_color(pair, band_subj_df):
     med = band_subj_df.loc[band_subj_df["pair_label"] == pair, "accuracy"].mean()
     if pair == "1–2":
-        return PINK
+        return COLOR_SPECIAL
     if med >= 0.75:
-        return TEAL
-    elif med < 0.50:
-        return SALMON
-    return MID
+        return COLOR_ABOVE_JND
+    if med < 0.50:
+        return COLOR_REVERSAL
+    return COLOR_MID
 
 # ── helper: jittered strip ────────────────────────────────────────────────────
 def jitter(n, width=0.18, seed=42):
@@ -244,7 +277,7 @@ def pval_label(p):
     return "n.s."   # non-significant: show as n.s. to reduce clutter
 
 # ── 9. Draw significance bracket ─────────────────────────────────────────────
-def draw_bracket(ax, x1, x2, y, label, color="dimgray", linewidth=1.2, fontsize=8.0):
+def draw_bracket(ax, x1, x2, y, label, color=SLATE_BLUE, linewidth=1.2, fontsize=8.0):
     """Draw a bracket from x1 to x2 at height y with label above."""
     h = 0.018
     ax.plot([x1, x1, x2, x2], [y, y + h, y + h, y],
@@ -275,14 +308,14 @@ def assign_bracket_levels(combos):
 
 # ── 10. Plot ──────────────────────────────────────────────────────────────────
 fig, (ax_low, ax_high) = plt.subplots(
-    2, 1, figsize=(11, 12), constrained_layout=True
+    2, 1, figsize=FIG_SIZE, facecolor="#FFFFFF"
 )
-fig.suptitle(
-    "Periungual Force Discrimination — GEE Pairwise Contrasts",
-    fontsize=14, fontweight="bold",
-)
+# fig.suptitle(
+#     "Periungual Force Discrimination — GEE Pairwise Contrasts",
+#     fontsize=14, fontweight="bold",
+# )
 
-def plot_band(ax, band_label, order, pvals_dict, title):
+def plot_band(ax, band_label, order, pvals_dict, title, show_xlabel=False):
     sub = subj_acc[subj_acc["band"] == band_label].copy()
 
     for xi, pair in enumerate(order):
@@ -296,31 +329,32 @@ def plot_band(ax, band_label, order, pvals_dict, title):
         bp = ax.boxplot(
             pdata, positions=[xi], widths=0.45,
             patch_artist=True,
-            medianprops=dict(color="white", linewidth=2.2),
+            medianprops=dict(color=BLACK, linewidth=1.5),
             whiskerprops=dict(color=color, linewidth=1.4),
             capprops=dict(color=color, linewidth=1.4),
             flierprops=dict(marker="o", markerfacecolor=color,
                             markersize=4, alpha=0.5, linestyle="none"),
-            boxprops=dict(facecolor=color, alpha=0.60, linewidth=0),
+            boxprops=dict(facecolor=color, alpha=0.75, linewidth=0.8,
+                          edgecolor=BLACK),
         )
 
         # mean diamond
         ax.scatter(xi, np.mean(pdata), marker="D",
-                   color="crimson", s=60, zorder=6)
+                   color=COLOR_MEAN, s=60, zorder=6, edgecolors=BLACK, linewidths=0.5)
 
         # jittered individual dots
         ax.scatter(
             np.full(len(pdata), xi) + jitter(len(pdata)),
             pdata,
-            color=color, alpha=0.55, s=22, zorder=5,
+            color=color, alpha=0.45, s=22, zorder=5,
         )
 
     # reference lines
-    ax.axhline(0.75, color="gray",  linestyle="--", linewidth=1.3,
+    ax.axhline(0.75, color=REF_LINE, linestyle="--", linewidth=1.0, alpha=0.8,
                label="JND criterion (0.75)")
-    ax.axhline(0.50, color="black", linestyle="-",  linewidth=1.0,
+    ax.axhline(0.50, color=BLACK, linestyle="-", linewidth=0.8,
                label="Chance (0.50)")
-    ax.axhspan(-0.05, 0.50, color=SALMON, alpha=0.07, label="Reversal zone")
+    ax.axhspan(-0.05, 0.50, color=COLOR_REVERSAL, alpha=0.07, label="Reversal zone")
 
     # ── GEE pairwise brackets ────────────────────────────────────────────────
     # Sort combos by span (smallest first) then assign non-overlapping levels
@@ -340,7 +374,10 @@ def plot_band(ax, band_label, order, pvals_dict, title):
     ax.set_xticklabels(order, fontsize=10.5)
     ax.set_ylim(-0.05, ylim_top)
     ax.set_ylabel("Accuracy (proportion correct)", fontsize=11)
-    ax.set_xlabel("Force pair (g)", fontsize=11)
+    if show_xlabel:
+        ax.set_xlabel("Force pair (g)", fontsize=11, labelpad=6)
+    else:
+        ax.set_xlabel("")
     ax.set_title(title, fontsize=12, fontweight="bold", pad=8)
     ax.legend(fontsize=8.5, loc="upper right")
 
@@ -350,32 +387,44 @@ def plot_band(ax, band_label, order, pvals_dict, title):
         pval = pvals_dict.get((p1, p2), pvals_dict.get((p2, p1), np.nan))
         label = pval_label(pval)
         y = bracket_base + level * bracket_step
-        color = "crimson" if (not np.isnan(pval) and pval < 0.05) else "dimgray"
+        color = WINE if (not np.isnan(pval) and pval < 0.05) else SLATE_BLUE
         draw_bracket(ax, i1, i2, y, label, color=color)
 
 plot_band(ax_low,  "Low",  low_order,  low_pvals,
-          "Low band (ref = 1 g)")
+          "Low band (ref = 1 g)", show_xlabel=False)
 plot_band(ax_high, "High", high_order, high_pvals,
-          "High band (ref = 26 g)")
+          "High band (ref = 26 g)", show_xlabel=True)
 
 # ── 11. Global colour legend ──────────────────────────────────────────────────
 legend_elements = [
-    mpatches.Patch(facecolor=TEAL,   alpha=0.7, label="Above JND criterion (≥0.75)"),
-    mpatches.Patch(facecolor=MID,    alpha=0.7, label="Intermediate (0.50–0.75)"),
-    mpatches.Patch(facecolor=SALMON, alpha=0.7, label="Reversal zone (<0.50)"),
-    mpatches.Patch(facecolor=PINK,   alpha=0.7, label="1–2 g pair"),
-    Line2D([0], [0], marker="D", color="w", markerfacecolor="crimson",
+    mpatches.Patch(facecolor=COLOR_ABOVE_JND, edgecolor=BLACK, linewidth=0.6,
+                   alpha=0.75, label="Above JND criterion (≥0.75)"),
+    mpatches.Patch(facecolor=COLOR_MID, edgecolor=BLACK, linewidth=0.6,
+                   alpha=0.75, label="Intermediate (0.50–0.75)"),
+    mpatches.Patch(facecolor=COLOR_REVERSAL, edgecolor=BLACK, linewidth=0.6,
+                   alpha=0.75, label="Reversal zone (<0.50)"),
+    mpatches.Patch(facecolor=COLOR_SPECIAL, edgecolor=BLACK, linewidth=0.6,
+                   alpha=0.75, label="1–2 g pair"),
+    Line2D([0], [0], marker="D", color="w", markerfacecolor=COLOR_MEAN,
+           markeredgecolor=BLACK, markeredgewidth=0.5,
            markersize=9, label="Mean accuracy"),
 ]
+fig.subplots_adjust(left=0.09, right=0.97, top=0.96, bottom=0.13, hspace=0.32)
+
+# Legend: one row, directly below bottom-panel x-axis label
 fig.legend(
     handles=legend_elements,
-    loc="lower center", ncol=5,
-    fontsize=9, framealpha=0.9,
-    bbox_to_anchor=(0.5, -0.01),
+    loc="upper center",
+    bbox_to_anchor=(0.5, 0.07),
+    ncol=5,
+    fontsize=7.5,
+    frameon=False,
+    columnspacing=0.9,
+    handletextpad=0.4,
 )
 
 # ── 12. Save ──────────────────────────────────────────────────────────────────
 out_path = os.path.join(OUTPUT_DIR, "gee_pairwise_plot.png")
-plt.savefig(out_path, dpi=180, bbox_inches="tight")
-plt.close()
-print(f"Saved: {out_path}")
+fig.savefig(out_path, dpi=SAVE_DPI, facecolor="white")
+plt.close(fig)
+print(f"Saved: {out_path}  ({FIG_SIZE[0]}×{FIG_SIZE[1]} in @ {SAVE_DPI} dpi)")
