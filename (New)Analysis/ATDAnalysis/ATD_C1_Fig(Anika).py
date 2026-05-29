@@ -1,7 +1,7 @@
 """
 ATD Comparison Figures
 ======================
-Figure 1: Anika Paint (fingerpad, Kao et al. 2022) vs. Periungual On-touch (this study)
+Figure 1: Anika Paint (fingerpad, Kao et al. 2022) vs. Periungual In-air (this study)
 Figure 2: Periungual On-touch vs. In-air (this study)
 
 Kao et al. 2022 Paint condition values are digitized from published Fig. B (n=5).
@@ -156,13 +156,13 @@ USER_FORCES   = sorted(df_raw["Force_Val"].unique())   # [0.07, 0.16, 0.6, 1.0, 
 KAO_FORCES    = sorted(KAO_PAINT_RAW.keys())           # [0.02, 0.04, 0.07, 0.4, 1.0, 1.4]
 
 # =============================================================================
-# Figure 1 — Anika Paint (fingerpad) vs Periungual On-touch
+# Figure 1 — Anika Paint (fingerpad) vs Periungual In-air
 # =============================================================================
-ONTOUCH_LABEL = f"Periungual — On-touch\n(this study, n= {n_subjects})"
-KAO_LABEL     = f"Fingerpad — On-touch\n(Kao et al. 2022, n= {KAO_N})"
+INAIR_LABEL = f"Periungual — In-air\n(this study, n= {n_subjects})"
+KAO_LABEL   = f"Fingerpad — On-touch\n(Kao et al. 2022, n= {KAO_N})"
 
-df_ontouch = df_raw[df_raw["Condition"] == "On-touch (Mid)"].copy()
-df_ontouch["Source"] = ONTOUCH_LABEL
+df_inair = df_raw[df_raw["Condition"] == "In-air"].copy()
+df_inair["Source"] = INAIR_LABEL
 
 df_kao_plot = df_kao.copy()
 df_kao_plot["Source"] = KAO_LABEL
@@ -173,12 +173,12 @@ COMBINED_FORCES = sorted(set(KAO_FORCES) | set(USER_FORCES))
 
 df_fig1 = pd.concat(
     [df_kao_plot[["Force_Val", "Score", "Source"]],
-     df_ontouch[["Force_Val",  "Score", "Source"]]],
+     df_inair[["Force_Val",  "Score", "Source"]]],
     ignore_index=True,
 )
 
-SOURCE_ORDER  = [KAO_LABEL, ONTOUCH_LABEL]
-SOURCE_COLORS = {KAO_LABEL: KAO_COLOR, ONTOUCH_LABEL: OLIVE}
+SOURCE_ORDER  = [KAO_LABEL, INAIR_LABEL]
+SOURCE_COLORS = {KAO_LABEL: KAO_COLOR, INAIR_LABEL: SLATE_BLUE}
 
 sns.set_theme(style="white")
 fig1, ax1 = plt.subplots(figsize=FIG_SIZE)
@@ -233,17 +233,17 @@ if sp_kao:
              ha="center", va="top", fontsize=7, color=KAO_COLOR, style="italic")
 
 if sp_user:
-    ax1.axvspan(*sp_user, color=OLIVE, alpha=0.06, zorder=0)
+    ax1.axvspan(*sp_user, color=SLATE_BLUE, alpha=0.06, zorder=0)
     mid = (sp_user[0] + sp_user[1]) / 2
     ax1.text(mid, 105, "Periungual\nonly",
-             ha="center", va="top", fontsize=7, color=OLIVE, style="italic")
+             ha="center", va="top", fontsize=7, color=SLATE_BLUE, style="italic")
 
 # Legend
 leg_handles = [
     mpatches.Patch(facecolor=KAO_COLOR + BOX_ALPHA_HEX,
                    edgecolor=BLACK, linewidth=0.7, label=KAO_LABEL),
-    mpatches.Patch(facecolor=OLIVE + BOX_ALPHA_HEX,
-                   edgecolor=BLACK, linewidth=0.7, label=ONTOUCH_LABEL),
+    mpatches.Patch(facecolor=SLATE_BLUE + BOX_ALPHA_HEX,
+                   edgecolor=BLACK, linewidth=0.7, label=INAIR_LABEL),
 ]
 ax1.legend(handles=leg_handles, loc="lower right",
            fontsize=8, frameon=False, labelspacing=0.5)
@@ -256,7 +256,7 @@ ax1.set_xticklabels([str(f) for f in COMBINED_FORCES])
 sns.despine(ax=ax1)
 fig1.tight_layout(pad=1.5)
 
-save_figure(fig1, "Fig1_fingerpad_paint_vs_ontouch")
+save_figure(fig1, "Fig1_fingerpad_paint_vs_inair")
 plt.close(fig1)
 
 # =============================================================================

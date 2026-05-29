@@ -4,14 +4,11 @@ import numpy as np
 import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
-import matplotlib.gridspec as gridspec
-from mpl_toolkits.axes_grid1 import make_axes_locatable
 from matplotlib.colors import LinearSegmentedColormap
 import seaborn as sns
 import glob
 import statsmodels.formula.api as smf
 import warnings
-from itertools import combinations
 
 warnings.filterwarnings("ignore")
 
@@ -24,62 +21,64 @@ SLATE_BLUE = "#56708A"
 OLIVE      = "#686F12"
 WINE       = "#7F212B"
 CREAM      = "#EDE2D0"
-BOX_ALPHA_HEX = "BE"
 PALETTE_4  = [SLATE_BLUE, OLIVE, WINE, CREAM]
 ATD_CMAP   = LinearSegmentedColormap.from_list("atd", [CREAM, SLATE_BLUE, OLIVE, WINE])
 
-ENABLE_FIG1 = False
-#0.07, 1.0, 1.4 빼고 싶은거..
-#EXCLUDE_FORCES = {0.07, 1.0, 1.4}   # omit from all plots / plot-filtered analyses
-EXCLUDE_FORCES = {}   # omit from all plots / plot-filtered analyses
-FIG2_PANEL_W = 2.85   # inches per 6×6 heatmap panel
-FIG2_HEIGHT  = 4.0    # fixed height for pairwise LME heatmaps
-FIG4_SIZE    = (10.2, 4.8)   # force-pooled: heatmap + region boxplot + brackets
-FIG3_SIZE   = (14.5, 5.2)   # lateral / proximal contrasts
+ENABLE_FIG1    = False
+EXCLUDE_FORCES = {0.07, 1.0, 1.4}   # omit from all plots / plot-filtered analyses
+
+# =============================================================================
+# Normalization flag
+# True  → per-subject normalize: each trial score / subject's personal max score × 100
+#         Removes individual absolute sensitivity; isolates spatial / force patterns.
+#         80% line meaning changes: "80% of personal best" not "80% accuracy".
+# False → raw Relative_Score (default)
+# =============================================================================
+NORMALIZE_BY_MAX = False
+
+FIG2_SIZE   = (14.0, 6.0)
+FIG3_SIZE   = (14.5, 5.2)
 SAVE_DPI    = 220
-
-
-def _pairwise_lme_p_matrix(subset, subject_col, area_order):
-    """One pairwise LME p-value matrix for a trial subset."""
-    p_matrix = pd.DataFrame(np.nan, index=area_order, columns=area_order)
-    ref_subset = subset[subset["Area"].isin(area_order)].copy()
-    if ref_subset.empty:
-        return p_matrix
-
-    for ref_area in area_order:
-        if ref_subset["Area"].nunique() < 2:
-            continue
-        try:
-            formula = f"Relative_Score ~ C(Area, Treatment(reference='{ref_area}'))"
-            result = smf.mixedlm(formula, ref_subset, groups=ref_subset[subject_col]).fit()
-            for target_area in area_order:
-                if ref_area == target_area:
-                    p_matrix.loc[ref_area, target_area] = 1.0
-                    continue
-                col_name = (
-                    f"C(Area, Treatment(reference='{ref_area}'))[T.{target_area}]"
-                )
-                if col_name in result.pvalues:
-                    p_matrix.loc[ref_area, target_area] = result.pvalues[col_name]
-        except Exception:
-            continue
-    return p_matrix
 
 
 def build_pairwise_lme_p_matrices(df_input, subject_col, area_order, force_values):
     """Build pairwise LME p-value matrices by changing treatment reference area."""
     all_p_matrices = {}
+
     for force_val in force_values:
         subset = df_input[df_input["Force_Val"] == force_val].copy()
-        all_p_matrices[force_val] = _pairwise_lme_p_matrix(
-            subset, subject_col, area_order
-        )
+        p_matrix = pd.DataFrame(np.nan, index=area_order, columns=area_order)
+
+        if subset.empty:
+            all_p_matrices[force_val] = p_matrix
+            continue
+
+        for ref_area in area_order:
+            ref_subset = subset[subset["Area"].isin(area_order)].copy()
+            if ref_subset["Area"].nunique() < 2:
+                continue
+
+            try:
+                formula = f"Relative_Score ~ C(Area, Treatment(reference='{ref_area}'))"
+                model = smf.mixedlm(formula, ref_subset, groups=ref_subset[subject_col])
+                result = model.fit()
+
+                for target_area in area_order:
+                    if ref_area == target_area:
+                        p_matrix.loc[ref_area, target_area] = 1.0
+                        continue
+
+                    col_name = (
+                        f"C(Area, Treatment(reference='{ref_area}'))[T.{target_area}]"
+                    )
+                    if col_name in result.pvalues:
+                        p_matrix.loc[ref_area, target_area] = result.pvalues[col_name]
+            except Exception:
+                continue
+
+        all_p_matrices[force_val] = p_matrix
+
     return all_p_matrices
-
-
-def build_pairwise_lme_p_matrix_pooled(df_input, subject_col, area_order):
-    """Pairwise LME p-values with all forces aggregated (no Force term)."""
-    return _pairwise_lme_p_matrix(df_input, subject_col, area_order)
 
 
 def gender_lme_pvalue(subset, subject_col, score_col="Relative_Score", gender_col="Gender"):
@@ -147,101 +146,6 @@ def _star_from_p(p):
     if p < 0.05:
         return "*"
     return "n.s."
-
-
-def _add_sig_bracket(ax, x_l, x_r, y_base, tick_h=0.45, text="", fontsize=6.0):
-    """Bracket from each box center; compact for multi-pair stacking."""
-    x_center = (x_l + x_r) / 2.0
-    y_top = y_base + tick_h
-    ax.plot(
-        [x_l, x_l, x_r, x_r],
-        [y_base, y_top, y_top, y_base],
-        color=WINE,
-        linewidth=0.7,
-        clip_on=False,
-        zorder=5,
-    )
-    ax.text(
-        x_center,
-        y_top + 0.25,
-        text,
-        ha="center",
-        va="bottom",
-        fontsize=fontsize,
-        color=WINE,
-        fontweight="bold",
-        clip_on=False,
-        zorder=6,
-    )
-
-
-def lme_area_pair_pooled(df_in, sub_col, ref_area, target_area):
-    """Trial-level area contrast with all forces pooled (no Force term)."""
-    sub = df_in[df_in["Area"].isin([ref_area, target_area])].copy()
-    sub = sub.dropna(subset=[sub_col, "Relative_Score", "Area"])
-    if len(sub) < 10 or sub[sub_col].nunique() < 2 or sub["Area"].nunique() < 2:
-        return None
-    formula = f"Relative_Score ~ C(Area, Treatment(reference='{ref_area}'))"
-    try:
-        res = smf.mixedlm(formula, sub, groups=sub[sub_col]).fit()
-        col = f"C(Area, Treatment(reference='{ref_area}'))[T.{target_area}]"
-        if col not in res.params.index:
-            return None
-        return {"p": float(res.pvalues[col]), "coef": float(res.params[col])}
-    except Exception:
-        return None
-
-
-def _boxplot_x_center(ax, cat_index):
-    if not ax.containers:
-        return float(cat_index)
-    boxes = ax.containers[0].boxes
-    if cat_index >= len(boxes):
-        return float(cat_index)
-    ext = boxes[cat_index].get_path().get_extents()
-    return 0.5 * (ext.xmin + ext.xmax)
-
-
-def _boxplot_whisker_top(ax, cat_index):
-    if not ax.containers:
-        return None
-    whiskers = ax.containers[0].whiskers
-    if cat_index >= len(whiskers) // 2:
-        return None
-    return max(whiskers[2 * cat_index + 1].get_ydata())
-
-
-def annotate_region_pairwise_brackets(ax, areas, df_in, sub_col, *, bracket_step=2.5, alpha=0.05):
-    """Significant pairwise region LME brackets only (forces pooled), stacked by span."""
-    pair_stats = []
-    for i, j in combinations(range(len(areas)), 2):
-        r = lme_area_pair_pooled(df_in, sub_col, areas[i], areas[j])
-        if r is not None and r["p"] < alpha:
-            pair_stats.append((i, j, areas[i], areas[j], r))
-
-    tops = [
-        _boxplot_whisker_top(ax, k)
-        for k in range(len(areas))
-        if _boxplot_whisker_top(ax, k) is not None
-    ]
-    if not tops or not pair_stats:
-        return ax.get_ylim()[1]
-
-    y0 = max(tops) + 0.8
-    y_max = y0
-    for level, (i, j, _a1, _a2, r) in enumerate(
-        sorted(pair_stats, key=lambda t: (t[1] - t[0], t[0]))
-    ):
-        y_base = y0 + level * bracket_step
-        _add_sig_bracket(
-            ax,
-            _boxplot_x_center(ax, i),
-            _boxplot_x_center(ax, j),
-            y_base,
-            text=f"{_star_from_p(r['p'])} p={r['p']:.3f}",
-        )
-        y_max = max(y_max, y_base + 2.2)
-    return y_max
 
 
 def subject_mean_accuracy_long(df_in, sub_col, area_first, area_second):
@@ -342,54 +246,9 @@ def plot_accuracy_contrast_panel(ax, plot_df, lme_by_label, title):
             )
 
 
-def log_region_accuracy_txt(region_subj, areas, sub_col, out_path):
-    """Write per-region accuracy summary and per-subject means to a text file."""
-    lines = [
-        "Figure 4 — Subject mean accuracy by region",
-        "On-touch (Mid) | all forces aggregated",
-        "",
-        "=== Group summary (subject means, %) ===",
-        f"{'Region':<8} {'Mean':>8} {'SD':>8} {'SEM':>8} {'Median':>8} "
-        f"{'Min':>8} {'Max':>8} {'N':>4}",
-        "-" * 68,
-    ]
-    for area in areas:
-        vals = region_subj.loc[region_subj["Area"] == area, "accuracy"]
-        n = len(vals)
-        if n == 0:
-            lines.append(f"{area:<8} {'—':>8} {'—':>8} {'—':>8} {'—':>8} {'—':>8} {'—':>8} {0:>4}")
-            continue
-        mean = float(vals.mean())
-        sd = float(vals.std(ddof=1)) if n > 1 else 0.0
-        sem = sd / np.sqrt(n) if n > 1 else 0.0
-        lines.append(
-            f"{area:<8} {mean:8.3f} {sd:8.3f} {sem:8.3f} "
-            f"{float(vals.median()):8.3f} {float(vals.min()):8.3f} "
-            f"{float(vals.max()):8.3f} {n:4d}"
-        )
-
-    wide = region_subj.pivot(index=sub_col, columns="Area", values="accuracy")
-    wide = wide.reindex(columns=areas)
-    lines.extend(["", "=== Per-subject mean accuracy (%) ==="])
-    header = f"{'Subject':<12}" + "".join(f"{a:>10}" for a in areas)
-    lines.append(header)
-    lines.append("-" * len(header))
-    for subj, row in wide.sort_index().iterrows():
-        cells = "".join(
-            f"{row[a]:10.3f}" if pd.notna(row[a]) else f"{'—':>10}" for a in areas
-        )
-        lines.append(f"{str(subj):<12}{cells}")
-
-    text = "\n".join(lines) + "\n"
-    with open(out_path, "w", encoding="utf-8") as fh:
-        fh.write(text)
-    print(f"Saved: {out_path}")
-    print("\n  Region accuracy summary (subject means, %):")
-    for line in lines[4:11]:
-        print(f"  {line}")
-
-
+# =============================================================================
 # 1. 데이터 로드 및 전처리
+# =============================================================================
 file_pattern = "/Users/kyungeunjung/NailFoldExp/Data/(ATD)CurData/P*_AbsoluteThresholdDetection.csv"
 all_files = glob.glob(file_pattern)
 
@@ -423,6 +282,40 @@ else:
         return max(0, (1 - error_ratio) * 100)
 
     df["Relative_Score"] = df.apply(calc_relative_score, axis=1)
+
+    # ==========================================================================
+    # [Optional] Normalize by per-subject maximum score
+    # Each subject's scores are divided by their personal max × 100.
+    # Interpretation: "% of personal best" instead of absolute accuracy.
+    # Toggle: NORMALIZE_BY_MAX = True / False (top of script)
+    # ==========================================================================
+    if NORMALIZE_BY_MAX:
+        sub_max = (
+            df.groupby(sub_col)["Relative_Score"]
+            .transform("max")
+        )
+        # Guard against division by zero (subject with all-zero scores)
+        sub_max = sub_max.replace(0, np.nan)
+        df["Relative_Score_Raw"] = df["Relative_Score"].copy()
+        df["Relative_Score"] = (df["Relative_Score"] / sub_max * 100).clip(upper=100)
+        print(
+            "[Normalization ON] Relative_Score ← score / subject_max × 100\n"
+            "  80% line = 80% of each subject's personal best, not absolute 80%."
+        )
+    else:
+        df["Relative_Score_Raw"] = df["Relative_Score"].copy()
+        print("[Normalization OFF] Using raw Relative_Score.")
+
+    # Summary: per-subject max before/after
+    if NORMALIZE_BY_MAX:
+        diag = (
+            df.groupby(sub_col)[["Relative_Score_Raw", "Relative_Score"]]
+            .max()
+            .rename(columns={"Relative_Score_Raw": "max_raw", "Relative_Score": "max_norm"})
+        )
+        print("\nPer-subject max (raw → normalized):")
+        print(diag.to_string())
+        print()
 
     all_forces = sorted(df["Force_Val"].unique())
     plot_forces = [f for f in all_forces if f not in EXCLUDE_FORCES]
@@ -541,182 +434,33 @@ else:
         force_values=plot_forces,
     )
 
-    n_force_hm = len(plot_forces)
-    cbar_col_ratio = 0.07
-    fig2_w = n_force_hm * FIG2_PANEL_W + 0.45
-    fig2 = plt.figure(figsize=(fig2_w, FIG2_HEIGHT), facecolor="white")
-    gs = gridspec.GridSpec(
-        1,
-        n_force_hm + 1,
-        figure=fig2,
-        width_ratios=[1.0] * n_force_hm + [cbar_col_ratio],
-        wspace=0.14,
+    fig2, axes = plt.subplots(
+        1, len(plot_forces), figsize=FIG2_SIZE, facecolor="white"
     )
-    axes = [fig2.add_subplot(gs[0, i]) for i in range(n_force_hm)]
-    cax = fig2.add_subplot(gs[0, n_force_hm])
+    if len(plot_forces) == 1:
+        axes = [axes]
 
-    hm_mappable = None
+    norm_tag = " [normalized]" if NORMALIZE_BY_MAX else ""
     for i, f_val in enumerate(plot_forces):
-        hm = sns.heatmap(
+        sns.heatmap(
             all_p_matrices[f_val],
             annot=True,
             fmt=".3f",
-            annot_kws={"size": 7},
             cmap=ATD_CMAP,
             ax=axes[i],
             vmin=0,
             vmax=0.1,
-            square=True,
-            cbar=False,
-            linewidths=0.4,
-            linecolor="white",
         )
-        hm_mappable = hm.collections[0]
-        axes[i].set_aspect("equal", adjustable="box")
-        axes[i].set_title(f"{f_val:g} g", fontsize=10, fontweight="bold", pad=6)
-        axes[i].set_xlabel("Compared Area", fontsize=9)
-        if i == 0:
-            axes[i].set_ylabel("Reference Area", fontsize=9)
-        else:
-            axes[i].set_ylabel("")
-        axes[i].tick_params(labelsize=8)
+        axes[i].set_title(f"Force {f_val}g: Pairwise LME p-values{norm_tag}")
+        axes[i].set_xlabel("Compared Area")
+        axes[i].set_ylabel("Reference Area")
 
-    if hm_mappable is not None:
-        fig2.colorbar(
-            hm_mappable,
-            cax=cax,
-            label="p-value",
-        )
-        cax.tick_params(labelsize=8)
-        cax.yaxis.label.set_size(9)
-
-    fig2.subplots_adjust(left=0.06, right=0.96, top=0.90, bottom=0.14)
-    out_hm = os.path.join(FIG_DIR, "pairwise_lme_heatmap.png")
-    fig2.savefig(out_hm, dpi=SAVE_DPI, facecolor="white")
-    print(f"Saved: {out_hm}  ({fig2_w:.1f}×{FIG2_HEIGHT} in @ {SAVE_DPI} dpi)")
+    fig2.tight_layout()
+    suffix = "_norm" if NORMALIZE_BY_MAX else ""
+    out_hm = os.path.join(FIG_DIR, f"pairwise_lme_heatmap{suffix}.png")
+    fig2.savefig(out_hm, dpi=SAVE_DPI, bbox_inches="tight", facecolor="white")
+    print(f"Saved: {out_hm}  ({FIG2_SIZE[0]}×{FIG2_SIZE[1]} in @ {SAVE_DPI} dpi)")
     plt.close(fig2)
-
-    # --- Figure 4: All forces pooled — region-only pairwise LME + accuracy by region ---
-    p_matrix_pooled = build_pairwise_lme_p_matrix_pooled(
-        df_analysis, sub_col, areas
-    )
-
-    print(
-        "\n[Figure 4 — Force-pooled region LME | all forces aggregated, On-touch (Mid)]"
-    )
-    try:
-        area_main = smf.mixedlm(
-            "Relative_Score ~ C(Area)",
-            df_analysis,
-            groups=df_analysis[sub_col],
-        ).fit()
-        print("  Omnibus C(Area) (mixed model):")
-        for idx in area_main.pvalues.index:
-            if idx.startswith("C(Area)"):
-                print(f"    {idx}: p={area_main.pvalues[idx]:.4f}")
-    except Exception as exc:
-        print(f"  Omnibus Area LME failed: {exc}")
-
-    region_subj = (
-        df_analysis.groupby([sub_col, "Area"], as_index=False)["Relative_Score"]
-        .mean()
-        .rename(columns={"Relative_Score": "accuracy"})
-    )
-    out_acc_txt = os.path.join(FIG_DIR, "region_pairwise_pooled_forces_accuracy.txt")
-    log_region_accuracy_txt(region_subj, areas, sub_col, out_acc_txt)
-    region_pal = {a: AREA_PALETTE[a] for a in areas}
-
-    fig4 = plt.figure(figsize=FIG4_SIZE, facecolor="white")
-    gs4 = gridspec.GridSpec(
-        1, 2, figure=fig4, width_ratios=[1.0, 1.05], wspace=0.48
-    )
-    ax_hm4 = fig4.add_subplot(gs4[0, 0])
-    ax_bp4 = fig4.add_subplot(gs4[0, 1])
-
-    hm4 = sns.heatmap(
-        p_matrix_pooled,
-        annot=True,
-        fmt=".3f",
-        annot_kws={"size": 8},
-        cmap=ATD_CMAP,
-        ax=ax_hm4,
-        vmin=0,
-        vmax=0.1,
-        square=True,
-        cbar=False,
-        linewidths=0.4,
-        linecolor="white",
-    )
-    ax_hm4.set_aspect("equal", adjustable="box")
-    ax_hm4.set_title("All forces pooled", fontsize=10, fontweight="bold", pad=6)
-    ax_hm4.set_xlabel("Compared Area", fontsize=9)
-    ax_hm4.set_ylabel("Reference Area", fontsize=9)
-    ax_hm4.tick_params(labelsize=8)
-
-    cbar_div = make_axes_locatable(ax_hm4)
-    cax4 = cbar_div.append_axes("right", size="5%", pad=0.10)
-    cb4 = fig4.colorbar(hm4.collections[0], cax=cax4)
-    cb4.set_label("p-value", fontsize=9)
-    cax4.tick_params(labelsize=8)
-
-    sns.boxplot(
-        data=region_subj,
-        x="Area",
-        y="accuracy",
-        order=areas,
-        palette={k: v + BOX_ALPHA_HEX for k, v in region_pal.items()},
-        width=0.62,
-        fliersize=0,
-        linewidth=1.0,
-        ax=ax_bp4,
-    )
-    sns.stripplot(
-        data=region_subj,
-        x="Area",
-        y="accuracy",
-        order=areas,
-        palette=region_pal,
-        alpha=0.45,
-        size=4,
-        jitter=0.15,
-        ax=ax_bp4,
-        legend=False,
-    )
-    ax_bp4.axhline(80, color=WINE, linestyle="--", linewidth=1, alpha=0.55)
-    ax_bp4.set_title("Subject mean accuracy by region", fontsize=10, fontweight="bold", pad=6)
-    ax_bp4.set_xlabel("Region", fontsize=9)
-    ax_bp4.set_ylabel("Accuracy (relative score, %)", fontsize=9, labelpad=8)
-    ax_bp4.grid(axis="y", alpha=0.35)
-    ax_bp4.tick_params(labelsize=8)
-
-    print("  Pairwise region LME (forces pooled, trial-level):")
-    for a1, a2 in combinations(areas, 2):
-        r = lme_area_pair_pooled(df_analysis, sub_col, a1, a2)
-        if r is None:
-            print(f"    {a1} vs {a2}: LME failed")
-        else:
-            print(f"    {a1} vs {a2}: p={r['p']:.4f} ({_star_from_p(r['p'])})")
-
-    y_top_bp = annotate_region_pairwise_brackets(
-        ax_bp4, areas, df_analysis, sub_col, bracket_step=2.6
-    )
-    y_floor = 30
-    if (region_subj["accuracy"] < y_floor).any():
-        y_lo = max(-5, float(region_subj["accuracy"].min()) - 3)
-    else:
-        y_lo = y_floor
-    ax_bp4.set_ylim(y_lo, min(115, y_top_bp + 2))
-
-    fig4.suptitle(
-        "Region differences with all forces aggregated (On-touch Mid, trial-level LME)",
-        fontsize=11,
-        y=0.98,
-    )
-    fig4.subplots_adjust(left=0.08, right=0.97, top=0.86, bottom=0.14)
-    out_pooled = os.path.join(FIG_DIR, "region_pairwise_pooled_forces.png")
-    fig4.savefig(out_pooled, dpi=SAVE_DPI, facecolor="white")
-    print(f"Saved: {out_pooled}  ({FIG4_SIZE[0]}×{FIG4_SIZE[1]} in @ {SAVE_DPI} dpi)")
-    plt.close(fig4)
 
     # --- Figure 3: Lateral / proximal contrasts ---
     pairs_left = [("A", "C"), ("A", "D"), ("B", "C"), ("B", "D")]
@@ -740,7 +484,7 @@ else:
         1, 2, figsize=FIG3_SIZE, gridspec_kw={"wspace": 0.28}, facecolor="white"
     )
     fig3.suptitle(
-        "Lateral / proximal accuracy by region contrast (LME inference)",
+        f"Lateral / proximal accuracy by region contrast (LME inference){norm_tag}",
         fontsize=13,
         y=1.02,
     )
@@ -757,7 +501,7 @@ else:
         "E–C, E–D, F–C, F–D",
     )
     fig3.tight_layout()
-    out_lp = os.path.join(FIG_DIR, "lateral_proximal_accuracy.png")
+    out_lp = os.path.join(FIG_DIR, f"lateral_proximal_accuracy{suffix}.png")
     fig3.savefig(out_lp, dpi=SAVE_DPI, bbox_inches="tight", facecolor="white")
     print(f"Saved: {out_lp}  ({FIG3_SIZE[0]}×{FIG3_SIZE[1]} in @ {SAVE_DPI} dpi)")
     plt.close(fig3)

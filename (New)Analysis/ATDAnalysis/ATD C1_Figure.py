@@ -31,8 +31,9 @@ STRIP_ALPHA = 0.45
 BOX_ALPHA_HEX = "BE"   # ~75 % opacity appended to hex color
 
 # Fixed figure sizes (inches) and export resolution
-FIG_A_SIZE = (7.2, 4.0)
-FIG_B_SIZE = (18.0, 4.5)
+EXCLUDE_FORCES = set()              # empty = all forces in CSV; e.g. {0.07, 1.0, 1.4} to omit
+FIG_A_SIZE = (10.0, 4.0)
+FIG_B_SIZE = (18.0, 4.5)            # facet width scales with # force panels
 SAVE_DPI   = 200
 
 
@@ -121,7 +122,14 @@ df = df[df["Condition"] != "On-touch (Soft)"]
 df = df[df["Area"].isin(["A", "B", "C", "D", "E", "F"])].copy()
 
 df["Force_Val"] = df["Force"].str.extract(r"(\d+\.?\d*)").astype(float)
-force_order = sorted(df["Force_Val"].unique())
+all_forces = sorted(df["Force_Val"].unique())
+force_order = [f for f in all_forces if f not in EXCLUDE_FORCES]
+if not force_order:
+    raise ValueError(
+        f"No forces left for plotting after excluding {sorted(EXCLUDE_FORCES)}. "
+        f"Available: {all_forces}"
+    )
+print(f"Plot forces (g): {force_order}  |  excluded: {sorted(EXCLUDE_FORCES)}")
 
 
 def calc_relative_accuracy(row):
@@ -134,6 +142,7 @@ def calc_relative_accuracy(row):
 
 df["Relative_Score"] = df.apply(calc_relative_accuracy, axis=1)
 df["Region"] = df["Area"]
+df_plot = df[df["Force_Val"].isin(force_order)].copy()
 
 cond_list    = [c for c in COND_ORDER if c in df["Condition"].unique()]
 num_subjects = df["SubjectID"].nunique() if "SubjectID" in df.columns else len(all_files)
@@ -146,7 +155,7 @@ sns.set_theme(style="white")
 fig, ax = plt.subplots(figsize=FIG_A_SIZE)
 
 sns.boxplot(
-    data=df,
+    data=df_plot,
     x="Force_Val",
     y="Relative_Score",
     hue="Condition",
@@ -165,7 +174,7 @@ sns.boxplot(
 )
 
 sns.stripplot(
-    data=df,
+    data=df_plot,
     x="Force_Val",
     y="Relative_Score",
     hue="Condition",
@@ -209,8 +218,8 @@ print("분석 및 시각화 (Force × Condition) 완료.")
 # =============================================================================
 # 3. Figure B — Facet: Force × Region × Condition  (PNAS style)
 # =============================================================================
-force_order_facet = [0.07, 0.16, 0.6, 1.0, 1.4]
-region_order = sorted(df["Region"].unique())
+force_order_facet = force_order
+region_order = sorted(df_plot["Region"].unique())
 
 
 def get_star_label(p):
@@ -223,7 +232,7 @@ def get_star_label(p):
 significance_results = []
 for f in force_order_facet:
     for r in region_order:
-        sub_data = df[(df["Force_Val"] == f) & (df["Region"] == r)]
+        sub_data = df_plot[(df_plot["Force_Val"] == f) & (df_plot["Region"] == r)]
         if len(sub_data["Condition"].unique()) > 1:
             try:
                 model = smf.ols("Relative_Score ~ C(Condition)", data=sub_data).fit()
@@ -236,7 +245,7 @@ sns.set_theme(style="white")
 
 n_facet_cols = len(force_order_facet)
 g = sns.FacetGrid(
-    df,
+    df_plot,
     col="Force_Val",
     col_order=force_order_facet,
     height=FIG_B_SIZE[1],
@@ -302,8 +311,8 @@ for ax_i in g.axes.flat:
         if res:
             star = get_star_label(res["p_val"])
             if star:
-                y_max = df[
-                    (df["Force_Val"] == current_force) & (df["Region"] == r)
+                y_max = df_plot[
+                    (df_plot["Force_Val"] == current_force) & (df_plot["Region"] == r)
                 ]["Relative_Score"].max()
                 y_pos = y_max + 3 if y_max < 97 else 102
                 ax_i.text(i, y_pos, star, ha="center", va="bottom",
