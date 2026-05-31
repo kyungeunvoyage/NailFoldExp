@@ -1,0 +1,872 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Nail Precision Guide Tool</title>
+    <style>
+        :root {
+            --slate:   #56708A;
+            --olive:   #686F12;
+            --wine:    #7F212B;
+            --cream:   #EDE2D0;
+            --ink:     #1A1A1A;
+            --muted:   #6B7280;
+            --border:  #E5E7EB;
+            --surface: #FFFFFF;
+            --bg:      #F8F7F5;
+            --ruler:   #374151;
+        }
+
+        * { box-sizing: border-box; }
+
+        body {
+            font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
+            background: var(--bg);
+            color: var(--ink);
+            margin: 0;
+            padding: 0 72px;
+            min-height: 100vh;
+            -webkit-font-smoothing: antialiased;
+        }
+
+        .container {
+            background: var(--surface);
+            min-height: 100vh;
+            width: 100%;
+            max-width: 1180px;
+            margin: 0 auto;
+            display: flex;
+            flex-direction: column;
+            border-left: 1px solid var(--border);
+            border-right: 1px solid var(--border);
+        }
+
+        .header {
+            text-align: left;
+            margin-bottom: 20px;
+        }
+
+        h2 {
+            margin: 0 0 6px;
+            font-size: 1.15rem;
+            font-weight: 600;
+            letter-spacing: -0.01em;
+            color: var(--ink);
+        }
+
+        .subtitle {
+            margin: 0;
+            font-size: 0.82rem;
+            color: var(--muted);
+            font-weight: 400;
+        }
+
+        .main-layout {
+            display: flex;
+            flex: 1;
+            min-height: 100vh;
+        }
+
+        .sidebar {
+            flex: 0 0 50%;
+            width: 50%;
+            display: flex;
+            flex-direction: column;
+            align-items: flex-end;
+            justify-content: flex-start;
+            padding: 36px 48px 36px 28px;
+            border-right: 1px solid var(--border);
+            overflow-y: auto;
+        }
+
+        .sidebar-inner {
+            width: 100%;
+            max-width: 520px;
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+        }
+
+        .canvas-area {
+            flex: 0 0 50%;
+            width: 50%;
+            display: flex;
+            justify-content: flex-start;
+            align-items: center;
+            padding: 36px 28px 36px 48px;
+            background: #ECEAE6;
+            overflow: auto;
+        }
+
+        .canvas-area-inner {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            width: 100%;
+            max-width: 520px;
+        }
+
+        .status-bar {
+            background: var(--ink);
+            color: #F9FAFB;
+            padding: 10px 14px;
+            border-radius: 6px;
+            font-size: 0.8rem;
+            font-weight: 400;
+            letter-spacing: 0.01em;
+            line-height: 1.4;
+            text-align: left;
+        }
+
+        .controls {
+            display: flex;
+            flex-direction: column;
+            gap: 18px;
+            max-width: 520px;
+        }
+
+        .control-row {
+            display: flex;
+            gap: 20px;
+            align-items: flex-start;
+            border-top: 1px solid var(--border);
+            padding-top: 16px;
+        }
+
+        .control-group {
+            display: flex;
+            flex-direction: column;
+            gap: 7px;
+            flex: 1;
+            min-width: 0;
+            max-width: 240px;
+        }
+
+        .control-row .control-group + .control-group {
+            border-top: none;
+            padding-top: 0;
+            border-left: 1px solid var(--border);
+            padding-left: 20px;
+        }
+
+        .control-group-label {
+            font-size: 0.72rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.06em;
+            color: var(--muted);
+            margin-bottom: 2px;
+        }
+
+        .control-group + .control-group {
+            border-left: none;
+            padding-left: 0;
+            border-top: 1px solid var(--border);
+            padding-top: 16px;
+        }
+
+        .control-row .control-group {
+            border-top: none;
+            padding-top: 0;
+        }
+
+        .file-input-wrap {
+            position: relative;
+            display: block;
+            width: 100%;
+        }
+
+        .file-input-wrap input[type="file"] {
+            position: absolute;
+            inset: 0;
+            opacity: 0;
+            cursor: pointer;
+            width: 100%;
+        }
+
+        .file-label {
+            display: block;
+            width: 100%;
+            padding: 10px 14px;
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            background: var(--surface);
+            color: var(--ink);
+            font-size: 0.92rem;
+            font-weight: 500;
+            cursor: pointer;
+            transition: border-color 0.15s, background 0.15s;
+            text-align: left;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .file-label:hover {
+            border-color: var(--slate);
+            background: #F9FAFB;
+        }
+
+        button {
+            display: block;
+            width: 100%;
+            padding: 10px 14px;
+            border: 1px solid transparent;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 0.92rem;
+            font-weight: 500;
+            font-family: inherit;
+            transition: opacity 0.15s, transform 0.1s, box-shadow 0.15s;
+            letter-spacing: 0.01em;
+            text-align: left;
+        }
+
+        button:disabled {
+            opacity: 0.38;
+            cursor: not-allowed;
+            transform: none !important;
+        }
+
+        button:not(:disabled):hover {
+            opacity: 0.92;
+            transform: translateY(-1px);
+        }
+
+        .btn-u       { background: var(--cream);  color: var(--ink);   border-color: #D4C9B8; }
+        .btn-v       { background: var(--wine);   color: #fff; }
+        .btn-h       { background: var(--slate);  color: #fff; }
+        .btn-dipj    { background: var(--olive);  color: #fff; }
+        .btn-outline { background: #4B5563;       color: #fff; }
+        .btn-expand  { background: var(--slate);  color: #fff; border: 1px solid #455A6E; }
+        .btn-stim    { background: var(--wine);   color: #fff; }
+        .btn-final   { background: var(--ink);    color: #fff; }
+        .btn-reset   { background: transparent;  color: var(--muted); border-color: var(--border); }
+
+        .canvas-wrapper {
+            position: relative;
+            display: none;
+            padding-top: 30px;
+            padding-left: 30px;
+            background: var(--surface);
+            border-radius: 6px;
+            border: 1px solid var(--border);
+            box-shadow: 0 1px 4px rgba(0, 0, 0, 0.06);
+        }
+
+        .canvas-wrapper.visible {
+            display: inline-block;
+        }
+
+        .canvas-placeholder {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+            width: 100%;
+            max-width: 360px;
+            aspect-ratio: 3 / 4;
+            border: 2px dashed var(--border);
+            border-radius: 8px;
+            color: var(--muted);
+            font-size: 0.85rem;
+            text-align: center;
+            padding: 24px;
+        }
+
+        .canvas-placeholder.hidden {
+            display: none;
+        }
+
+        canvas {
+            border: 1px solid #D1D5DB;
+            cursor: crosshair;
+            display: block;
+            background-color: #fff;
+            max-width: 100%;
+            max-height: calc(100vh - 48px);
+            width: auto;
+            height: auto;
+        }
+
+        canvas.hidden {
+            display: none;
+        }
+
+        canvas:not(.hidden) {
+            display: block;
+        }
+
+        @media (max-width: 900px) {
+            body {
+                padding: 0 20px;
+            }
+
+            .container {
+                max-width: none;
+                border-left: none;
+                border-right: none;
+            }
+
+            .main-layout {
+                flex-direction: column;
+            }
+            .sidebar,
+            .canvas-area {
+                flex: none;
+                width: 100%;
+                align-items: center;
+                padding: 28px 24px;
+            }
+            .sidebar-inner,
+            .canvas-area-inner {
+                max-width: 520px;
+            }
+            .canvas-area {
+                min-height: 60vh;
+                justify-content: center;
+            }
+            .sidebar {
+                border-right: none;
+                border-bottom: 1px solid var(--border);
+            }
+            .control-row {
+                flex-direction: column;
+                gap: 18px;
+            }
+            .control-row .control-group {
+                max-width: 260px;
+            }
+            .control-row .control-group + .control-group {
+                border-left: none;
+                padding-left: 0;
+                border-top: 1px solid var(--border);
+                padding-top: 16px;
+            }
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <div class="main-layout">
+        <aside class="sidebar">
+            <div class="sidebar-inner">
+            <div class="header">
+                <h2>Nail &amp; Finger Stimulus Point Tool</h2>
+                <p class="subtitle">Periungual stimulus localization</p>
+            </div>
+
+            <div class="status-bar" id="status">Upload an image to begin.</div>
+
+            <div class="controls">
+                <div class="control-group">
+                    <span class="control-group-label">Image</span>
+                    <div class="file-input-wrap">
+                        <span class="file-label">Choose Image</span>
+                        <input type="file" id="upload" accept="image/*">
+                    </div>
+                </div>
+                <div class="control-row">
+                    <div class="control-group">
+                        <span class="control-group-label">Guide Setup</span>
+                        <button class="btn-u" onclick="setMode('u-curve')">0. U-Curve (V1–V5)</button>
+                        <button class="btn-v" onclick="setMode('vertical')">1. Vertical Guide</button>
+                        <button class="btn-h" onclick="setMode('horizontal')">2. Horizontal Guide</button>
+                        <button class="btn-dipj" onclick="setMode('dipj')">3. Set DIPJ</button>
+                        <button class="btn-outline" onclick="setMode('outline')">4. Finger Outline</button>
+                    </div>
+                    <div class="control-group">
+                        <span class="control-group-label">Output</span>
+                        <button class="btn-expand" id="expandBtn" onclick="expandUCurve()" disabled>7. Expand U-Curve</button>
+                        <button class="btn-stim" id="stimBtn" onclick="generateStimulusPoints()" disabled>Generate Points</button>
+                        <button class="btn-final" id="finalBtn" onclick="showFinalStimuli()" disabled>Final Stimuli</button>
+                        <button class="btn-reset" onclick="resetCanvas()">Reset</button>
+                    </div>
+                </div>
+            </div>
+            </div>
+        </aside>
+
+        <main class="canvas-area">
+            <div class="canvas-area-inner">
+            <div class="canvas-placeholder" id="placeholder">
+                <span>No image loaded</span>
+                <span style="font-size:0.75rem;">Choose an image from the left panel</span>
+            </div>
+            <div class="canvas-wrapper">
+                <canvas id="canvas" class="hidden"></canvas>
+            </div>
+            </div>
+        </main>
+    </div>
+</div>
+
+<script>
+    /* Publication palette (matches analysis figures) */
+    const COL = {
+        slate:  "#56708A",
+        olive:  "#686F12",
+        wine:   "#7F212B",
+        cream:  "#EDE2D0",
+        ink:    "#1A1A1A",
+        ruler:  "#374151",
+        white:  "#FFFFFF",
+    };
+
+    const canvas = document.getElementById('canvas');
+    const ctx = canvas.getContext('2d');
+    const status = document.getElementById('status');
+    const placeholder = document.getElementById('placeholder');
+    const canvasWrapper = document.querySelector('.canvas-wrapper');
+    const stimBtn = document.getElementById('stimBtn');
+    const expandBtn = document.getElementById('expandBtn');
+    const finalBtn = document.getElementById('finalBtn');
+    let img = new Image();
+    let mode = 'none';
+    let points = [];
+    let isStimulusGenerated = false;
+    let isCurveExpanded = false;
+    let isFinalView = false;
+
+    const RULER_SIZE = 30;
+    const IMAGE_SIZE = 400;
+
+    let guideLines = {
+        topY: null, midY: null, bottomY: null,
+        leftX: null, midX: null, rightX: null,
+        dipjY: null, outlines: [], uPoints: []
+    };
+
+    function setImageVisible(visible) {
+        placeholder.classList.toggle('hidden', visible);
+        canvas.classList.toggle('hidden', !visible);
+        canvasWrapper.classList.toggle('visible', visible);
+    }
+
+    function cropImageToSquare(dataUrl) {
+        return new Promise((resolve) => {
+            const raw = new Image();
+            raw.onload = () => {
+                const side = Math.min(raw.width, raw.height);
+                const sx = (raw.width - side) / 2;
+                const sy = (raw.height - side) / 2;
+
+                const offscreen = document.createElement('canvas');
+                offscreen.width = IMAGE_SIZE;
+                offscreen.height = IMAGE_SIZE;
+                const offCtx = offscreen.getContext('2d');
+                offCtx.drawImage(raw, sx, sy, side, side, 0, 0, IMAGE_SIZE, IMAGE_SIZE);
+
+                const cropped = new Image();
+                cropped.onload = () => resolve(cropped);
+                cropped.src = offscreen.toDataURL('image/png');
+            };
+            raw.src = dataUrl;
+        });
+    }
+
+    document.getElementById('upload').addEventListener('change', async (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+        document.querySelector('.file-label').textContent = file.name;
+        const reader = new FileReader();
+        reader.onload = async (event) => {
+            img = await cropImageToSquare(event.target.result);
+            canvas.width = IMAGE_SIZE + RULER_SIZE;
+            canvas.height = IMAGE_SIZE + RULER_SIZE;
+            setImageVisible(true);
+            drawEverything();
+            status.innerText = `Image loaded (center-cropped to ${IMAGE_SIZE} × ${IMAGE_SIZE} px)`;
+        };
+        reader.readAsDataURL(file);
+    });
+
+    function getBezierPoint(t, p0, p1, p2) {
+        const invT = 1 - t;
+        return {
+            x: invT * invT * p0.x + 2 * invT * t * p1.x + t * t * p2.x,
+            y: invT * invT * p0.y + 2 * invT * t * p1.y + t * t * p2.y
+        };
+    }
+
+    function drawRuler() {
+        ctx.fillStyle = COL.ruler;
+        ctx.font = "9px Helvetica, Arial, sans-serif";
+        ctx.strokeStyle = COL.ruler;
+        ctx.lineWidth = 0.75;
+
+        for (let x = 0; x <= img.width; x += 10) {
+            const posX = x + RULER_SIZE;
+            ctx.beginPath();
+            ctx.moveTo(posX, RULER_SIZE);
+            if (x % 100 === 0) {
+                ctx.lineTo(posX, 0);
+                ctx.fillText(x, posX + 2, 10);
+            } else if (x % 50 === 0) {
+                ctx.lineTo(posX, 10);
+            } else {
+                ctx.lineTo(posX, 20);
+            }
+            ctx.stroke();
+        }
+
+        for (let y = 0; y <= img.height; y += 10) {
+            const posY = y + RULER_SIZE;
+            ctx.beginPath();
+            ctx.moveTo(RULER_SIZE, posY);
+            if (y % 100 === 0) {
+                ctx.lineTo(0, posY);
+                ctx.save();
+                ctx.translate(10, posY + 2);
+                ctx.rotate(-Math.PI / 2);
+                ctx.fillText(y, 0, 0);
+                ctx.restore();
+            } else if (y % 50 === 0) {
+                ctx.lineTo(10, posY);
+            } else {
+                ctx.lineTo(20, posY);
+            }
+            ctx.stroke();
+        }
+    }
+
+    function drawEverything() {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        if (!img.src) return;
+
+        ctx.drawImage(img, RULER_SIZE, RULER_SIZE);
+        drawRuler();
+        renderAllGuides();
+
+        if (mode !== 'none') {
+            points.forEach((p, index) => {
+                ctx.fillStyle = COL.white;
+                ctx.beginPath();
+                ctx.arc(p.x + RULER_SIZE, p.y + RULER_SIZE, 3.5, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.strokeStyle = COL.ink;
+                ctx.lineWidth = 0.75;
+                ctx.stroke();
+
+                if (mode === 'u-curve') {
+                    ctx.fillStyle = COL.wine;
+                    ctx.font = "600 10px Helvetica, Arial, sans-serif";
+                    ctx.fillText(`V${index + 1}`, p.x + RULER_SIZE + 6, p.y + RULER_SIZE + 1);
+                }
+            });
+        }
+
+        if (isStimulusGenerated) {
+            renderStimulusPointsOnly();
+        }
+    }
+
+    canvas.onclick = (e) => {
+        if (mode === 'none' || !img.src) return;
+
+        const rect = canvas.getBoundingClientRect();
+        const rawX = (e.clientX - rect.left) * (canvas.width / rect.width);
+        const rawY = (e.clientY - rect.top) * (canvas.height / rect.height);
+        if (rawX < RULER_SIZE || rawY < RULER_SIZE) return;
+
+        const x = rawX - RULER_SIZE;
+        const y = rawY - RULER_SIZE;
+        points.push({ x, y });
+        drawEverything();
+
+        if (mode === 'u-curve' && points.length === 5) {
+            guideLines.uPoints = [...points];
+            finalizeSelection();
+        } else if (mode === 'dipj' && points.length === 1) {
+            guideLines.dipjY = points[0].y;
+            finalizeSelection();
+        } else if (points.length === 2 && mode !== 'u-curve') {
+            if (mode === 'vertical') {
+                guideLines.topY = Math.min(points[0].y, points[1].y);
+                guideLines.bottomY = Math.max(points[0].y, points[1].y);
+                guideLines.midY = (guideLines.topY + guideLines.bottomY) / 2;
+            } else if (mode === 'horizontal') {
+                guideLines.leftX = Math.min(points[0].x, points[1].x);
+                guideLines.rightX = Math.max(points[0].x, points[1].x);
+                guideLines.midX = (guideLines.leftX + guideLines.rightX) / 2;
+            } else if (mode === 'outline') {
+                guideLines.outlines = [
+                    Math.min(points[0].x, points[1].x),
+                    Math.max(points[0].x, points[1].x)
+                ];
+            }
+            finalizeSelection();
+        }
+    };
+
+    function finalizeSelection() {
+        drawEverything();
+        checkReady();
+        points = [];
+        mode = 'none';
+        isStimulusGenerated = false;
+        isFinalView = false;
+    }
+
+    function checkReady() {
+        if (
+            guideLines.topY !== null &&
+            guideLines.leftX !== null &&
+            guideLines.outlines.length === 2 &&
+            guideLines.dipjY !== null
+        ) {
+            stimBtn.disabled = false;
+        }
+        if (
+            guideLines.uPoints.length === 5 &&
+            guideLines.dipjY !== null &&
+            guideLines.outlines.length === 2
+        ) {
+            expandBtn.disabled = false;
+            finalBtn.disabled = false;
+        }
+    }
+
+    function drawHLine(y) {
+        ctx.beginPath();
+        ctx.moveTo(RULER_SIZE, y + RULER_SIZE);
+        ctx.lineTo(canvas.width, y + RULER_SIZE);
+        ctx.stroke();
+    }
+
+    function drawVLine(x) {
+        ctx.beginPath();
+        ctx.moveTo(x + RULER_SIZE, RULER_SIZE);
+        ctx.lineTo(x + RULER_SIZE, canvas.height);
+        ctx.stroke();
+    }
+
+    function drawStimulusPoint(x, y, label) {
+        const cx = x + RULER_SIZE;
+        const cy = y + RULER_SIZE;
+
+        ctx.fillStyle = COL.wine;
+        ctx.beginPath();
+        ctx.arc(cx, cy, 5, 0, Math.PI * 2);
+        ctx.fill();
+
+        ctx.strokeStyle = COL.white;
+        ctx.lineWidth = 1.5;
+        ctx.stroke();
+
+        ctx.fillStyle = COL.ink;
+        ctx.font = "600 11px Helvetica, Arial, sans-serif";
+        ctx.textAlign = "left";
+        ctx.textBaseline = "middle";
+        ctx.fillText(label, cx + 8, cy);
+    }
+
+    function setMode(newMode) {
+        if (!img.src) return;
+        mode = newMode;
+        points = [];
+        isStimulusGenerated = false;
+        isFinalView = false;
+        status.innerText = newMode === 'u-curve'
+            ? "Click V1 through V5 in order."
+            : "Click to set guide positions.";
+        drawEverything();
+    }
+
+    function renderAllGuides() {
+        if (isFinalView) return;
+
+        /* Initial U-curve */
+        if (guideLines.uPoints.length === 5) {
+            ctx.strokeStyle = COL.cream;
+            ctx.lineWidth = 2.5;
+            ctx.setLineDash([]);
+            ctx.beginPath();
+            const up = guideLines.uPoints;
+            ctx.moveTo(up[0].x + RULER_SIZE, up[0].y + RULER_SIZE);
+            for (let i = 0; i < up.length - 1; i++) {
+                const midX = (up[i].x + up[i + 1].x) / 2;
+                const midY = (up[i].y + up[i + 1].y) / 2;
+                ctx.quadraticCurveTo(
+                    up[i].x + RULER_SIZE, up[i].y + RULER_SIZE,
+                    midX + RULER_SIZE, midY + RULER_SIZE
+                );
+            }
+            ctx.lineTo(up[4].x + RULER_SIZE, up[4].y + RULER_SIZE);
+            ctx.stroke();
+
+            ctx.strokeStyle = COL.wine;
+            ctx.lineWidth = 1.5;
+            ctx.stroke();
+        }
+
+        /* Expanded U-curve */
+        if (isCurveExpanded || isStimulusGenerated) {
+            expandUCurve(true);
+        }
+
+        if (!isStimulusGenerated) {
+            if (guideLines.topY !== null) {
+                ctx.lineWidth = 2;
+                ctx.setLineDash([10, 7]);
+                ctx.strokeStyle = COL.wine;
+                drawHLine(guideLines.topY);
+                drawHLine(guideLines.bottomY);
+                ctx.setLineDash([]);
+                ctx.strokeStyle = COL.olive;
+                ctx.lineWidth = 1.5;
+                drawHLine(guideLines.midY);
+            }
+
+            if (guideLines.leftX !== null) {
+                ctx.lineWidth = 2;
+                ctx.setLineDash([10, 7]);
+                ctx.strokeStyle = COL.slate;
+                drawVLine(guideLines.leftX);
+                drawVLine(guideLines.rightX);
+                ctx.setLineDash([]);
+                ctx.strokeStyle = COL.olive;
+                ctx.lineWidth = 1.5;
+                drawVLine(guideLines.midX);
+            }
+
+            if (guideLines.dipjY !== null) {
+                ctx.lineWidth = 2;
+                ctx.setLineDash([]);
+                ctx.strokeStyle = COL.olive;
+                drawHLine(guideLines.dipjY);
+            }
+
+            if (guideLines.outlines.length === 2) {
+                ctx.lineWidth = 2;
+                ctx.setLineDash([]);
+                ctx.strokeStyle = "#4B5563";
+                guideLines.outlines.forEach(x => drawVLine(x));
+            }
+        }
+    }
+
+    function expandUCurve(onlyDraw = false) {
+        if (guideLines.uPoints.length < 5) return;
+        if (!onlyDraw) {
+            isCurveExpanded = true;
+            isFinalView = false;
+            isStimulusGenerated = false;
+        }
+
+        const up = guideLines.uPoints;
+        const leftLimitX = guideLines.outlines[0];
+        const rightLimitX = guideLines.outlines[1];
+        const dipjY = guideLines.dipjY !== null ? guideLines.dipjY : up[2].y + 50;
+        const bottomY = guideLines.bottomY !== null ? guideLines.bottomY : up[2].y;
+        const proximalLimitY = bottomY + (dipjY - bottomY) * 0.4;
+
+        const ext = up.map((p, index) => {
+            if (index === 2) return { x: p.x, y: proximalLimitY };
+            const newX = index < 2
+                ? leftLimitX + (p.x - up[0].x) * 0.5
+                : rightLimitX - (up[4].x - p.x) * 0.5;
+            const minY = Math.min(...up.map(pt => pt.y));
+            const maxY = Math.max(...up.map(pt => pt.y));
+            const ratioY = (p.y - minY) / (maxY - minY);
+            return { x: newX, y: minY + ratioY * (proximalLimitY - minY) };
+        });
+
+        ctx.strokeStyle = COL.white;
+        ctx.lineWidth = 3;
+        ctx.setLineDash([]);
+        ctx.beginPath();
+        ctx.moveTo(ext[0].x + RULER_SIZE, ext[0].y + RULER_SIZE);
+        for (let i = 0; i < ext.length - 1; i++) {
+            const midX = (ext[i].x + ext[i + 1].x) / 2;
+            const midY = (ext[i].y + ext[i + 1].y) / 2;
+            ctx.quadraticCurveTo(
+                ext[i].x + RULER_SIZE, ext[i].y + RULER_SIZE,
+                midX + RULER_SIZE, midY + RULER_SIZE
+            );
+        }
+        ctx.lineTo(ext[4].x + RULER_SIZE, ext[4].y + RULER_SIZE);
+        ctx.stroke();
+
+        ctx.strokeStyle = COL.slate;
+        ctx.lineWidth = 1.5;
+        ctx.stroke();
+
+        if (!onlyDraw) {
+            status.innerText = "U-curve expanded.";
+            drawEverything();
+        }
+        return ext;
+    }
+
+    function renderStimulusPointsOnly() {
+        const ext = expandUCurve(true);
+        const stimY_target = guideLines.midY;
+        const stimY_DE = guideLines.bottomY + (guideLines.dipjY - guideLines.bottomY) * 0.2;
+
+        const leftLatX = guideLines.outlines[0] + (guideLines.leftX - guideLines.outlines[0]) * 0.5;
+        const rightLatX = guideLines.outlines[1] - (guideLines.outlines[1] - guideLines.rightX) * 0.5;
+        const stimX_LInner = (guideLines.leftX + guideLines.midX) / 2;
+        const stimX_RInner = (guideLines.midX + guideLines.rightX) / 2;
+
+        const pointB = getBezierPoint(0.5, ext[0], ext[1], ext[2]);
+        const pointE = getBezierPoint(0.5, ext[2], ext[3], ext[4]);
+
+        const stimPoints = [
+            { label: 'a', x: leftLatX, y: stimY_target },
+            { label: 'b', x: pointB.x, y: pointB.y },
+            { label: 'c', x: stimX_LInner, y: stimY_DE },
+            { label: 'd', x: stimX_RInner, y: stimY_DE },
+            { label: 'e', x: pointE.x, y: pointE.y },
+            { label: 'f', x: rightLatX, y: stimY_target }
+        ];
+
+        stimPoints.forEach(p => drawStimulusPoint(p.x, p.y, p.label));
+    }
+
+    function generateStimulusPoints() {
+        if (guideLines.uPoints.length < 5) return;
+        isStimulusGenerated = true;
+        isFinalView = false;
+        drawEverything();
+        status.innerText = "Stimulus points generated (curve and points only).";
+    }
+
+    function showFinalStimuli() {
+        if (guideLines.uPoints.length < 5) return;
+        isFinalView = true;
+        isStimulusGenerated = false;
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        ctx.drawImage(img, RULER_SIZE, RULER_SIZE);
+        drawRuler();
+        renderStimulusPointsOnly();
+        status.innerText = "Final stimuli view — ready for export.";
+    }
+
+    function resetCanvas() {
+        guideLines = {
+            topY: null, midY: null, bottomY: null,
+            leftX: null, midX: null, rightX: null,
+            dipjY: null, outlines: [], uPoints: []
+        };
+        points = [];
+        isStimulusGenerated = false;
+        isCurveExpanded = false;
+        isFinalView = false;
+        img = new Image();
+        stimBtn.disabled = true;
+        expandBtn.disabled = true;
+        finalBtn.disabled = true;
+        document.querySelector('.file-label').textContent = "Choose Image";
+        document.getElementById('upload').value = "";
+        setImageVisible(false);
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        status.innerText = "Canvas reset. Upload an image to begin.";
+    }
+</script>
+
+</body>
+</html>
