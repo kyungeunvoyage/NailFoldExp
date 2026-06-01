@@ -19,18 +19,35 @@ Outputs (saved to OUTPUT_DIR):
   - fd_region_bar_per_pair.png            Grouped bars per pair
   - fd_region_violin_per_pair.png         Violin plot per pair
   - fd_region_heatmap_fixed.png           Heatmap with proper Weber ordering
+  - fd_region_pooled_by_region.png        All force pairs pooled, accuracy by region
   - fd_region_slope_subjects.png          Per-subject slope plot
   - fd_region_summary_fixed.csv           Summary table
+  - fd_region_pooled_summary.csv          Pooled (all pairs) summary by region
+  - fd_region_pooled_stats.txt            Omnibus + pairwise LME for pooled regions
 """
 
 import os
 import glob
 import warnings
+from itertools import combinations
+
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 import matplotlib.ticker as mtick
 import seaborn as sns
+import statsmodels.formula.api as smf
+
+from fd_export import (
+    BLACK,
+    FIG_SIZE,
+    HEATMAP_CMAP,
+    REGION_ORDER,
+    REGION_PALETTE,
+    SLATE_BLUE,
+    WINE,
+    save_figure_png,
+)
 
 warnings.filterwarnings("ignore")
 sns.set_theme(style="whitegrid")
@@ -40,11 +57,155 @@ sns.set_theme(style="whitegrid")
 # 1. Paths
 # ============================================================
 FILE_PATTERN = "/Users/kyungeunjung/NailFoldExp/Data/(FD)CurData/P*_ForceDiscrimination.csv"
-OUTPUT_DIR = "/Users/kyungeunjung/NailFoldExp/(New)Analysis/ForceDiscAnalysis"
+OUTPUT_DIR = "/Users/kyungeunjung/NailFoldExp/(New)Analysis/ForceDiscAnalysis/Output/FD_Region"
 os.makedirs(OUTPUT_DIR, exist_ok=True)
 
 CHANCE_LEVEL = 0.50
 JND_CRITERION = 0.75
+REF_LINE = WINE
+SIG_COLOR = WINE
+
+
+def _star_from_p(p):
+    if p < 0.001:
+        return "***"
+    if p < 0.01:
+        return "**"
+    if p < 0.05:
+        return "*"
+    return "n.s."
+
+
+def lme_region_pair_pooled(df_in, sub_col, ref_region, target_region):
+    """Trial-level region contrast with all force pairs pooled."""
+    sub = df_in[df_in["Region"].isin([ref_region, target_region])].copy()
+    sub = sub.dropna(subset=[sub_col, "IsCorrect", "Region"])
+    if len(sub) < 10 or sub[sub_col].nunique() < 2 or sub["Region"].nunique() < 2:
+        return None
+    formula = f"IsCorrect ~ C(Region, Treatment(reference='{ref_region}'))"
+    try:
+        res = smf.mixedlm(formula, sub, groups=sub[sub_col]).fit()
+        col = f"C(Region, Treatment(reference='{ref_region}'))[T.{target_region}]"
+        if col not in res.params.index:
+            return None
+        ci = res.conf_int().loc[col]
+        return {
+            "ref": ref_region,
+            "target": target_region,
+            "label": f"{target_region} − {ref_region}",
+            "coef": float(res.params[col]),
+            "ci_lo": float(ci[0]),
+            "ci_hi": float(ci[1]),
+            "p": float(res.pvalues[col]),
+        }
+    except Exception:
+        return None
+
+
+def run_region_pairwise_lme(df_in, sub_col, regions):
+    rows = []
+    for r1, r2 in combinations(regions, 2):
+        result = lme_region_pair_pooled(df_in, sub_col, r1, r2)
+        if result is None:
+            rows.append({
+                "region_a": r1,
+                "region_b": r2,
+                "contrast": f"{r2} − {r1}",
+                "coef": np.nan,
+                "ci_lo": np.nan,
+                "ci_hi": np.nan,
+                "p": np.nan,
+                "sig": "LME failed",
+            })
+        else:
+            rows.append({
+                "region_a": r1,
+                "region_b": r2,
+                "contrast": result["label"],
+                "coef": result["coef"],
+                "ci_lo": result["ci_lo"],
+                "ci_hi": result["ci_hi"],
+                "p": result["p"],
+                "sig": _star_from_p(result["p"]),
+            })
+    return pd.DataFrame(rows)
+
+
+def _add_sig_bracket(ax, x_l, x_r, y_base, tick_h=0.018, text="", fontsize=7.5):
+    x_center = (x_l + x_r) / 2.0
+    y_top = y_base + tick_h
+    ax.plot(
+        [x_l, x_l, x_r, x_r],
+        [y_base, y_top, y_top, y_base],
+        color=SIG_COLOR,
+        linewidth=0.9,
+        clip_on=False,
+        zorder=5,
+    )
+    ax.text(
+        x_center,
+        y_top + 0.008,
+        text,
+        ha="center",
+        va="bottom",
+        fontsize=fontsize,
+        color=SIG_COLOR,
+        fontweight="bold",
+        clip_on=False,
+        zorder=6,
+    )
+
+
+def _boxplot_x_center(ax, cat_index):
+    if not ax.containers:
+        return float(cat_index)
+    boxes = ax.containers[0].boxes
+    if cat_index >= len(boxes):
+        return float(cat_index)
+    ext = boxes[cat_index].get_path().get_extents()
+    return 0.5 * (ext.xmin + ext.xmax)
+
+
+def _boxplot_whisker_top(ax, cat_index):
+    if not ax.containers:
+        return None
+    whiskers = ax.containers[0].whiskers
+    if cat_index >= len(whiskers) // 2:
+        return None
+    return max(whiskers[2 * cat_index + 1].get_ydata())
+
+
+def annotate_region_pairwise_brackets(ax, regions, df_in, sub_col, *, bracket_step=0.045, alpha=0.05):
+    """Significant pairwise region LME brackets only (all force pairs pooled)."""
+    pair_stats = []
+    for i, j in combinations(range(len(regions)), 2):
+        r = lme_region_pair_pooled(df_in, sub_col, regions[i], regions[j])
+        if r is not None and r["p"] < alpha:
+            pair_stats.append((i, j, regions[i], regions[j], r))
+
+    tops = [
+        _boxplot_whisker_top(ax, k)
+        for k in range(len(regions))
+        if _boxplot_whisker_top(ax, k) is not None
+    ]
+    if not tops or not pair_stats:
+        return ax.get_ylim()[1]
+
+    y0 = max(tops) + 0.04
+    y_max = y0
+    for level, (i, j, _r1, _r2, r) in enumerate(
+        sorted(pair_stats, key=lambda t: (t[1] - t[0], t[0]))
+    ):
+        y_base = y0 + level * bracket_step
+        _add_sig_bracket(
+            ax,
+            _boxplot_x_center(ax, i),
+            _boxplot_x_center(ax, j),
+            y_base,
+            text=f"{_star_from_p(r['p'])} p={r['p']:.3f}",
+        )
+        y_max = max(y_max, y_base + 0.06)
+    return y_max
 
 
 # ============================================================
@@ -113,40 +274,37 @@ grp_summary.to_csv(os.path.join(OUTPUT_DIR, "fd_region_summary_fixed.csv"), inde
 
 
 # ============================================================
-# 4. Canonical ordering by Weber ratio (within band)
+# 4. Canonical ordering by comparison force (f_lo, then f_hi)
 # ============================================================
-pair_order_low = (
-    grp_summary[grp_summary["Band"] == "Low (ref=1g)"]
-    .drop_duplicates("ForcePair")
-    .sort_values("WeberRatio")["ForcePair"]
-    .tolist()
-)
-pair_order_high = (
-    grp_summary[grp_summary["Band"] == "High (ref=26g)"]
-    .drop_duplicates("ForcePair")
-    .sort_values("WeberRatio")["ForcePair"]
-    .tolist()
-)
+def _pair_sort_key(force_pair):
+    lo, hi = force_pair.split("--")
+    return (float(lo), float(hi))
+
+
+def _ordered_pairs(band_name):
+    pairs = (
+        grp_summary[grp_summary["Band"] == band_name]
+        .drop_duplicates("ForcePair")["ForcePair"]
+        .tolist()
+    )
+    return sorted(pairs, key=_pair_sort_key)
+
+
+pair_order_low = _ordered_pairs("Low (ref=1g)")
+pair_order_high = _ordered_pairs("High (ref=26g)")
 pair_order_all = pair_order_low + pair_order_high
 
 print(f"\n[2] Pair order (Low band): {pair_order_low}")
 print(f"    Pair order (High band): {pair_order_high}")
 
-region_order = ["A", "B", "C", "D", "E", "F"]
-region_palette = {
-    "A": "#e74c3c",
-    "B": "#e67e22",
-    "C": "#27ae60",
-    "D": "#16a085",
-    "E": "#3498db",
-    "F": "#9b59b6",
-}
+region_order = REGION_ORDER
+region_palette = REGION_PALETTE
 
 
 # ============================================================
 # Visualization 1 — Line plot: psychometric curves per region
 # ============================================================
-fig, axes = plt.subplots(1, 2, figsize=(14, 5.5), sharey=True)
+fig, axes = plt.subplots(1, 2, figsize=FIG_SIZE, sharey=True)
 
 for ax, (band_name, pair_order) in zip(
     axes,
@@ -168,8 +326,8 @@ for ax, (band_name, pair_order) in zip(
             color=region_palette[region],
             label=region,
         )
-    ax.axhline(JND_CRITERION, color="red", ls="--", lw=1.5, alpha=0.7)
-    ax.axhline(CHANCE_LEVEL, color="gray", ls=":", lw=1.2, alpha=0.7)
+    ax.axhline(JND_CRITERION, color=REF_LINE, ls="--", lw=1.5, alpha=0.85)
+    ax.axhline(CHANCE_LEVEL, color=BLACK, ls=":", lw=1.2, alpha=0.55)
     ax.set_xlabel(r"Weber ratio $|\Delta F|/F_{\mathrm{ref}}$", fontsize=12)
     ax.set_ylabel("Mean accuracy" if band_name.startswith("Low") else "")
     ax.set_title(band_name, fontsize=13)
@@ -182,7 +340,7 @@ for ax, (band_name, pair_order) in zip(
 fig.suptitle("Psychometric curves per region (mean ± SEM)", fontsize=14, y=1.02)
 plt.tight_layout()
 out1 = os.path.join(OUTPUT_DIR, "fd_region_lineplot_by_weber.png")
-plt.savefig(out1, dpi=200, bbox_inches="tight")
+save_figure_png(fig, out1)
 plt.close()
 print(f"\n[3] Saved {out1}")
 
@@ -190,7 +348,7 @@ print(f"\n[3] Saved {out1}")
 # ============================================================
 # Visualization 2 — Bar plot: grouped bars per pair
 # ============================================================
-fig, ax = plt.subplots(figsize=(15, 6))
+fig, ax = plt.subplots(figsize=FIG_SIZE)
 
 # Need to compute mean per (Region, ForcePair) and add error bars
 plot_data = grp_summary.copy()
@@ -212,27 +370,27 @@ for i, region in enumerate(region_order):
         bar_width,
         yerr=rdata["sem_acc"],
         color=region_palette[region],
-        edgecolor="black",
+        edgecolor=BLACK,
         linewidth=0.5,
         capsize=2,
         label=region,
     )
 
-ax.axhline(JND_CRITERION, color="red", ls="--", lw=2, alpha=0.7,
+ax.axhline(JND_CRITERION, color=REF_LINE, ls="--", lw=2, alpha=0.85,
            label=f"{int(JND_CRITERION*100)}% criterion")
-ax.axhline(CHANCE_LEVEL, color="gray", ls=":", lw=1.5, alpha=0.7, label="Chance (50%)")
+ax.axhline(CHANCE_LEVEL, color=BLACK, ls=":", lw=1.5, alpha=0.55, label="Chance (50%)")
 
 # Band separator
 boundary = len(pair_order_low) - 0.5
-ax.axvline(boundary, color="black", lw=2.5)
+ax.axvline(boundary, color=BLACK, lw=2.5)
 ax.text((len(pair_order_low) - 1) / 2, 1.08, "Low band (ref=1g)",
-         ha="center", fontsize=12, fontweight="bold")
+         ha="center", fontsize=15, fontweight="bold")
 ax.text(len(pair_order_low) + (len(pair_order_high) - 1) / 2, 1.08,
-         "High band (ref=26g)", ha="center", fontsize=12, fontweight="bold")
+         "High band (ref=26g)", ha="center", fontsize=15, fontweight="bold")
 
 ax.set_xticks(x_centers)
 ax.set_xticklabels(pair_order_all)
-ax.set_xlabel("Force pair (ordered by Weber ratio within band)", fontsize=12)
+ax.set_xlabel("Force pair (ordered by comparison force, ascending)", fontsize=12)
 ax.set_ylabel("Mean accuracy", fontsize=12)
 ax.set_title("Force discrimination accuracy by Region × ForcePair (grouped bars)",
               fontsize=13, pad=20)
@@ -242,7 +400,7 @@ ax.legend(title="Region", bbox_to_anchor=(1.02, 1), loc="upper left", fontsize=1
 ax.grid(axis="y", alpha=0.3)
 plt.tight_layout()
 out2 = os.path.join(OUTPUT_DIR, "fd_region_bar_per_pair.png")
-plt.savefig(out2, dpi=200, bbox_inches="tight")
+save_figure_png(fig, out2)
 plt.close()
 print(f"[4] Saved {out2}")
 
@@ -250,7 +408,7 @@ print(f"[4] Saved {out2}")
 # ============================================================
 # Visualization 3 — Violin plot per pair (distribution shape)
 # ============================================================
-fig, ax = plt.subplots(figsize=(16, 7))
+fig, ax = plt.subplots(figsize=FIG_SIZE)
 
 sns.violinplot(
     data=subj_acc,
@@ -266,11 +424,11 @@ sns.violinplot(
     ax=ax,
 )
 
-ax.axhline(JND_CRITERION, color="red", ls="--", lw=2, alpha=0.7)
-ax.axhline(CHANCE_LEVEL, color="gray", ls=":", lw=1.5, alpha=0.7)
+ax.axhline(JND_CRITERION, color=REF_LINE, ls="--", lw=2, alpha=0.85)
+ax.axhline(CHANCE_LEVEL, color=BLACK, ls=":", lw=1.5, alpha=0.55)
 
 boundary = len(pair_order_low) - 0.5
-ax.axvline(boundary, color="black", lw=2.5)
+ax.axvline(boundary, color=BLACK, lw=2.5)
 
 ax.set_xlabel("Force pair", fontsize=12)
 ax.set_ylabel("Accuracy (per subject)", fontsize=12)
@@ -281,7 +439,7 @@ ax.legend(title="Region", bbox_to_anchor=(1.02, 1), loc="upper left", fontsize=1
 ax.grid(axis="y", alpha=0.3)
 plt.tight_layout()
 out3 = os.path.join(OUTPUT_DIR, "fd_region_violin_per_pair.png")
-plt.savefig(out3, dpi=200, bbox_inches="tight")
+save_figure_png(fig, out3)
 plt.close()
 print(f"[5] Saved {out3}")
 
@@ -295,15 +453,14 @@ heatmap_data = (
     .reindex(columns=pair_order_all)
 )
 
-fig, ax = plt.subplots(figsize=(13, 5.5))
+fig, ax = plt.subplots(figsize=FIG_SIZE)
 sns.heatmap(
     heatmap_data,
     annot=True,
     fmt=".2f",
-    cmap="RdYlGn",
+    cmap=HEATMAP_CMAP,
     vmin=0,
     vmax=1,
-    center=0.5,
     cbar_kws={"label": "Mean accuracy"},
     linewidths=0.6,
     linecolor="white",
@@ -312,7 +469,7 @@ sns.heatmap(
 
 # Band boundary
 boundary = len(pair_order_low)
-ax.axvline(boundary, color="black", lw=3)
+ax.axvline(boundary, color=BLACK, lw=3)
 
 # Band labels above heatmap
 ax.text(boundary / 2, -0.6, "Low band (ref=1g)",
@@ -327,24 +484,170 @@ for p in pair_order_all:
     xtick_labels.append(f"{p}\n(WR={wr:.2f})")
 ax.set_xticklabels(xtick_labels, rotation=0, fontsize=10)
 
-ax.set_xlabel("Force pair (ordered by Weber ratio within band)", fontsize=12)
+ax.set_xlabel("Force pair (ordered by comparison force, ascending)", fontsize=12)
 ax.set_ylabel("Region", fontsize=12)
-ax.set_title("Mean accuracy heatmap: Region × ForcePair (Weber-ratio ordered)",
-              fontsize=13, pad=25)
+# ax.set_title("Mean accuracy heatmap: Region × ForcePair (Weber-ratio ordered)",
+#               fontsize=13, pad=25)
 plt.tight_layout()
 out4 = os.path.join(OUTPUT_DIR, "fd_region_heatmap_fixed.png")
-plt.savefig(out4, dpi=200, bbox_inches="tight")
+save_figure_png(fig, out4)
 plt.close()
 print(f"[6] Saved {out4}")
 
 
 # ============================================================
-# Visualization 5 — Per-subject slope plots (paired)
+# Visualization 5 — All force pairs pooled: accuracy by region
+# ============================================================
+subj_region_pooled = (
+    df.groupby([sub_col, "Region"])["IsCorrect"]
+    .mean()
+    .reset_index()
+    .rename(columns={"IsCorrect": "accuracy"})
+)
+
+region_pooled_summary = (
+    subj_region_pooled.groupby("Region")
+    .agg(
+        mean_acc=("accuracy", "mean"),
+        sem_acc=("accuracy", lambda x: x.std(ddof=1) / np.sqrt(len(x))),
+        n_subj=("accuracy", "count"),
+    )
+    .reset_index()
+    .set_index("Region")
+    .reindex(region_order)
+    .reset_index()
+)
+region_pooled_summary.to_csv(
+    os.path.join(OUTPUT_DIR, "fd_region_pooled_summary.csv"), index=False
+)
+
+print("\n[Pooled region LME | all force pairs aggregated, trial-level, RE=Subject]")
+pairwise_lme = run_region_pairwise_lme(df, sub_col, region_order)
+pairwise_lme.to_csv(
+    os.path.join(OUTPUT_DIR, "fd_region_pooled_pairwise_lme.csv"), index=False
+)
+
+stat_lines = [
+    "Force Discrimination — Pooled region LME",
+    "All force pairs aggregated | trial-level IsCorrect ~ C(Region) | RE=Subject",
+    "",
+]
+try:
+    omnibus = smf.mixedlm(
+        "IsCorrect ~ C(Region)",
+        df,
+        groups=df[sub_col],
+    ).fit()
+    stat_lines.append("Omnibus C(Region):")
+    for idx in omnibus.pvalues.index:
+        if idx.startswith("C(Region)"):
+            stat_lines.append(f"  {idx}: p={omnibus.pvalues[idx]:.4f}")
+except Exception as exc:
+    stat_lines.append(f"Omnibus C(Region) failed: {exc}")
+
+stat_lines.extend(["", "Pairwise region contrasts (p < 0.05 marked *):"])
+for _, row in pairwise_lme.iterrows():
+    if np.isnan(row["p"]):
+        stat_lines.append(f"  {row['region_a']} vs {row['region_b']}: LME failed")
+    else:
+        stat_lines.append(
+            f"  {row['region_a']} vs {row['region_b']}: "
+            f"Δ={row['coef']:.3f} [{row['ci_lo']:.3f}, {row['ci_hi']:.3f}], "
+            f"p={row['p']:.4f} ({row['sig']})"
+        )
+
+stats_txt = os.path.join(OUTPUT_DIR, "fd_region_pooled_stats.txt")
+with open(stats_txt, "w", encoding="utf-8") as fh:
+    fh.write("\n".join(stat_lines) + "\n")
+
+for line in stat_lines:
+    print(line)
+
+fig, ax = plt.subplots(figsize=FIG_SIZE)
+box_palette = {r: region_palette[r] for r in region_order}
+
+sns.boxplot(
+    data=subj_region_pooled,
+    x="Region",
+    y="accuracy",
+    order=region_order,
+    palette=box_palette,
+    width=0.55,
+    fliersize=0,
+    linewidth=1.0,
+    boxprops=dict(alpha=0.35, edgecolor=BLACK),
+    whiskerprops=dict(color=BLACK, linewidth=0.8),
+    capprops=dict(color=BLACK, linewidth=0.8),
+    medianprops=dict(color=BLACK, linewidth=1.5),
+    ax=ax,
+)
+sns.stripplot(
+    data=subj_region_pooled,
+    x="Region",
+    y="accuracy",
+    order=region_order,
+    palette=box_palette,
+    alpha=0.55,
+    size=5,
+    jitter=0.18,
+    linewidth=0,
+    ax=ax,
+)
+
+for i, row in region_pooled_summary.iterrows():
+    ax.text(
+        i,
+        min(row["mean_acc"] + row["sem_acc"] + 0.04, 1.02),
+        f"{row['mean_acc']:.0%}",
+        ha="center",
+        va="bottom",
+        fontsize=9,
+        fontweight="bold",
+    )
+
+ax.axhline(JND_CRITERION, color=REF_LINE, ls="--", lw=1.5, alpha=0.85,
+           label=f"{int(JND_CRITERION*100)}% criterion")
+ax.axhline(CHANCE_LEVEL, color=BLACK, ls=":", lw=1.2, alpha=0.55, label="Chance (50%)")
+
+y_top_bp = annotate_region_pairwise_brackets(
+    ax, region_order, df, sub_col, bracket_step=0.045
+)
+y_floor = 0.0
+if (subj_region_pooled["accuracy"] < 0.15).any():
+    y_floor = max(-0.05, float(subj_region_pooled["accuracy"].min()) - 0.05)
+ax.set_ylim(y_floor, min(1.18, y_top_bp + 0.04))
+
+ax.set_xlabel("Region", fontsize=12)
+ax.set_ylabel("Mean accuracy (all force pairs pooled)", fontsize=12)
+ax.set_title(
+    "Force discrimination accuracy by region\n"
+    "(all force pairs aggregated; brackets = significant pairwise LME, p < 0.05)",
+    fontsize=13,
+)
+ax.yaxis.set_major_formatter(mtick.PercentFormatter(1.0))
+ax.legend(loc="lower right", fontsize=9)
+ax.grid(axis="y", alpha=0.3)
+plt.tight_layout()
+out_pooled = os.path.join(OUTPUT_DIR, "fd_region_pooled_by_region.png")
+save_figure_png(fig, out_pooled)
+plt.close()
+print(f"\n[7] Saved {out_pooled}")
+print(f"    Saved {stats_txt}")
+print(f"    Saved {os.path.join(OUTPUT_DIR, 'fd_region_pooled_pairwise_lme.csv')}")
+print("    Pooled summary by region:")
+print(region_pooled_summary.to_string(index=False, formatters={
+    "mean_acc": "{:.3f}".format,
+    "sem_acc": "{:.3f}".format,
+}))
+
+
+# ============================================================
+# Visualization 6 — Per-subject slope plots (paired)
 # ============================================================
 # Show whether individual subjects are consistent across regions
 # Use 2 representative pairs: one sub-chance + one above-criterion
 
-fig, axes = plt.subplots(2, 2, figsize=(14, 9), sharey=True)
+fig, axes = plt.subplots(2, 2, figsize=FIG_SIZE, sharey=True)
 axes_flat = axes.flatten()
 
 # Pick representative pairs from each band, one sub-chance and one above
@@ -368,8 +671,8 @@ for ax, (pair, title) in zip(axes_flat, representative_pairs):
             gr_sorted["Region"],
             gr_sorted["accuracy"],
             "-o",
-            color="gray",
-            alpha=0.4,
+            color=SLATE_BLUE,
+            alpha=0.35,
             ms=4,
             lw=0.8,
         )
@@ -382,14 +685,14 @@ for ax, (pair, title) in zip(axes_flat, representative_pairs):
         mean_by_region.index,
         mean_by_region.values,
         "-s",
-        color="red",
+        color=WINE,
         lw=2.5,
         ms=10,
         label="Mean across subjects",
     )
 
-    ax.axhline(JND_CRITERION, color="red", ls="--", lw=1, alpha=0.6)
-    ax.axhline(CHANCE_LEVEL, color="gray", ls=":", lw=1, alpha=0.6)
+    ax.axhline(JND_CRITERION, color=REF_LINE, ls="--", lw=1, alpha=0.75)
+    ax.axhline(CHANCE_LEVEL, color=BLACK, ls=":", lw=1, alpha=0.55)
     ax.set_title(f"{pair}\n{title}", fontsize=11)
     ax.set_ylim(-0.05, 1.10)
     ax.set_xlabel("Region")
@@ -402,9 +705,9 @@ fig.suptitle("Per-subject accuracy across regions (representative pairs)",
               fontsize=14, y=1.00)
 plt.tight_layout()
 out5 = os.path.join(OUTPUT_DIR, "fd_region_slope_subjects.png")
-plt.savefig(out5, dpi=200, bbox_inches="tight")
+save_figure_png(fig, out5)
 plt.close()
-print(f"[7] Saved {out5}")
+print(f"[8] Saved {out5}")
 
 
 # ============================================================

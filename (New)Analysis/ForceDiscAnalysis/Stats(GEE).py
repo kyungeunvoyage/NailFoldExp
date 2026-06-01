@@ -1,11 +1,10 @@
 """
 Force Discrimination – GEE Pairwise Statistics Box Plot
 =========================================================
-Creates two-subplot figure (Low band / High band) with:
+Creates horizontal (Low | High) and vertical (Low above High) figures with:
   - Box plots per force pair, individual subject dots (jittered)
-  - Red diamond = mean accuracy
   - JND criterion line at 0.75
-  - Significance brackets from GEE pairwise contrasts
+  - Significance brackets from GEE pairwise contrasts (p < 0.05 only)
 
 Column assumptions
 ------------------
@@ -49,10 +48,10 @@ COLOR_ABOVE_JND = OLIVE       # accuracy ≥ 0.75
 COLOR_MID       = SLATE_BLUE  # 0.50–0.75
 COLOR_REVERSAL  = WINE        # accuracy < 0.50
 COLOR_SPECIAL   = CREAM       # 1–2 g pair
-COLOR_MEAN      = WINE
 
-FIG_SIZE = (12.0, 12.0)
-SAVE_DPI = 200
+from fd_export import FIG_SIZE, SAVE_DPI, save_figure_png
+
+BRACKET_ALPHA = 0.05
 
 # ── Stat backend selection ────────────────────────────────────────────────────
 USE_GEE = False
@@ -87,22 +86,25 @@ rcParams.update({
     "xtick.direction":       "out",
     "ytick.direction":       "out",
     "legend.frameon":        False,
-    "legend.fontsize":       8,
-    "legend.title_fontsize": 8,
-    "font.size":             9,
-    "axes.titlesize":        10,
-    "axes.labelsize":        9,
+    "legend.fontsize":       15,
+    "legend.title_fontsize": 15,
+    "font.size":             10,
+    "axes.titlesize":        12,
+    "axes.labelsize":        11,
+    "xtick.labelsize":       11,
+    "ytick.labelsize":       11,
     "axes.grid":             True,
     "axes.grid.axis":        "y",
     "grid.alpha":            0.35,
     "grid.linestyle":        "--",
     "grid.color":            SLATE_BLUE,
-    "figure.dpi":            150,
+    "figure.dpi":            SAVE_DPI,
+    "savefig.dpi":           SAVE_DPI,
 })
 
 # ── 1. Paths ──────────────────────────────────────────────────────────────────
 FILE_PATTERN = "/Users/kyungeunjung/NailFoldExp/Data/(FD)CurData/P*_ForceDiscrimination.csv"
-OUTPUT_DIR   = "/Users/kyungeunjung/NailFoldExp/(New)Analysis/ForceDiscAnalysis"
+OUTPUT_DIR   = "/Users/kyungeunjung/NailFoldExp/(New)Analysis/ForceDiscAnalysis/Output/Stats(GEE)"
 os.makedirs(OUTPUT_DIR, exist_ok=True)
 
 # ── 2. Load data ──────────────────────────────────────────────────────────────
@@ -269,21 +271,141 @@ def jitter(n, width=0.18, seed=42):
 # ── 8. Significance label ─────────────────────────────────────────────────────
 def pval_label(p):
     if np.isnan(p):
-        return "n.s."
+        return ""
     if p < 0.001:
-        return "p<0.001"
+        return "***"
+    if p < 0.01:
+        return "**"
     if p < 0.05:
-        return f"p={p:.3f}"
-    return "n.s."   # non-significant: show as n.s. to reduce clutter
+        return "*"
+    return ""
+
+
+# ── Export plot data for paper ────────────────────────────────────────────────
+def _band_summary(band_label, order):
+    sub = subj_acc[subj_acc["band"] == band_label]
+    rows = []
+    for pair in order:
+        vals = sub.loc[sub["pair_label"] == pair, "accuracy"].values
+        if len(vals) == 0:
+            continue
+        rows.append({
+            "band": band_label,
+            "force_pair_g": pair,
+            "n_subjects": len(vals),
+            "mean_accuracy": np.mean(vals),
+            "sem": np.std(vals, ddof=1) / np.sqrt(len(vals)) if len(vals) > 1 else np.nan,
+            "sd": np.std(vals, ddof=1) if len(vals) > 1 else np.nan,
+            "median": np.median(vals),
+            "min": np.min(vals),
+            "max": np.max(vals),
+        })
+    return rows
+
+
+def _pairwise_rows(band_label, order, pvals_dict):
+    rows = []
+    for p1, p2 in itertools.combinations(order, 2):
+        pval = pvals_dict.get((p1, p2), pvals_dict.get((p2, p1), np.nan))
+        rows.append({
+            "band": band_label,
+            "pair_a": p1,
+            "pair_b": p2,
+            "p_value": pval,
+            "significant_p05": (not np.isnan(pval)) and pval < BRACKET_ALPHA,
+            "sig_label": pval_label(pval),
+        })
+    return rows
+
+
+def export_plot_data_txt(path):
+    stat_method = (
+        "GEE (binomial, subject-clustered trials)"
+        if USE_GEE else
+        "Wilcoxon signed-rank (per-subject means)" if USE_WILCOXON else
+        "Permutation test (per-subject means)"
+    )
+    n_subj = subj_acc["Subject"].nunique()
+    summaries = _band_summary("Low", low_order) + _band_summary("High", high_order)
+    pairwise = _pairwise_rows("Low", low_order, low_pvals) + _pairwise_rows("High", high_order, high_pvals)
+
+    lines = [
+        "=" * 72,
+        "Force Discrimination — GEE Pairwise Plot Data Export",
+        "=" * 72,
+        "",
+        f"N participants     : {n_subj}",
+        f"Statistical method   : {stat_method}",
+        f"Significance alpha   : {BRACKET_ALPHA}",
+        f"Accuracy definition  : proportion correct (chose stronger force)",
+        "",
+        "Low band  (reference = 1 g)  pairs: " + ", ".join(low_order),
+        "High band (reference = 26 g) pairs: " + ", ".join(high_order),
+        "",
+        "-" * 72,
+        "1. Per-subject accuracy (values shown as box-plot dots)",
+        "-" * 72,
+        f"{'Subject':<12} {'Band':<6} {'Force pair (g)':<14} {'Accuracy':>10}",
+    ]
+    for _, row in subj_acc.sort_values(["band", "pair_label", "Subject"]).iterrows():
+        lines.append(
+            f"{str(row['Subject']):<12} {row['band']:<6} {row['pair_label']:<14} {row['accuracy']:>10.4f}"
+        )
+
+    lines += [
+        "",
+        "-" * 72,
+        "2. Group summary (box-plot aggregates; mean ± SEM across subjects)",
+        "-" * 72,
+        f"{'Band':<6} {'Force pair (g)':<14} {'N':>4} {'Mean':>8} {'SEM':>8} {'SD':>8} {'Median':>8} {'Min':>8} {'Max':>8}",
+    ]
+    for s in summaries:
+        lines.append(
+            f"{s['band']:<6} {s['force_pair_g']:<14} {s['n_subjects']:>4} "
+            f"{s['mean_accuracy']:>8.4f} {s['sem']:>8.4f} {s['sd']:>8.4f} "
+            f"{s['median']:>8.4f} {s['min']:>8.4f} {s['max']:>8.4f}"
+        )
+
+    lines += [
+        "",
+        "-" * 72,
+        "3. Pairwise contrasts (bracket statistics; significant if p < 0.05)",
+        "-" * 72,
+        f"{'Band':<6} {'Pair A':<12} {'Pair B':<12} {'p-value':>12} {'Sig.':>6} {'Label':>6}",
+    ]
+    for r in pairwise:
+        pstr = f"{r['p_value']:.6f}" if not np.isnan(r["p_value"]) else "NA"
+        sig = "Yes" if r["significant_p05"] else "No"
+        lines.append(
+            f"{r['band']:<6} {r['pair_a']:<12} {r['pair_b']:<12} {pstr:>12} {sig:>6} {r['sig_label']:>6}"
+        )
+
+    lines += ["", "=" * 72]
+    path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+
+
+export_txt = os.path.join(OUTPUT_DIR, "gee_pairwise_plot_data.txt")
+export_plot_data_txt(Path(export_txt))
+subj_acc.to_csv(os.path.join(OUTPUT_DIR, "gee_pairwise_subject_accuracy.csv"), index=False)
+pd.DataFrame(_band_summary("Low", low_order) + _band_summary("High", high_order)).to_csv(
+    os.path.join(OUTPUT_DIR, "gee_pairwise_group_summary.csv"), index=False
+)
+pd.DataFrame(_pairwise_rows("Low", low_order, low_pvals) + _pairwise_rows("High", high_order, high_pvals)).to_csv(
+    os.path.join(OUTPUT_DIR, "gee_pairwise_contrasts.csv"), index=False
+)
+print(f"Saved: {export_txt}")
+
 
 # ── 9. Draw significance bracket ─────────────────────────────────────────────
-def draw_bracket(ax, x1, x2, y, label, color=SLATE_BLUE, linewidth=1.2, fontsize=8.0):
+def draw_bracket(ax, x1, x2, y, label, color=SLATE_BLUE, linewidth=1.0, fontsize=9.0):
     """Draw a bracket from x1 to x2 at height y with label above."""
-    h = 0.018
+    h = 0.014
     ax.plot([x1, x1, x2, x2], [y, y + h, y + h, y],
-            color=color, linewidth=linewidth, clip_on=False)
-    ax.text((x1 + x2) / 2, y + h + 0.004, label,
-            ha="center", va="bottom", fontsize=fontsize, color=color, clip_on=False)
+            color=color, linewidth=linewidth, clip_on=False, zorder=7)
+    if label:
+        ax.text((x1 + x2) / 2, y + h + 0.003, label,
+                ha="center", va="bottom", fontsize=fontsize,
+                color=color, clip_on=False, zorder=8)
 
 # ── proper interval-scheduling level assignment ───────────────────────────────
 def assign_bracket_levels(combos):
@@ -307,16 +429,10 @@ def assign_bracket_levels(combos):
     return placed
 
 # ── 10. Plot ──────────────────────────────────────────────────────────────────
-fig, (ax_low, ax_high) = plt.subplots(
-    2, 1, figsize=FIG_SIZE, facecolor="#FFFFFF"
-)
-# fig.suptitle(
-#     "Periungual Force Discrimination — GEE Pairwise Contrasts",
-#     fontsize=14, fontweight="bold",
-# )
-
-def plot_band(ax, band_label, order, pvals_dict, title, show_xlabel=False):
+def plot_band(ax, band_label, order, pvals_dict, title, show_xlabel=True, show_ylabel=True,
+              title_fontsize=12):
     sub = subj_acc[subj_acc["band"] == band_label].copy()
+    band_max = 0.0
 
     for xi, pair in enumerate(order):
         pdata = sub.loc[sub["pair_label"] == pair, "accuracy"].values
@@ -324,62 +440,66 @@ def plot_band(ax, band_label, order, pvals_dict, title, show_xlabel=False):
             print(f"  WARNING: no data for pair '{pair}' in band '{band_label}'")
             continue
         color = pair_color(pair, sub)
+        band_max = max(band_max, float(np.max(pdata)))
 
-        # box plot
-        bp = ax.boxplot(
-            pdata, positions=[xi], widths=0.45,
+        ax.boxplot(
+            pdata, positions=[xi], widths=0.42,
             patch_artist=True,
-            medianprops=dict(color=BLACK, linewidth=1.5),
-            whiskerprops=dict(color=color, linewidth=1.4),
-            capprops=dict(color=color, linewidth=1.4),
+            medianprops=dict(color=BLACK, linewidth=1.4),
+            whiskerprops=dict(color=color, linewidth=1.2),
+            capprops=dict(color=color, linewidth=1.2),
             flierprops=dict(marker="o", markerfacecolor=color,
-                            markersize=4, alpha=0.5, linestyle="none"),
-            boxprops=dict(facecolor=color, alpha=0.75, linewidth=0.8,
+                            markersize=3.5, alpha=0.45, linestyle="none"),
+            boxprops=dict(facecolor=color, alpha=0.72, linewidth=0.8,
                           edgecolor=BLACK),
         )
 
-        # mean diamond
-        ax.scatter(xi, np.mean(pdata), marker="D",
-                   color=COLOR_MEAN, s=60, zorder=6, edgecolors=BLACK, linewidths=0.5)
-
-        # jittered individual dots
         ax.scatter(
-            np.full(len(pdata), xi) + jitter(len(pdata)),
+            np.full(len(pdata), xi) + jitter(len(pdata), width=0.14),
             pdata,
-            color=color, alpha=0.45, s=22, zorder=5,
+            color=color, alpha=0.38, s=16, zorder=5, linewidths=0,
         )
 
-    # reference lines
-    ax.axhline(0.75, color=REF_LINE, linestyle="--", linewidth=1.0, alpha=0.8,
-               label="JND criterion (0.75)")
-    ax.axhline(0.50, color=BLACK, linestyle="-", linewidth=0.8,
-               label="Chance (0.50)")
-    ax.axhspan(-0.05, 0.50, color=COLOR_REVERSAL, alpha=0.07, label="Reversal zone")
+    ax.axhline(0.75, color=REF_LINE, linestyle="--", linewidth=1.0, alpha=0.8)
+    ax.axhline(0.50, color=BLACK, linestyle="-", linewidth=0.8, alpha=0.55)
+    ax.axhspan(-0.05, 0.50, color=COLOR_REVERSAL, alpha=0.07)
 
-    # ── GEE pairwise brackets ────────────────────────────────────────────────
-    # Sort combos by span (smallest first) then assign non-overlapping levels
-    pair_combos = sorted(itertools.combinations(range(len(order)), 2),
-                         key=lambda t: t[1] - t[0])
-    placed = assign_bracket_levels(pair_combos)
-    max_level = max(lv for _, _, lv in placed) if placed else 0
+    pair_combos = sorted(
+        itertools.combinations(range(len(order)), 2),
+        key=lambda t: t[1] - t[0],
+    )
+    sig_combos = []
+    for i1, i2 in pair_combos:
+        p1, p2 = order[i1], order[i2]
+        pval = pvals_dict.get((p1, p2), pvals_dict.get((p2, p1), np.nan))
+        if not np.isnan(pval) and pval < BRACKET_ALPHA:
+            sig_combos.append((i1, i2))
 
-    bracket_base = 1.04
-    bracket_step = 0.075
+    placed = assign_bracket_levels(sig_combos)
+    max_level = max((lv for _, _, lv in placed), default=-1)
 
-    # Compute required ylim to fit all brackets
-    top_y = bracket_base + max_level * bracket_step + 0.018 + 0.04  # h + text
-    ylim_top = max(1.15, top_y)
+    bracket_step = 0.055
+    bracket_base = max(1.02, band_max + 0.05)
+    if placed:
+        top_y = bracket_base + max_level * bracket_step + 0.028
+    else:
+        top_y = max(1.08, band_max + 0.08)
+    ylim_top = max(1.10, top_y)
 
     ax.set_xticks(range(len(order)))
-    ax.set_xticklabels(order, fontsize=10.5)
+    ax.set_xticklabels(order, fontsize=15)
+    ax.tick_params(axis="y", labelsize=15)
     ax.set_ylim(-0.05, ylim_top)
-    ax.set_ylabel("Accuracy (proportion correct)", fontsize=11)
+    ax.set_xlim(-0.55, len(order) - 0.45)
+    if show_ylabel:
+        ax.set_ylabel("Accuracy (proportion correct)", fontsize=11)
+    else:
+        ax.set_ylabel("")
     if show_xlabel:
-        ax.set_xlabel("Force pair (g)", fontsize=11, labelpad=6)
+        ax.set_xlabel("Force pair (g)", fontsize=11, labelpad=4)
     else:
         ax.set_xlabel("")
-    ax.set_title(title, fontsize=12, fontweight="bold", pad=8)
-    ax.legend(fontsize=8.5, loc="upper right")
+    ax.set_title(title, fontsize=title_fontsize, fontweight="bold", pad=30)
 
     for i1, i2, level in placed:
         p1 = order[i1]
@@ -387,44 +507,104 @@ def plot_band(ax, band_label, order, pvals_dict, title, show_xlabel=False):
         pval = pvals_dict.get((p1, p2), pvals_dict.get((p2, p1), np.nan))
         label = pval_label(pval)
         y = bracket_base + level * bracket_step
-        color = WINE if (not np.isnan(pval) and pval < 0.05) else SLATE_BLUE
-        draw_bracket(ax, i1, i2, y, label, color=color)
+        draw_bracket(ax, i1, i2, y, label, color=WINE)
 
-plot_band(ax_low,  "Low",  low_order,  low_pvals,
-          "Low band (ref = 1 g)", show_xlabel=False)
-plot_band(ax_high, "High", high_order, high_pvals,
-          "High band (ref = 26 g)", show_xlabel=True)
 
-# ── 11. Global colour legend ──────────────────────────────────────────────────
-legend_elements = [
+LEGEND_ELEMENTS = [
     mpatches.Patch(facecolor=COLOR_ABOVE_JND, edgecolor=BLACK, linewidth=0.6,
-                   alpha=0.75, label="Above JND criterion (≥0.75)"),
+                   alpha=0.75, label="≥ 0.75"),
     mpatches.Patch(facecolor=COLOR_MID, edgecolor=BLACK, linewidth=0.6,
-                   alpha=0.75, label="Intermediate (0.50–0.75)"),
+                   alpha=0.75, label="0.50–0.75"),
     mpatches.Patch(facecolor=COLOR_REVERSAL, edgecolor=BLACK, linewidth=0.6,
-                   alpha=0.75, label="Reversal zone (<0.50)"),
+                   alpha=0.75, label="< 0.50"),
     mpatches.Patch(facecolor=COLOR_SPECIAL, edgecolor=BLACK, linewidth=0.6,
-                   alpha=0.75, label="1–2 g pair"),
-    Line2D([0], [0], marker="D", color="w", markerfacecolor=COLOR_MEAN,
-           markeredgecolor=BLACK, markeredgewidth=0.5,
-           markersize=9, label="Mean accuracy"),
+                   alpha=0.75, label="1–2 g"),
+    Line2D([0], [0], color=REF_LINE, linestyle="--", linewidth=1.2,
+           label="JND (0.75)"),
+    Line2D([0], [0], color=BLACK, linestyle="-", linewidth=0.9,
+           label="Chance (0.50)"),
 ]
-fig.subplots_adjust(left=0.09, right=0.97, top=0.96, bottom=0.13, hspace=0.32)
 
-# Legend: one row, directly below bottom-panel x-axis label
-fig.legend(
-    handles=legend_elements,
-    loc="upper center",
-    bbox_to_anchor=(0.5, 0.07),
-    ncol=5,
-    fontsize=7.5,
-    frameon=False,
-    columnspacing=0.9,
-    handletextpad=0.4,
-)
 
-# ── 12. Save ──────────────────────────────────────────────────────────────────
-out_path = os.path.join(OUTPUT_DIR, "gee_pairwise_plot.png")
-fig.savefig(out_path, dpi=SAVE_DPI, facecolor="white")
-plt.close(fig)
-print(f"Saved: {out_path}  ({FIG_SIZE[0]}×{FIG_SIZE[1]} in @ {SAVE_DPI} dpi)")
+def _add_legend(fig, ax_low, ax_high):
+    p0 = ax_low.get_position()
+    p1 = ax_high.get_position()
+    legend_x = p0.x0
+    legend_w = p1.x1 - p0.x0
+    fig.legend(
+        handles=LEGEND_ELEMENTS,
+        loc="lower center",
+        bbox_to_anchor=(legend_x + legend_w / 2, 0.02),
+        bbox_transform=fig.transFigure,
+        ncol=3,
+        fontsize=15,
+        frameon=False,
+        columnspacing=1.2,
+        handletextpad=0.5,
+    )
+
+
+MARGIN_BOTTOM = 0.28   # figure fraction — room for 2-row legend
+GAP_BAND_IN   = 1.5    # inches between Low and High panels
+TOP_MARGIN_V  = 1.4    # inches — headroom above Low band (vertical canvas)
+
+
+def _panel_size_inches():
+    """Panel size (in) from horizontal layout — used as fixed size for both orientations."""
+    tmp, axes = plt.subplots(1, 2, figsize=FIG_SIZE, sharey=True, facecolor="#FFFFFF")
+    tmp.subplots_adjust(left=0.07, right=0.98, top=0.86, bottom=MARGIN_BOTTOM, wspace=0.10)
+    pos = axes[0].get_position()
+    px = pos.x0 * FIG_SIZE[0]
+    py = pos.y0 * FIG_SIZE[1]
+    pw = pos.width * FIG_SIZE[0]
+    ph = pos.height * FIG_SIZE[1]
+    plt.close(tmp)
+    return px, py, pw, ph
+
+
+def make_pairwise_figure(orientation):
+    """Build GEE pairwise plot. orientation: 'horizontal' (1×2) or 'vertical' (2×1)."""
+    px, py, pw, ph = _panel_size_inches()
+    left_in = 0.07 * FIG_SIZE[0]
+    right_in = (1 - 0.98) * FIG_SIZE[0]
+    bottom_in = MARGIN_BOTTOM * FIG_SIZE[1]
+    top_in = (1 - 0.86) * FIG_SIZE[1]
+
+    if orientation == "horizontal":
+        fig_w = left_in + pw + GAP_BAND_IN + pw + right_in
+        fig = plt.figure(figsize=(fig_w, FIG_SIZE[1]), facecolor="#FFFFFF")
+        ax_low = fig.add_axes([left_in / fig_w, py / FIG_SIZE[1], pw / fig_w, ph / FIG_SIZE[1]])
+        x_high = (left_in + pw + GAP_BAND_IN) / fig_w
+        ax_high = fig.add_axes([x_high, py / FIG_SIZE[1], pw / fig_w, ph / FIG_SIZE[1]])
+    elif orientation == "vertical":
+        fig_h = bottom_in + ph + GAP_BAND_IN + ph + TOP_MARGIN_V
+        fig = plt.figure(figsize=(FIG_SIZE[0], fig_h), facecolor="#FFFFFF")
+        y_high = bottom_in / fig_h
+        y_low = (bottom_in + ph + GAP_BAND_IN) / fig_h
+        ax_high = fig.add_axes([px / FIG_SIZE[0], y_high, pw / FIG_SIZE[0], ph / fig_h])
+        ax_low = fig.add_axes([px / FIG_SIZE[0], y_low, pw / FIG_SIZE[0], ph / fig_h])
+    else:
+        raise ValueError(f"Unknown orientation: {orientation!r}")
+
+    plot_band(ax_low, "Low", low_order, low_pvals,
+              "Low band (ref = 1 g)", show_xlabel=(orientation == "horizontal"),
+              show_ylabel=True, title_fontsize=20)
+    plot_band(ax_high, "High", high_order, high_pvals,
+              "High band (ref = 26 g)", show_xlabel=True,
+              show_ylabel=(orientation == "vertical"), title_fontsize = 20)
+    _add_legend(fig, ax_low, ax_high)
+    return fig
+
+
+# ── 11–12. Save both layouts ──────────────────────────────────────────────────
+for orientation, filename in (
+    ("horizontal", "gee_pairwise_plot_horizontal.png"),
+    ("vertical", "gee_pairwise_plot_vertical.png"),
+):
+    fig = make_pairwise_figure(orientation)
+    out_path = os.path.join(OUTPUT_DIR, filename)
+    save_figure_png(fig, out_path)
+    w, h = fig.get_size_inches()
+    px = (int(round(w * SAVE_DPI)), int(round(h * SAVE_DPI)))
+    plt.close(fig)
+    print(f"Saved: {out_path}  ({w}×{h} in @ {SAVE_DPI} dpi → {px[0]}×{px[1]} px)")

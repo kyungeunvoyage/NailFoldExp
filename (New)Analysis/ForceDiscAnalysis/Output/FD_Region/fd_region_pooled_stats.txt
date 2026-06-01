@@ -1,0 +1,26 @@
+Force Discrimination — Pooled region LME
+All force pairs aggregated | trial-level IsCorrect ~ C(Region) | RE=Subject
+
+Omnibus C(Region):
+  C(Region)[T.B]: p=1.0000
+  C(Region)[T.C]: p=0.5420
+  C(Region)[T.D]: p=0.7605
+  C(Region)[T.E]: p=0.6474
+  C(Region)[T.F]: p=0.4460
+
+Pairwise region contrasts (p < 0.05 marked *):
+  A vs B: Δ=-0.000 [-0.073, 0.073], p=1.0000 (n.s.)
+  A vs C: Δ=-0.023 [-0.097, 0.051], p=0.5443 (n.s.)
+  A vs D: Δ=0.011 [-0.062, 0.085], p=0.7599 (n.s.)
+  A vs E: Δ=0.017 [-0.057, 0.091], p=0.6487 (n.s.)
+  A vs F: Δ=0.029 [-0.045, 0.102], p=0.4470 (n.s.)
+  B vs C: Δ=-0.023 [-0.096, 0.051], p=0.5429 (n.s.)
+  B vs D: Δ=0.011 [-0.061, 0.084], p=0.7583 (n.s.)
+  B vs E: Δ=0.017 [-0.056, 0.090], p=0.6469 (n.s.)
+  B vs F: Δ=0.029 [-0.045, 0.102], p=0.4471 (n.s.)
+  C vs D: Δ=0.034 [-0.039, 0.108], p=0.3612 (n.s.)
+  C vs E: Δ=0.040 [-0.034, 0.114], p=0.2886 (n.s.)
+  C vs F: Δ=0.051 [-0.022, 0.125], p=0.1716 (n.s.)
+  D vs E: Δ=0.006 [-0.068, 0.079], p=0.8792 (n.s.)
+  D vs F: Δ=0.017 [-0.056, 0.091], p=0.6478 (n.s.)
+  E vs F: Δ=0.011 [-0.062, 0.085], p=0.7606 (n.s.)

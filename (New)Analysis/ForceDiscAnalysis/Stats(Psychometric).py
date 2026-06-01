@@ -46,10 +46,50 @@ REF_LINE   = WINE
 REF_PALETTE = {1.0: SLATE_BLUE, 26.0: WINE}
 DIR_PALETTE = {"heavier": OLIVE, "lighter": SLATE_BLUE}
 
-FIG_WEBER_SIZE  = (9.0, 5.5)
-FIG_DIR_SIZE    = (13.0, 5.0)
-FIG_PSYCH_SIZE  = (8.5, 5.5)
-SAVE_DPI        = 200
+from fd_export import FIG_SIZE, SAVE_DPI, save_figure_png
+
+FONT_TICK   = 16
+FONT_LABEL  = 14
+FONT_TITLE  = 16
+FONT_LEGEND = 14
+FONT_ANNOT  = 15
+FONT_WEIGHT = 900    # extra-bold for in-figure numbers and labels
+
+WSPACE      = 0.06   # horizontal gap between side-by-side panels
+FIT_LW      = 3.5
+REF_LW      = 2.2
+CHANCE_LW   = 1.8
+ERR_LW      = 2.0
+SCATTER_S   = 28
+SCATTER_A   = 0.30
+
+
+def _style_axes(ax):
+    ax.tick_params(axis="both", labelsize=FONT_TICK)
+    for tick in ax.get_xticklabels() + ax.get_yticklabels():
+        tick.set_fontweight(FONT_WEIGHT)
+    ax.xaxis.label.set_fontweight(FONT_WEIGHT)
+    ax.yaxis.label.set_fontweight(FONT_WEIGHT)
+    ax.title.set_fontweight(FONT_WEIGHT)
+
+
+def _annotate_pair(ax, xy, text, color, y_off=8, side=None):
+    if side is None:
+        side = "left" if " / " in text else "right"
+    if side == "left":
+        x_off, ha = -8, "right"
+    else:
+        x_off, ha = 8, "left"
+    ax.annotate(
+        text, xy,
+        xytext=(x_off, y_off),
+        textcoords="offset points",
+        fontsize=FONT_ANNOT,
+        fontweight=FONT_WEIGHT,
+        color=color,
+        ha=ha,
+        zorder=5,
+    )
 
 rcParams.update({
     "figure.facecolor":      "#FFFFFF",
@@ -66,17 +106,20 @@ rcParams.update({
     "xtick.direction":       "out",
     "ytick.direction":       "out",
     "legend.frameon":        False,
-    "legend.fontsize":       8,
-    "legend.title_fontsize": 8,
-    "font.size":             9,
-    "axes.titlesize":        10,
-    "axes.labelsize":        9,
+    "legend.fontsize":       FONT_LEGEND,
+    "legend.title_fontsize": FONT_LEGEND,
+    "font.size":             12,
+    "axes.titlesize":        FONT_TITLE,
+    "axes.labelsize":        FONT_LABEL,
+    "xtick.labelsize":       FONT_TICK,
+    "ytick.labelsize":       FONT_TICK,
     "axes.grid":             True,
     "axes.grid.axis":        "y",
     "grid.alpha":            0.35,
     "grid.linestyle":        "--",
     "grid.color":            SLATE_BLUE,
-    "figure.dpi":            150,
+    "figure.dpi":            SAVE_DPI,
+    "savefig.dpi":           SAVE_DPI,
 })
 
 
@@ -84,7 +127,7 @@ rcParams.update({
 # CONFIG
 # ============================================================
 FILE_PATTERN = "/Users/kyungeunjung/NailFoldExp/Data/(FD)CurData/P*_ForceDiscrimination.csv"
-OUTPUT_DIR = "/Users/kyungeunjung/NailFoldExp/(New)Analysis/ForceDiscAnalysis"
+OUTPUT_DIR = "/Users/kyungeunjung/NailFoldExp/(New)Analysis/ForceDiscAnalysis/Output/Stats(Psychometric)"
 os.makedirs(OUTPUT_DIR, exist_ok=True)
 
 
@@ -174,7 +217,7 @@ print("\n[2] Group-level summary:")
 print(grp_agg.round(3).to_string(index=False))
 
 
-fig, ax = plt.subplots(figsize=FIG_WEBER_SIZE, facecolor="#FFFFFF")
+fig, ax = plt.subplots(figsize=FIG_SIZE, facecolor="#FFFFFF")
 palette = REF_PALETTE
 
 # (a) Per-subject jittered dots (translucent)
@@ -194,29 +237,22 @@ for ref, sub in grp_agg.groupby("Reference_n"):
         lbl = force_pair_label(ref, row["weber_ratio"])
         if not lbl:
             continue
-        ax.annotate(
-            lbl,
-            (row["weber_ratio"], row["mean_acc"]),
-            xytext=(6, 8),
-            textcoords="offset points",
-            fontsize=8,
-            color=color,
-            ha="left",
-            zorder=5,
-        )
+        _annotate_pair(ax, (row["weber_ratio"], row["mean_acc"]), lbl, color)
 
 ax.axhline(0.75, ls="--", color=REF_LINE, alpha=0.8, linewidth=1.0,
            label="75% threshold criterion")
 ax.axhline(0.50, ls="-", color=BLACK, alpha=0.8, linewidth=0.8,
            label="Chance (2-AFC)")
-ax.set_xlabel("Weber ratio |ΔF| / F_ref")
-ax.set_ylabel("Accuracy ('chose the stronger')")
-ax.set_title("Force discrimination as a function of Weber ratio (data-driven)")
+ax.set_xlabel("Weber ratio |ΔF| / F_ref", fontsize=FONT_LABEL)
+ax.set_ylabel("Accuracy ('chose the stronger')", fontsize=FONT_LABEL)
+ax.set_title("Force discrimination as a function of Weber ratio (data-driven)",
+              fontsize=FONT_TITLE)
+_style_axes(ax)
 ax.set_ylim(-0.02, 1.05)
-ax.legend(loc="lower right")
+ax.legend(loc="lower right", fontsize=FONT_LEGEND, prop={"weight": FONT_WEIGHT})
 plt.tight_layout()
 out1 = os.path.join(OUTPUT_DIR, "weber_scatter_data_driven.png")
-fig.savefig(out1, dpi=SAVE_DPI, bbox_inches="tight", facecolor="white")
+save_figure_png(fig, out1)
 plt.close(fig)
 print(f"    Saved {out1}")
 
@@ -281,7 +317,7 @@ dir_grp = (dir_agg.groupby(["Reference_n", "weber_ratio", "direction"])
 print(dir_grp.round(3).to_string(index=False))
 
 
-fig, axes = plt.subplots(1, 2, figsize=FIG_DIR_SIZE, sharey=True, facecolor="#FFFFFF")
+fig, axes = plt.subplots(1, 2, figsize=FIG_SIZE, sharey=True, facecolor="#FFFFFF")
 for ax, ref in zip(axes, sorted(df["Reference_n"].unique())):
     sub = dir_grp[dir_grp["Reference_n"] == ref]
     for direction, dsub in sub.groupby("direction"):
@@ -296,25 +332,20 @@ for ax, ref in zip(axes, sorted(df["Reference_n"].unique())):
             lbl = force_pair_label(ref, row["weber_ratio"], comp_filter=direction)
             if not lbl:
                 continue
-            ax.annotate(
-                lbl,
-                (row["weber_ratio"], row["mean_acc"]),
-                xytext=(6, y_off),
-                textcoords="offset points",
-                fontsize=8,
-                color=color,
-                ha="left",
+            _annotate_pair(
+                ax, (row["weber_ratio"], row["mean_acc"]), lbl, color, y_off=y_off
             )
     ax.axhline(0.75, ls="--", color=REF_LINE, alpha=0.8, linewidth=1.0)
     ax.axhline(0.50, ls="-", color=BLACK, alpha=0.8, linewidth=0.8)
-    ax.set_xlabel("Weber ratio |ΔF| / F_ref")
-    ax.set_ylabel("Accuracy ('chose the stronger')")
-    ax.set_title(f"Reference = {ref:g} g")
+    ax.set_xlabel("Weber ratio |ΔF| / F_ref", fontsize=FONT_LABEL)
+    ax.set_ylabel("Accuracy ('chose the stronger')", fontsize=FONT_LABEL)
+    ax.set_title(f"Reference = {ref:g} g", fontsize=FONT_TITLE)
+    _style_axes(ax)
     ax.set_ylim(-0.02, 1.05)
-    ax.legend(loc="lower right")
-plt.tight_layout()
+    ax.legend(loc="lower right", fontsize=FONT_LEGEND, prop={"weight": FONT_WEIGHT})
+fig.subplots_adjust(left=0.08, right=0.98, top=0.88, bottom=0.14, wspace=WSPACE)
 out2 = os.path.join(OUTPUT_DIR, "direction_specific_accuracy.png")
-fig.savefig(out2, dpi=SAVE_DPI, bbox_inches="tight", facecolor="white")
+save_figure_png(fig, out2)
 plt.close(fig)
 print(f"    Saved {out2}")
 
@@ -343,49 +374,52 @@ def fit_psychometric(x, y, p0=(0.5, 5.0), bounds=([0.01, 0.1], [3.0, 100])):
 
 # Group-level fit per reference
 print("\n[5] Psychometric fits (group-level):")
-fig, ax = plt.subplots(figsize=FIG_PSYCH_SIZE, facecolor="#FFFFFF")
+fig, ax = plt.subplots(figsize=FIG_SIZE, facecolor="#FFFFFF")
 x_smooth = np.linspace(0, 1.5, 200)
 
 group_fits = {}
+for ref, sub in subj_agg.groupby("Reference_n"):
+    color = REF_PALETTE.get(ref, SLATE_BLUE)
+    jitter = np.random.uniform(-0.015, 0.015, size=len(sub))
+    ax.scatter(
+        sub["weber_ratio"] + jitter, sub["accuracy"],
+        s=SCATTER_S, alpha=SCATTER_A, color=color, edgecolor="none", zorder=2,
+    )
+
 for ref, sub in grp_agg.groupby("Reference_n"):
     color = REF_PALETTE.get(ref, SLATE_BLUE)
     k, slope = fit_psychometric(sub["weber_ratio"].values, sub["mean_acc"].values)
     group_fits[ref] = (k, slope)
     print(f"    ref={ref:g}g: Weber fraction k={k:.3f}, slope={slope:.2f}")
 
-    # plot data
-    ax.errorbar(sub["weber_ratio"], sub["mean_acc"], yerr=sub["sem_acc"],
-                marker="o", color=color, ms=10, lw=0, capsize=4,
-                label=f"ref={ref:g}g (data)")
+    ax.errorbar(
+        sub["weber_ratio"], sub["mean_acc"], yerr=sub["sem_acc"],
+        marker="o", color=color, ms=10, linestyle="none",
+        elinewidth=ERR_LW, capsize=5, label=f"ref = {ref:g} g", zorder=4,
+    )
     for _, row in sub.iterrows():
         lbl = force_pair_label(ref, row["weber_ratio"])
         if not lbl:
             continue
-        ax.annotate(
-            lbl,
-            (row["weber_ratio"], row["mean_acc"]),
-            xytext=(6, 8),
-            textcoords="offset points",
-            fontsize=8,
-            color=color,
-            ha="left",
-        )
-    # plot fit
+        _annotate_pair(ax, (row["weber_ratio"], row["mean_acc"]), lbl, color)
     if not np.isnan(k):
-        ax.plot(x_smooth, psychometric(x_smooth, k, slope),
-                color=color, lw=2, alpha=0.8,
-                label=f"ref={ref:g}g fit (k={k:.2f})")
+        ax.plot(
+            x_smooth, psychometric(x_smooth, k, slope),
+            color=color, lw=FIT_LW, alpha=0.9, zorder=3,
+            label=f"ref={ref:g}g fit (k={k:.2f})",
+        )
 
-ax.axhline(0.75, ls="--", color=REF_LINE, alpha=0.8, linewidth=1.0, label="75% criterion")
-ax.axhline(0.50, ls="-", color=BLACK, alpha=0.8, linewidth=0.8, label="Chance")
-ax.set_xlabel("Weber ratio |ΔF| / F_ref")
-ax.set_ylabel("Accuracy")
-ax.set_title("Psychometric fit per reference (Weber's law check)")
+ax.axhline(0.75, ls="--", color=REF_LINE, alpha=0.85, linewidth=REF_LW, label="75% criterion")
+ax.axhline(0.50, ls="-", color=BLACK, alpha=0.85, linewidth=CHANCE_LW, label="Chance")
+ax.set_xlabel("Weber ratio |ΔF| / F_ref", fontsize=FONT_LABEL)
+ax.set_ylabel("Accuracy", fontsize=FONT_LABEL)
+ax.set_title("Psychometric fit per reference (Weber's law check)", fontsize=FONT_TITLE)
+_style_axes(ax)
 ax.set_ylim(-0.02, 1.05)
-ax.legend(loc="lower right")
+ax.legend(loc="lower right", fontsize=FONT_LEGEND, prop={"weight": FONT_WEIGHT})
 plt.tight_layout()
 out3 = os.path.join(OUTPUT_DIR, "weber_psychometric_fits.png")
-fig.savefig(out3, dpi=SAVE_DPI, bbox_inches="tight", facecolor="white")
+save_figure_png(fig, out3)
 plt.close(fig)
 print(f"    Saved {out3}")
 
