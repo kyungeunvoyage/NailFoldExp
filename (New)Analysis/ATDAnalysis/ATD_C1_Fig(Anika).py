@@ -78,7 +78,7 @@ REGION_ONLY_X_FRAC = 0.28  # along shaded span (0=left, 0.5=center)
 Y_ZERO_GAP_BELOW = 5         # ylim padding: 0% tick floats above x-axis (no stroke in gap)
 ACCURACY_YMIN = -Y_ZERO_GAP_BELOW
 ACCURACY_YTICKS = (0, 20, 40, 60, 80, 100)
-ACCURACY_YSPINE = (0, 100)   # left spine 0–100% only (stops at 0 tick, not plot bottom)
+ACCURACY_YSPINE = (ACCURACY_YMIN, 100)   # left spine extends to ylim bottom so it meets x-axis
 ACCURACY_YLIM_TOP = 103      # data ylim above 100 so 100% scatter is not clipped
 
 # Inward tick guides drawn manually (seaborn categorical axes hide mpl ticks)
@@ -380,7 +380,7 @@ def add_legend_outside(
     multiline = any("\n" in (lab or "") for lab in labels)
     axes_top = FIG_LEGEND_TOP_MULTILINE if multiline else top
     labelspacing = 0.55 if multiline else 0.2
-    handleheight = 1.7 if multiline else 1.0
+    handleheight = 1.0
     adjust_kw = dict(left=left, right=right, top=axes_top, bottom=bottom)
     if wspace is not None:
         adjust_kw["wspace"] = wspace

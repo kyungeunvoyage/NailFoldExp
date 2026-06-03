@@ -80,9 +80,12 @@ def add_fig5_legend(fig, handles, ncol=3):
         ncol=ncol,
         frameon=False,
         fontsize=FONT_LABEL,
-        labelspacing=0.25,
+        title_fontsize=FONT_LABEL,
+        labelspacing=0.2,
         columnspacing=2.0,
-        borderaxespad=0.0,
+        handlelength=1.6,
+        handleheight=1.0,
+        borderaxespad=atd_c1.FIG_LEGEND_PAD_PT,
     )
 
 
@@ -1046,7 +1049,7 @@ else:
         )
         for i, r in enumerate(REGION_ORDER)
     ]
-    add_legend_outside(fig4, leg_handles, ncol=len(REGION_ORDER))
+    add_legend_outside(fig4, ax4, leg_handles, ncol=len(REGION_ORDER))
 
     fig4.subplots_adjust(left=0.10, right=0.97, top=0.94, bottom=0.18)
     out_nail = os.path.join(FIG_DIR, "onnail_vs_offnail_accuracy.png")
