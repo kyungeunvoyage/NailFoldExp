@@ -38,7 +38,7 @@ NORMALIZE_BY_MAX = False
 
 FIG2_SIZE   = (14.0, 6.0)
 FIG3_SIZE   = (14.5, 5.2)
-SAVE_DPI    = 220
+SAVE_DPI    = 600
 
 
 def build_pairwise_lme_p_matrices(df_input, subject_col, area_order, force_values):

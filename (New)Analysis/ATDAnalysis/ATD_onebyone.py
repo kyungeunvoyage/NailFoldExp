@@ -54,7 +54,7 @@ BOX_ALPHA_HEX = "BE"
 EXCLUDE_FORCES = set()
 FIG_A_SIZE = (10.0, 4.0)
 FIG_B_SIZE = (18.0, 4.5)
-SAVE_DPI   = 200
+SAVE_DPI   = 600
 
 
 def condition_legend_handles():

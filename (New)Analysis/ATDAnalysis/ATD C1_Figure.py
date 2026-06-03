@@ -34,7 +34,7 @@ BOX_ALPHA_HEX = "BE"   # ~75 % opacity appended to hex color
 EXCLUDE_FORCES = set()              # empty = all forces in CSV; e.g. {0.07, 1.0, 1.4} to omit
 FIG_A_SIZE = (10.0, 4.0)
 FIG_B_SIZE = (18.0, 4.5)            # facet width scales with # force panels
-SAVE_DPI   = 200
+SAVE_DPI   = 600
 
 
 def condition_legend_handles():
@@ -96,7 +96,7 @@ REPO_ROOT  = os.path.normpath(os.path.join(SCRIPT_DIR, "../../"))
 FILE_PATTERN = os.path.join(
     REPO_ROOT, "Data", "(ATD)CurData", "P*_AbsoluteThresholdDetection.csv"
 )
-OUT_DIR = os.path.join(SCRIPT_DIR, "atd_c1_outputs")
+OUT_DIR = os.path.join(SCRIPT_DIR, "ATD_F2")
 os.makedirs(OUT_DIR, exist_ok=True)
 
 # =============================================================================

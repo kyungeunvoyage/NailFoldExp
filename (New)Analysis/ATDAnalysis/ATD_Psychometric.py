@@ -563,7 +563,7 @@ ax_t.legend(handles=c_handles, fontsize=7.0, frameon=False, loc="lower right")
 # =============================================================================
 fig.tight_layout(pad=2.0)
 out_path = os.path.join(OUT_DIR, "atd_psychometric_v2.png")
-fig.savefig(out_path, dpi=200, facecolor="white", bbox_inches="tight")
+fig.savefig(out_path, dpi=600, facecolor="white", bbox_inches="tight")
 plt.close(fig)
 print(f"\nSaved → {out_path}")
 

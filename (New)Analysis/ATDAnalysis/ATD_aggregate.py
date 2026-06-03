@@ -1,4 +1,5 @@
 import os
+import importlib.util
 import pandas as pd
 import numpy as np
 import matplotlib
@@ -6,6 +7,8 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import matplotlib.patches as mpatches
 from matplotlib.colors import LinearSegmentedColormap
+from matplotlib.transforms import blended_transform_factory
+from matplotlib.ticker import FixedLocator
 import seaborn as sns
 import glob
 import statsmodels.formula.api as smf
@@ -17,23 +20,130 @@ SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 FIG_DIR = os.path.join(SCRIPT_DIR, "figures")
 os.makedirs(FIG_DIR, exist_ok=True)
 
-# Shared figure palette
-SLATE_BLUE = "#56708A"
-OLIVE      = "#686F12"
-WINE       = "#7F212B"
-CREAM      = "#EDE2D0"
-BLACK      = "#1A1A1A"
-BOX_ALPHA_HEX = "BE"
-PALETTE_4  = [SLATE_BLUE, OLIVE, WINE, CREAM]
-ATD_CMAP   = LinearSegmentedColormap.from_list("atd", [CREAM, SLATE_BLUE, OLIVE, WINE])
+# Shared styling with ATD_C1_Fig(Anika).py
+_ANIKA_PATH = os.path.join(SCRIPT_DIR, "ATD_C1_Fig(Anika).py")
+_spec = importlib.util.spec_from_file_location("atd_c1", _ANIKA_PATH)
+atd_c1 = importlib.util.module_from_spec(_spec)
+_spec.loader.exec_module(atd_c1)
+
+IN_AIR = atd_c1.IN_AIR
+ON_TOUCH = atd_c1.ON_TOUCH
+SLATE_BLUE = atd_c1.SLATE_BLUE
+KAO_COLOR = atd_c1.KAO_COLOR
+ACCENT_RED = atd_c1.ACCENT_RED
+CRITERION_COLOR = atd_c1.CRITERION_COLOR
+BLACK = atd_c1.BLACK
+STRIP_ALPHA = atd_c1.STRIP_ALPHA
+SCATTER_HSB_BRIGHTNESS = atd_c1.SCATTER_HSB_BRIGHTNESS
+BOX_LINEWIDTH = atd_c1.BOX_LINEWIDTH
+CAP_LINEWIDTH = atd_c1.CAP_LINEWIDTH
+CAP_WIDTH = atd_c1.CAP_WIDTH
+FONT_TICK = atd_c1.FONT_TICK
+FONT_LABEL = atd_c1.FONT_LABEL
+FONT_LEGEND = atd_c1.FONT_LEGEND
+FONT_ANNOT = atd_c1.FONT_ANNOT
+SAVE_DPI = atd_c1.SAVE_DPI
+pale_box_face = atd_c1.pale_box_face
+pale_vis_color = atd_c1.pale_vis_color
+_hsb_scatter_rgba = atd_c1._hsb_scatter_rgba
+finalize_boxplot_lines = atd_c1.finalize_boxplot_lines
+
+ATD_CMAP = LinearSegmentedColormap.from_list(
+    "atd", ["#FFFFFF", pale_vis_color(IN_AIR), ON_TOUCH, ACCENT_RED]
+)
+_AREA_BASE = [IN_AIR, ON_TOUCH, KAO_COLOR, SLATE_BLUE, atd_c1.IN_AIR_LEGACY, atd_c1.ON_TOUCH_LEGACY]
 
 ENABLE_FIG1 = False
 #여기서 빼고 싶은거..
-EXCLUDE_FORCES = {0.07, 1.0, 1.4}   # omit from all plots / plot-filtered analyses
+EXCLUDE_FORCES = {0.07, 1.4}   # omit from plots (1.0 g included)
 FIG2_SIZE   = (14.0, 6.0)   # pairwise LME heatmaps (width scales with # forces)
 FIG3_SIZE   = (14.5, 5.2)   # lateral / proximal contrasts
-FIG5_SIZE   = (9.0, 5.0)    # on-nail contrasts faceted by force
-SAVE_DPI    = 220
+FIG5_SIZE = (8.0, 4.5)       # onnail_vs_offnail_by_force (2-col aspect)
+EXPORT_WIDTH_2COL = 2102
+Y_LABEL = "Detection Accuracy (%)"
+FONT_XTICK = 11              # smaller x-axis tick labels on contrast plots
+FONT_FIG5_XTICK = 12         # Fig5 region labels (On-nail\n(C+D), …)
+FIG5_Y_TICKS = [0, 25, 50, 75, 100]   # tick labels; axis line ends here
+FIG5_Y_AXIS_TOP = 100                 # visible y-axis spine stops at 100
+FIG5_YLIM_TOP_CAP = 120               # plot headroom for significance brackets
+TICK_LEN_AXES = atd_c1.TICK_LEN_AXES
+add_legend_outside = atd_c1.add_legend_outside
+
+
+def add_fig5_legend(fig, handles, ncol=3):
+    """Legend above the panels (same anchor pattern as ATD_C1_Fig add_legend_outside)."""
+    fig.legend(
+        handles=handles,
+        loc="lower center",
+        bbox_to_anchor=(0.5, 0.99),
+        bbox_transform=fig.transFigure,
+        ncol=ncol,
+        frameon=False,
+        fontsize=FONT_LABEL,
+        labelspacing=0.25,
+        columnspacing=2.0,
+        borderaxespad=0.0,
+    )
+
+
+def add_inward_tick_guides(ax, x_positions=None, y_ticks=None):
+    """Short inward tick marks at each x/y label (same style as ATD_C1_Fig)."""
+    ax.tick_params(axis="both", which="both", length=0)
+    x_trans = blended_transform_factory(ax.transData, ax.transAxes)
+    y_trans = blended_transform_factory(ax.transAxes, ax.transData)
+    y_lo, y_hi = ax.get_ylim()
+    if y_ticks is None:
+        y_vals = [t for t in ax.get_yticks() if y_lo - 1e-9 <= t <= y_hi + 1e-9]
+    else:
+        y_vals = [t for t in y_ticks if y_lo - 1e-9 <= t <= y_hi + 1e-9]
+    if x_positions is None:
+        x_positions = ax.get_xticks()
+    for xi in x_positions:
+        ax.plot(
+            [xi, xi], [0, TICK_LEN_AXES],
+            color=BLACK, linewidth=1.0, solid_capstyle="butt",
+            transform=x_trans, clip_on=False, zorder=6,
+        )
+    for y in y_vals:
+        ax.plot(
+            [0, TICK_LEN_AXES], [y, y],
+            color=BLACK, linewidth=1.0, solid_capstyle="butt",
+            transform=y_trans, clip_on=False, zorder=6,
+        )
+
+
+def save_png_at_width(fig, out_path, width_px=EXPORT_WIDTH_2COL, *, pad_inches=0.04):
+    w_in, _ = fig.get_size_inches()
+    dpi = width_px / w_in
+    fig.savefig(
+        out_path, dpi=dpi, bbox_inches="tight",
+        pad_inches=pad_inches, facecolor="white",
+    )
+
+
+def _force_panel_title(force_val):
+    """Compact force label for facet titles (e.g. 0.16 g, 0.6 g, 1 g)."""
+    text = f"{force_val:g}"
+    if "." not in text:
+        text = f"{text}.0"
+    return f"{text} g"
+
+
+def _set_force_title_above(ax, force_val, y=1.12):
+    """Place force title above the axes so brackets do not overlap it."""
+    ax.set_title("")
+    ax.text(
+        0.5, y, _force_panel_title(force_val),
+        transform=ax.transAxes,
+        ha="center", va="bottom",
+        fontsize=FONT_LABEL, fontweight="black",
+        clip_on=False,
+    )
+
+
+def _apply_c1_theme():
+    sns.set_theme(style="white")
+    atd_c1.apply_plot_style()
 
 
 def build_pairwise_lme_p_matrices(df_input, subject_col, area_order, force_values):
@@ -143,46 +253,176 @@ def _star_from_p(p):
     return "n.s."
 
 
-def _add_sig_bracket(ax, x_l, x_r, y_base, tick_h=0.5, text=""):
-    """Bracket from each box center (x_l, x_r) up to a shared bar; compact vertical size."""
+BRACKET_BASE_OFFSET = 2.5
+BRACKET_TIER_STEP = 8.0
+BRACKET_TEXT_PAD = 5.0
+
+
+def _assign_bracket_tiers(contrast_specs, region_order):
+    """Assign vertical tiers so overlapping x-spans do not share a tier."""
+    spans = []
+    for a1, a2, key in contrast_specs:
+        if a1 not in region_order or a2 not in region_order:
+            continue
+        x_l, x_r = sorted([region_order.index(a1), region_order.index(a2)])
+        spans.append({"x_l": x_l, "x_r": x_r, "w": x_r - x_l, "key": key})
+    spans.sort(key=lambda s: (s["w"], s["x_l"]))
+    for i, s_i in enumerate(spans):
+        tier = 0
+        while True:
+            conflict = any(
+                spans[j]["tier"] == tier
+                and s_i["x_l"] <= spans[j]["x_r"]
+                and spans[j]["x_l"] <= s_i["x_r"]
+                for j in range(i)
+            )
+            if not conflict:
+                s_i["tier"] = tier
+                break
+            tier += 1
+    return spans
+
+
+def _add_sig_bracket(ax, x_l, x_r, y_base, tick_h=0.45, text=""):
+    """Bracket from each box center (x_l, x_r) up to a shared bar."""
     x_center = (x_l + x_r) / 2.0
     y_top = y_base + tick_h
     ax.plot(
         [x_l, x_l, x_r, x_r],
         [y_base, y_top, y_top, y_base],
-        color=WINE,
+        color=ACCENT_RED,
         linewidth=0.75,
         clip_on=False,
         zorder=5,
     )
     ax.text(
         x_center,
-        y_top + 0.35,
+        y_top + 0.6,
         text,
         ha="center",
         va="bottom",
-        fontsize=6.5,
-        color=WINE,
+        fontsize=max(8, FONT_ANNOT - 1),
+        color=ACCENT_RED,
         fontweight="bold",
         clip_on=False,
         zorder=6,
     )
+    return y_top + 0.6 + BRACKET_TEXT_PAD
 
 
-def _style_boxplot(bp, facecolor):
+def _style_boxplot(bp, base_color):
+    face = pale_box_face(base_color)
     for patch in bp["boxes"]:
-        patch.set_facecolor(facecolor + BOX_ALPHA_HEX)
+        patch.set_facecolor(face)
         patch.set_edgecolor(BLACK)
-        patch.set_linewidth(0.8)
+        patch.set_linewidth(BOX_LINEWIDTH)
     for w in bp["whiskers"]:
         w.set_color(BLACK)
-        w.set_linewidth(0.8)
+        w.set_linewidth(BOX_LINEWIDTH)
     for c in bp["caps"]:
         c.set_color(BLACK)
-        c.set_linewidth(0.8)
+        c.set_linewidth(CAP_LINEWIDTH)
     for m in bp["medians"]:
-        m.set_color(BLACK)
-        m.set_linewidth(1.5)
+        m.set_color(ACCENT_RED)
+        m.set_linewidth(2.0)
+
+
+def subject_mean_accuracy_regions(df_in, sub_col, regions):
+    """Per-subject mean accuracy per region (trials pooled across forces)."""
+    sub = df_in[df_in["Area"].isin(regions)].dropna(
+        subset=[sub_col, "Area", "Relative_Score"]
+    )
+    if sub.empty:
+        return pd.DataFrame(columns=[sub_col, "Area", "accuracy"])
+    return (
+        sub.groupby([sub_col, "Area"], as_index=False)["Relative_Score"]
+        .mean()
+        .rename(columns={"Relative_Score": "accuracy"})
+    )
+
+
+def subject_mean_accuracy_regions_by_force(df_in, sub_col, regions):
+    """Per-subject mean accuracy per region and force."""
+    sub = df_in[df_in["Area"].isin(regions)].dropna(
+        subset=[sub_col, "Area", "Relative_Score", "Force_Val"]
+    )
+    if sub.empty:
+        return pd.DataFrame(columns=[sub_col, "Area", "Force_Val", "accuracy"])
+    return (
+        sub.groupby([sub_col, "Area", "Force_Val"], as_index=False)["Relative_Score"]
+        .mean()
+        .rename(columns={"Relative_Score": "accuracy"})
+    )
+
+
+def plot_region_boxes(
+    ax,
+    plot_df,
+    region_order,
+    palette,
+    *,
+    bar_w=0.55,
+    edge_pad=0.35,
+    x_tick_labels=None,
+):
+    """One box per region on the x-axis. Returns {region: whisker_top}."""
+    rng = np.random.default_rng(0)
+    box_kw = dict(
+        widths=bar_w,
+        patch_artist=True,
+        showfliers=False,
+        zorder=2,
+    )
+    tops = {}
+    all_edges = []
+
+    for xi, region in enumerate(region_order):
+        vals = plot_df.loc[plot_df["Area"] == region, "accuracy"].dropna().values
+        if len(vals) == 0:
+            continue
+        bp = ax.boxplot([vals], positions=[xi], **box_kw)
+        _style_boxplot(bp, palette[region])
+        bx0, bx1 = xi - bar_w / 2, xi + bar_w / 2
+        all_edges.extend([bx0, bx1])
+        tops[region] = max(bp["whiskers"][1].get_ydata())
+
+        jitter = rng.uniform(-bar_w * 0.12, bar_w * 0.12, size=len(vals))
+        ax.scatter(
+            xi + jitter,
+            vals,
+            color=_hsb_scatter_rgba(palette[region]),
+            s=14,
+            linewidths=0,
+            zorder=3,
+        )
+
+    labels = x_tick_labels if x_tick_labels is not None else region_order
+    ax.set_xticks(range(len(region_order)))
+    ax.set_xticklabels(labels)
+    if all_edges:
+        ax.set_xlim(min(all_edges) - edge_pad, max(all_edges) + edge_pad)
+    return tops
+
+
+def add_region_contrast_brackets(ax, region_order, region_tops, contrast_specs, lme_by_key):
+    """
+    Significance brackets between region pairs.
+    contrast_specs: [(area_left, area_right, lme_key), ...]
+    """
+    base_top = max(region_tops.values()) if region_tops else 80.0
+    y_ceiling = 80.0
+    for span in _assign_bracket_tiers(contrast_specs, region_order):
+        x_l, x_r = span["x_l"], span["x_r"]
+        tier = span["tier"]
+        y_bracket = base_top + BRACKET_BASE_OFFSET + tier * BRACKET_TIER_STEP
+        r = lme_by_key.get(span["key"])
+        if r is None:
+            sig_text = "LME fail"
+        else:
+            sig_text = f"{_star_from_p(r['p'])}  p={r['p']:.3f}"
+        text_top = _add_sig_bracket(ax, x_l, x_r, y_bracket, text=sig_text)
+        y_ceiling = max(y_ceiling, text_top)
+    return y_ceiling
 
 
 def plot_paired_contrast_boxes(
@@ -244,8 +484,7 @@ def plot_paired_contrast_boxes(
             ax.scatter(
                 pos + jitter,
                 vals,
-                color=palette[area],
-                alpha=0.4,
+                color=_hsb_scatter_rgba(palette[area]),
                 s=14,
                 linewidths=0,
                 zorder=3,
@@ -450,70 +689,49 @@ def lme_area_pair_contrast_v2(df_in, sub_col, ref_area, target_area):
 
 
 AREA_PALETTE = {
-    area: PALETTE_4[i % len(PALETTE_4)]
+    area: _AREA_BASE[i % len(_AREA_BASE)]
     for i, area in enumerate(["A", "B", "C", "D", "E", "F"])
 }
 
 
-def plot_accuracy_contrast_panel(ax, plot_df, lme_by_label, title):
-    """Y = accuracy (%); grouped boxplot by contrast (two areas); LME p from trial-level model."""
-    order = list(lme_by_label.keys())
-    if plot_df.empty or not order:
+def plot_region_accuracy_panel(ax, plot_df, region_order, palette, contrast_specs,
+                               lme_by_label, title, *, x_tick_labels=None):
+    """One box per region; brackets show pairwise LME contrasts."""
+    if plot_df.empty or not region_order:
         ax.text(0.5, 0.5, "Insufficient data", ha="center", va="center", transform=ax.transAxes)
-        ax.set_title(title, fontsize=12)
-        return
+        ax.set_title(title, fontsize=FONT_LABEL)
+        return 80.0
 
-    hue_order = ["A", "B", "C", "D", "E", "F"]
-    pal = {k: v for k, v in AREA_PALETTE.items() if k in plot_df["Area"].unique()}
-
-    sns.boxplot(
-        data=plot_df,
-        x="contrast",
-        y="accuracy",
-        hue="Area",
-        order=order,
-        hue_order=[a for a in hue_order if a in plot_df["Area"].unique()],
-        palette=pal,
-        width=0.72,
-        fliersize=0,
-        linewidth=1.1,
-        ax=ax,
+    region_tops = plot_region_boxes(
+        ax, plot_df, region_order, palette,
+        x_tick_labels=x_tick_labels,
     )
+    ax.axhline(80, color=CRITERION_COLOR, linestyle="--", linewidth=1.0, alpha=0.85,
+               zorder=atd_c1.REF_LINE_ZORDER)
+    ax.set_ylabel(Y_LABEL, fontsize=FONT_LABEL)
+    ax.set_xlabel("Region", fontsize=FONT_LABEL)
+    ax.set_title(title, fontsize=FONT_LABEL, fontweight="bold")
+    ax.tick_params(axis="x", labelsize=FONT_XTICK)
+    ax.tick_params(axis="y", labelsize=FONT_TICK)
+    y_ceiling = add_region_contrast_brackets(
+        ax, region_order, region_tops, contrast_specs, lme_by_label,
+    )
+    ax.set_ylim(-5, min(145, y_ceiling + 4))
+    return y_ceiling
 
-    ax.axhline(80, color=WINE, linestyle="--", linewidth=1, alpha=0.55)
-    ax.set_ylabel("Accuracy (relative score, %)", fontsize=11)
-    ax.set_xlabel("Contrast (LME: inner − outer area, + Force)", fontsize=10)
-    ax.set_title(title, fontsize=12, fontweight="bold")
-    ax.set_ylim(-5, 118)
-    ax.grid(axis="y", alpha=0.35)
-    handles, labels = ax.get_legend_handles_labels()
-    seen = set()
-    h2, l2 = [], []
-    for hi, li in zip(handles, labels):
-        if li not in seen:
-            seen.add(li)
-            h2.append(hi)
-            l2.append(li)
-    ax.legend(h2, l2, title="Area", frameon=False, loc="lower right")
-    ax.tick_params(axis="x", rotation=20)
 
-    for i, cv in enumerate(order):
-        sub_y = plot_df.loc[plot_df["contrast"] == cv, "accuracy"]
-        if sub_y.empty:
-            continue
-        y_ann = float(sub_y.max()) + 4.0
-        r = lme_by_label.get(cv)
-        if r is None:
-            ax.text(i, y_ann, "LME fail", ha="center", fontsize=8, color=SLATE_BLUE)
-        else:
-            ax.text(
-                i,
-                y_ann,
-                f"{_star_from_p(r['p'])}\np={r['p']:.3f}",
-                ha="center",
-                fontsize=8,
-                color=WINE,
-            )
+def plot_accuracy_contrast_panel(ax, plot_df, lme_by_label, title):
+    """Deprecated wrapper — use plot_region_accuracy_panel."""
+    region_order = sorted(plot_df["Area"].unique())
+    contrast_specs = [
+        tuple(k.split(" vs ", 1)) + (k,)
+        for k in lme_by_label.keys()
+        if " vs " in k and all(p in region_order for p in k.split(" vs ", 1))
+    ]
+    pal = {k: AREA_PALETTE.get(k, SLATE_BLUE) for k in region_order}
+    plot_region_accuracy_panel(
+        ax, plot_df, region_order, pal, contrast_specs, lme_by_label, title,
+    )
 
 
 # 1. 데이터 로드 및 전처리
@@ -571,8 +789,8 @@ else:
             "ATD_Stats: LME heatmaps require an 'Area' column (or 'Region' to alias as Area)."
         )
 
-    sns.set_theme(style="whitegrid")
-    palette = {"M": SLATE_BLUE, "F": OLIVE}
+    _apply_c1_theme()
+    palette = {"M": ON_TOUCH, "F": IN_AIR}
 
     # --- Figure 1: Gender (disabled) — LME stats printed only ---
     print("\n" + "=" * 50)
@@ -627,20 +845,20 @@ else:
                 m_med, f_med = m_scores.median(), f_scores.median()
                 ax_gender.text(
                     i - 0.2, m_med + 1, f"{m_med:.1f}",
-                    color=palette["M"], fontweight="bold", ha="center", fontsize=10,
+                    color=palette["M"], fontweight="bold", ha="center", fontsize=FONT_ANNOT,
                 )
                 ax_gender.text(
                     i + 0.2, f_med + 1, f"{f_med:.1f}",
-                    color=palette["F"], fontweight="bold", ha="center", fontsize=10,
+                    color=palette["F"], fontweight="bold", ha="center", fontsize=FONT_ANNOT,
                 )
                 if star != "n.s.":
                     ax_gender.text(
                         i, 115, star, ha="center", va="bottom",
-                        color=WINE, fontsize=20, fontweight="bold",
+                        color=ACCENT_RED, fontsize=FONT_LABEL, fontweight="bold",
                     )
                     ax_gender.text(
                         i, 110, f"p={p_val:.3f}", ha="center", va="top",
-                        color="black", fontsize=9,
+                        color=BLACK, fontsize=FONT_ANNOT,
                     )
         else:
             print(f"{f_val:<10.2f} | LME 불가 (성별/피험자 수준 부족)")
@@ -669,7 +887,9 @@ else:
     )
 
     fig2, axes = plt.subplots(
-        1, len(plot_forces), figsize=FIG2_SIZE, facecolor="white"
+        1, len(plot_forces),
+        figsize=(FIG2_SIZE[0] * len(plot_forces) / 2, FIG2_SIZE[1]),
+        facecolor="white",
     )
     if len(plot_forces) == 1:
         axes = [axes]
@@ -684,9 +904,10 @@ else:
             vmin=0,
             vmax=0.1,
         )
-        axes[i].set_title(f"Force {f_val}g: Pairwise LME p-values")
-        axes[i].set_xlabel("Compared Area")
-        axes[i].set_ylabel("Reference Area")
+        axes[i].set_title(f"Force {f_val}g: Pairwise LME p-values", fontsize=FONT_LABEL)
+        axes[i].set_xlabel("Compared Area", fontsize=FONT_LABEL)
+        axes[i].set_ylabel("Reference Area", fontsize=FONT_LABEL)
+        axes[i].tick_params(labelsize=FONT_TICK)
 
     fig2.tight_layout()
     out_hm = os.path.join(FIG_DIR, "pairwise_lme_heatmap.png")
@@ -695,11 +916,25 @@ else:
     plt.close(fig2)
 
     # --- Figure 3: Lateral / proximal contrasts ---
-    pairs_left = [("A", "C"), ("A", "D"), ("B", "C"), ("B", "D")]
-    pairs_right = [("E", "C"), ("E", "D"), ("F", "C"), ("F", "D")]
+    LEFT_AREAS = ["A", "B", "C", "D"]
+    LEFT_PAIRS = [("A", "C"), ("A", "D"), ("B", "C"), ("B", "D")]
+    RIGHT_AREAS = ["E", "F", "C", "D"]
+    RIGHT_PAIRS = [("E", "C"), ("E", "D"), ("F", "C"), ("F", "D")]
 
-    plot_left, lme_left = build_contrast_tables(df_analysis, sub_col, pairs_left)
-    plot_right, lme_right = build_contrast_tables(df_analysis, sub_col, pairs_right)
+    plot_left = subject_mean_accuracy_regions(df_analysis, sub_col, LEFT_AREAS)
+    plot_right = subject_mean_accuracy_regions(df_analysis, sub_col, RIGHT_AREAS)
+    lme_left = {
+        f"{a1} vs {a2}": lme_area_pair_contrast(df_analysis, sub_col, a2, a1)
+        for a1, a2 in LEFT_PAIRS
+    }
+    lme_right = {
+        f"{a1} vs {a2}": lme_area_pair_contrast(df_analysis, sub_col, a2, a1)
+        for a1, a2 in RIGHT_PAIRS
+    }
+    left_specs = [(a1, a2, f"{a1} vs {a2}") for a1, a2 in LEFT_PAIRS]
+    right_specs = [(a1, a2, f"{a1} vs {a2}") for a1, a2 in RIGHT_PAIRS]
+    left_pal = {a: AREA_PALETTE[a] for a in LEFT_AREAS}
+    right_pal = {a: AREA_PALETTE[a] for a in RIGHT_AREAS}
 
     print(
         "\n[LME contrasts | trial-level: first − second, + Force_Val, RE=Subject]"
@@ -717,18 +952,24 @@ else:
     )
     fig3.suptitle(
         "Lateral / proximal accuracy by region contrast (LME inference)",
-        fontsize=13,
+        fontsize=FONT_LABEL,
         y=1.02,
     )
-    plot_accuracy_contrast_panel(
+    plot_region_accuracy_panel(
         ax_l,
         plot_left,
+        LEFT_AREAS,
+        left_pal,
+        left_specs,
         lme_left,
         "A–C, A–D, B–C, B–D",
     )
-    plot_accuracy_contrast_panel(
+    plot_region_accuracy_panel(
         ax_r,
         plot_right,
+        RIGHT_AREAS,
+        right_pal,
+        right_specs,
         lme_right,
         "E–C, E–D, F–C, F–D",
     )
@@ -747,26 +988,28 @@ else:
 
     pairs_nail = [("On-Nail", "Off-Nail (A)"), ("On-Nail", "Off-Nail (F)")]
 
-    plot_parts_nail = []
+    NAIL_PALETTE = {
+        "On-Nail": "#10559A",
+        "Off-Nail (A)": "#7C94B8",
+        "Off-Nail (F)": "#B1BBC8",
+    }
+    REGION_ORDER = ["On-Nail", "Off-Nail (A)", "Off-Nail (F)"]
+    NAIL_X_LABELS = ["On-nail\n(C+D)", "Off-nail\n(A)", "Off-nail\n(F)"]
+    NAIL_CONTRAST_SPECS = [
+        ("On-Nail", "Off-Nail (A)", "On-Nail vs Off-Nail (A)"),
+        ("On-Nail", "Off-Nail (F)", "On-Nail vs Off-Nail (F)"),
+        ("Off-Nail (A)", "Off-Nail (F)", "A vs F"),
+    ]
+
     lme_nail = {}
     for a_nail, a_off in pairs_nail:
         label = f"{a_nail} vs {a_off}"
-        plot_parts_nail.append(
-            subject_mean_accuracy_long_v2(df_onnail, sub_col, a_nail, a_off)
-        )
         lme_nail[label] = lme_area_pair_contrast_v2(df_onnail, sub_col, a_off, a_nail)
-
-    # Same Off-Nail labels as other panels (not raw "A" / "F")
-    plot_af = subject_mean_accuracy_long_v2(
-        df_onnail, sub_col, "Off-Nail (A)", "Off-Nail (F)"
-    )
-    if not plot_af.empty:
-        plot_af["contrast"] = "A vs F"
     lme_nail["A vs F"] = lme_area_pair_contrast_v2(
         df_onnail, sub_col, "Off-Nail (F)", "Off-Nail (A)"
     )
 
-    plot_df_nail = pd.concat(plot_parts_nail + [plot_af], ignore_index=True)
+    plot_df_nail = subject_mean_accuracy_regions(df_onnail, sub_col, REGION_ORDER)
 
     print(
         "\n[On-Nail / Off-Nail / A–F LME contrasts | + Force_Val, RE=Subject]"
@@ -780,107 +1023,41 @@ else:
                 f"[{d['ci_lo']:.3f}, {d['ci_hi']:.3f}], p={d['p']:.4f}"
             )
 
-    NAIL_PALETTE = {
-        "On-Nail": SLATE_BLUE,
-        "Off-Nail (A)": OLIVE,
-        "Off-Nail (F)": WINE,
-    }
-    REGION_ORDER = ["On-Nail", "Off-Nail (A)", "Off-Nail (F)"]
+    fig4, ax4 = plt.subplots(figsize=(5.5, 5.2), facecolor="white")
 
-    order_nail = [
-        "On-Nail vs Off-Nail (A)",
-        "On-Nail vs Off-Nail (F)",
-        "A vs F",
-    ]
-
-    CONTRAST_AREAS = {
-        "On-Nail vs Off-Nail (A)": ["On-Nail", "Off-Nail (A)"],
-        "On-Nail vs Off-Nail (F)": ["On-Nail", "Off-Nail (F)"],
-        "A vs F": ["Off-Nail (A)", "Off-Nail (F)"],
-    }
-
-    fig4, ax4 = plt.subplots(figsize=(7.0, 5.2), facecolor="white")
-    # fig4.suptitle(
-    #     "On-Nail (C+D) vs Off-Nail (A, F) and A vs F — Accuracy Contrast\n"
-    #     "(LME: first − second in contrast label, + Force, RE=Subject)",
-    #     fontsize=11,
-    #     y=0.98,
-    # )
-
-    x_labels = ["On vs Off (A)", "On vs Off (F)", "A vs F"]
-
-    box_spans = plot_paired_contrast_boxes(
-        ax4,
-        plot_df_nail,
-        order_nail,
-        CONTRAST_AREAS,
-        NAIL_PALETTE,
-        bar_w=0.17,
-        pair_gap=0.05,
-        group_gap=0.14,
-        edge_pad_left=0.14,
-        edge_pad_right=0.30,
-        x_tick_labels=x_labels,
+    region_tops4 = plot_region_boxes(
+        ax4, plot_df_nail, REGION_ORDER, NAIL_PALETTE, edge_pad=0.40,
     )
-
-    ax4.axhline(80, color=WINE, linestyle="--", linewidth=1, alpha=0.55, zorder=0)
-    ax4.set_ylabel("Accuracy (relative score, %)", fontsize=11)
-    #ax4.set_xlabel("Contrast", fontsize=10)
-    ax4.grid(axis="y", alpha=0.35)
-    ax4.tick_params(axis="x", rotation=0, labelsize=8.5)
-
-    y_ceiling = 80.0
-    for cv in order_nail:
-        span = box_spans.get(cv)
-        if span is None:
-            continue
-        x_l, x_r, box_top = span
-        y_ceiling = max(y_ceiling, box_top)
-        y_bracket = box_top + 1.2
-        r = lme_nail.get(cv)
-        if r is None:
-            sig_text = "LME fail"
-        else:
-            sig_text = f"{_star_from_p(r['p'])}  p={r['p']:.3f}"
-        _add_sig_bracket(ax4, x_l, x_r, y_bracket, text=sig_text)
-        y_ceiling = max(y_ceiling, y_bracket + 2.8)
-
-    ax4.set_ylim(-5, min(105, y_ceiling + 3))
+    ax4.axhline(80, color=CRITERION_COLOR, linestyle="--", linewidth=1.0, alpha=0.85,
+                zorder=atd_c1.REF_LINE_ZORDER)
+    ax4.set_ylabel(Y_LABEL, fontsize=FONT_LABEL)
+    ax4.tick_params(axis="x", rotation=0, labelsize=FONT_XTICK)
+    ax4.tick_params(axis="y", labelsize=FONT_TICK)
+    y_ceiling = add_region_contrast_brackets(
+        ax4, REGION_ORDER, region_tops4, NAIL_CONTRAST_SPECS, lme_nail,
+    )
+    ax4.set_ylim(-5, min(120, y_ceiling + 4))
 
     leg_handles = [
-        mpatches.Patch(facecolor=NAIL_PALETTE[r] + BOX_ALPHA_HEX, edgecolor=BLACK,
-                       linewidth=0.6, label=r)
-        for r in REGION_ORDER
+        mpatches.Patch(
+            facecolor=pale_box_face(NAIL_PALETTE[r]), edgecolor=BLACK,
+            linewidth=BOX_LINEWIDTH,
+            label=NAIL_X_LABELS[i].replace("\n", " "),
+        )
+        for i, r in enumerate(REGION_ORDER)
     ]
-    ax4.legend(
-        handles=leg_handles,
-        title="Region",
-        frameon=False,
-        loc="lower right",
-        fontsize=8,
-        title_fontsize=8,
-    )
+    add_legend_outside(fig4, leg_handles, ncol=len(REGION_ORDER))
 
-    fig4.subplots_adjust(left=0.10, right=0.97, top=0.94, bottom=0.14)
+    fig4.subplots_adjust(left=0.10, right=0.97, top=0.94, bottom=0.18)
     out_nail = os.path.join(FIG_DIR, "onnail_vs_offnail_accuracy.png")
     fig4.savefig(out_nail, dpi=SAVE_DPI, bbox_inches="tight", facecolor="white")
     print(f"Saved: {out_nail}")
     plt.close(fig4)
 
-    # --- Figure 5: Same contrasts, split by force (0.16 g vs 0.6 g) ---
-    plot_parts_f5 = []
-    for a_nail, a_off in pairs_nail:
-        plot_parts_f5.append(
-            subject_mean_accuracy_by_force_v2(
-                df_onnail, sub_col, a_nail, a_off, f"{a_nail} vs {a_off}"
-            )
-        )
-    plot_af_f5 = subject_mean_accuracy_by_force_v2(
-        df_onnail, sub_col, "Off-Nail (A)", "Off-Nail (F)", "A vs F"
+    # --- Figure 5: On-nail regions by force (0.16, 0.6, 1.0 g) ---
+    plot_df_f5 = subject_mean_accuracy_regions_by_force(
+        df_onnail, sub_col, REGION_ORDER,
     )
-    if not plot_af_f5.empty:
-        plot_parts_f5.append(plot_af_f5)
-    plot_df_f5 = pd.concat(plot_parts_f5, ignore_index=True)
 
     nail_regions = ["On-Nail", "Off-Nail (A)", "Off-Nail (F)"]
 
@@ -911,14 +1088,14 @@ else:
     else:
         print("  Force × Area interaction: LME failed")
 
-    for cv, areas_pair in CONTRAST_AREAS.items():
-        sub_cv = df_onnail[df_onnail["Area"].isin(areas_pair)]
+    for a1, a2, key in NAIL_CONTRAST_SPECS:
+        sub_cv = df_onnail[df_onnail["Area"].isin([a1, a2])]
         r_cv = lme_force_test(sub_cv, sub_col, include_area=True)
         if r_cv:
-            print(f"  {cv} — Force|Area: p={r_cv['p']:.4f}")
+            print(f"  {key} — Force|Area: p={r_cv['p']:.4f}")
         for fval in plot_forces:
             r_af = lme_area_pair_at_force(
-                df_onnail, sub_col, areas_pair[1], areas_pair[0], fval
+                df_onnail, sub_col, a2, a1, fval
             )
             if r_af:
                 print(
@@ -929,8 +1106,8 @@ else:
     fig5, axes5 = plt.subplots(
         1,
         n_force_panels,
-        figsize=(FIG5_SIZE[0], FIG5_SIZE[1]),
-        sharey=True,
+        figsize=FIG5_SIZE,
+        sharey=False,
         facecolor="white",
     )
     if n_force_panels == 1:
@@ -938,76 +1115,53 @@ else:
 
     for ax5, fval in zip(axes5, plot_forces):
         sub_f = plot_df_f5[np.isclose(plot_df_f5["Force_Val"], fval)].copy()
-        spans_f = plot_paired_contrast_boxes(
-            ax5,
-            sub_f,
-            order_nail,
-            CONTRAST_AREAS,
-            NAIL_PALETTE,
-            bar_w=0.17,
-            pair_gap=0.05,
-            group_gap=0.14,
-            edge_pad_left=0.14,
-            edge_pad_right=0.22 if fval == plot_forces[-1] else 0.14,
-            x_tick_labels=x_labels,
+
+        region_tops_f = plot_region_boxes(
+            ax5, sub_f, REGION_ORDER, NAIL_PALETTE,
+            edge_pad=0.35, bar_w=0.55, x_tick_labels=NAIL_X_LABELS,
         )
-        ax5.axhline(80, color=WINE, linestyle="--", linewidth=1, alpha=0.55, zorder=0)
-        ax5.set_title(f"{fval:.2f} g", fontsize=10, fontweight="bold", pad=6)
-        ax5.grid(axis="y", alpha=0.35)
-        ax5.tick_params(axis="x", labelsize=8.5)
+        ax5.axhline(80, color=CRITERION_COLOR, linestyle="--", linewidth=1.0, alpha=0.85,
+                    zorder=atd_c1.REF_LINE_ZORDER)
+        _set_force_title_above(ax5, fval, y=1.10)
+        ax5.tick_params(axis="x", labelsize=FONT_FIG5_XTICK)
+        ax5.tick_params(axis="y", labelsize=FONT_TICK)
 
-        y_ceil_f = 80.0
-        for cv in order_nail:
-            areas_pair = CONTRAST_AREAS[cv]
-            span = spans_f.get(cv)
-            if span is None:
-                continue
-            x_l, x_r, box_top = span
-            y_ceil_f = max(y_ceil_f, box_top)
-            y_bracket = box_top + 1.2
-            r_af = lme_area_pair_at_force(
-                df_onnail, sub_col, areas_pair[1], areas_pair[0], fval
-            )
-            if r_af is None:
-                sig_text = "n.s."
-            else:
-                sig_text = f"{_star_from_p(r_af['p'])}  p={r_af['p']:.3f}"
-            _add_sig_bracket(ax5, x_l, x_r, y_bracket, text=sig_text)
-            y_ceil_f = max(y_ceil_f, y_bracket + 2.8)
-
-        ax5.set_ylim(-5, min(105, y_ceil_f + 3))
+        lme_at_force = {
+            key: lme_area_pair_at_force(df_onnail, sub_col, a2, a1, fval)
+            for a1, a2, key in NAIL_CONTRAST_SPECS
+        }
+        y_ceil_f = add_region_contrast_brackets(
+            ax5, REGION_ORDER, region_tops_f, NAIL_CONTRAST_SPECS, lme_at_force,
+        )
+        y_top = min(FIG5_YLIM_TOP_CAP, y_ceil_f + 4)
+        ax5.set_ylim(-5, y_top)
+        ax5.set_yticks(FIG5_Y_TICKS)
+        ax5.yaxis.set_major_locator(FixedLocator(FIG5_Y_TICKS))
+        # Spine/ticks end at 100; ylim may extend to ~120 for brackets only
+        ax5.spines["left"].set_bounds(-5, FIG5_Y_AXIS_TOP)
+        add_inward_tick_guides(
+            ax5,
+            x_positions=range(len(REGION_ORDER)),
+            y_ticks=FIG5_Y_TICKS,
+        )
         if fval == plot_forces[0]:
-            ax5.set_ylabel("Accuracy (relative score, %)", fontsize=11)
+            ax5.set_ylabel(Y_LABEL, fontsize=FONT_LABEL)
         else:
             ax5.set_ylabel("")
 
     leg_handles_f5 = [
         mpatches.Patch(
-            facecolor=NAIL_PALETTE[r] + BOX_ALPHA_HEX,
+            facecolor=pale_box_face(NAIL_PALETTE[r]),
             edgecolor=BLACK,
-            linewidth=0.6,
-            label=r,
+            linewidth=BOX_LINEWIDTH,
+            label=NAIL_X_LABELS[i].replace("\n", " "),
         )
-        for r in REGION_ORDER
+        for i, r in enumerate(REGION_ORDER)
     ]
-    axes5[-1].legend(
-        handles=leg_handles_f5,
-        title="Region",
-        frameon=False,
-        loc="lower right",
-        fontsize=8,
-        title_fontsize=8,
-    )
-
-    # fig5.suptitle(
-    
-    #     "On-Nail vs Off-Nail contrasts by force (On-touch Mid)\n"
-    #     "Brackets: area contrast within force; see console for Force LME",
-    #     fontsize=10,
-    #     y=1.02,
-    # )
-    fig5.subplots_adjust(left=0.08, right=0.97, top=0.88, bottom=0.14, wspace=0.06)
+    add_fig5_legend(fig5, leg_handles_f5, ncol=len(REGION_ORDER))
+    # Larger ``top`` → subplots move up → less white gap under the legend
+    fig5.subplots_adjust(left=0.08, right=0.97, top=0.83, bottom=0.12, wspace=0.18)
     out_f5 = os.path.join(FIG_DIR, "onnail_vs_offnail_by_force.png")
-    fig5.savefig(out_f5, dpi=SAVE_DPI, bbox_inches="tight", facecolor="white")
+    save_png_at_width(fig5, out_f5, width_px=EXPORT_WIDTH_2COL)
     print(f"Saved: {out_f5}")
     plt.close(fig5)

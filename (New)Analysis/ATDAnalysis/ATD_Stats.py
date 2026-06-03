@@ -16,7 +16,7 @@ from itertools import combinations
 warnings.filterwarnings("ignore")
 
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
-FIG_DIR = os.path.join(SCRIPT_DIR, "figures")
+FIG_DIR = os.path.join(SCRIPT_DIR, "Stats_Fig")
 os.makedirs(FIG_DIR, exist_ok=True)
 
 # Shared figure palette
@@ -36,7 +36,7 @@ FIG2_PANEL_W = 2.85   # inches per 6×6 heatmap panel
 FIG2_HEIGHT  = 4.0    # fixed height for pairwise LME heatmaps
 FIG4_SIZE    = (10.2, 4.8)   # force-pooled: heatmap + region boxplot + brackets
 FIG3_SIZE   = (14.5, 5.2)   # lateral / proximal contrasts
-SAVE_DPI    = 220
+SAVE_DPI    = 600
 
 
 def _pairwise_lme_p_matrix(subset, subject_col, area_order):
