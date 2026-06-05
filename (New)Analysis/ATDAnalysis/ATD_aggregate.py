@@ -358,6 +358,101 @@ def subject_mean_accuracy_regions_by_force(df_in, sub_col, regions):
     )
 
 
+def subject_area_pool_as_separate(df_in, sub_col, area_group_map, force_val=None):
+    """Per-subject mean accuracy per original area, then relabelled to group.
+
+    Unlike subject_mean_accuracy_regions (which averages C+D together per subject,
+    giving n=30), this keeps each area as a separate subject-level observation so
+    pooling C and D gives n=60 (30 from C + 30 from D).
+
+    area_group_map: dict mapping original Area label to group name.
+                   e.g. {"C": "On-nail", "D": "On-nail", "A": "Off-nail", "F": "Off-nail"}
+    """
+    areas = list(area_group_map.keys())
+    sub = df_in[df_in["Area"].isin(areas)].dropna(
+        subset=[sub_col, "Area", "Relative_Score"]
+    )
+    if force_val is not None:
+        sub = sub[np.isclose(sub["Force_Val"], force_val)]
+    if sub.empty:
+        return pd.DataFrame(columns=[sub_col, "Area", "Group", "accuracy"])
+    group_keys = ([sub_col, "Area", "Force_Val"] if force_val is None
+                  else [sub_col, "Area"])
+    agg = (
+        sub.groupby(group_keys, as_index=False)["Relative_Score"]
+        .mean()
+        .rename(columns={"Relative_Score": "accuracy"})
+    )
+    agg["Group"] = agg["Area"].map(area_group_map)
+    return agg
+
+
+def lme_two_groups_pooled(df_pooled, sub_col, ref_group, target_group,
+                           score_col="accuracy"):
+    """LME comparing two pooled groups where each subject may contribute
+    multiple observations (e.g. both C and D rows → On-nail).
+
+    Model: score ~ C(Group, Treatment(ref)), random intercept = Subject.
+    Returns dict with coef, ci_lo, ci_hi, p, or None on failure.
+    """
+    sub = df_pooled[df_pooled["Group"].isin([ref_group, target_group])].dropna(
+        subset=[sub_col, "Group", score_col]
+    )
+    if sub[sub_col].nunique() < 2 or sub["Group"].nunique() < 2:
+        return None
+    formula = (
+        f"{score_col} ~ C(Group, Treatment(reference='{ref_group}'))"
+    )
+    try:
+        res = smf.mixedlm(formula, sub, groups=sub[sub_col]).fit(reml=True)
+        col = f"C(Group, Treatment(reference='{ref_group}'))[T.{target_group}]"
+        if col not in res.params.index:
+            return None
+        ci = res.conf_int().loc[col]
+        return {
+            "coef": float(res.params[col]),
+            "ci_lo": float(ci[0]),
+            "ci_hi": float(ci[1]),
+            "p": float(res.pvalues[col]),
+        }
+    except Exception:
+        return None
+
+
+def subject_mean_of_area_means(df_in, sub_col, area_group_map, force_val=None):
+    """Per-subject mean-of-area-means: first compute per-area mean, then average
+    across areas within each group.
+
+    e.g. area_group_map = {"C": "On-nail", "D": "On-nail", "A": "Off-nail", "F": "Off-nail"}
+    → On-nail per subject  = (C_mean + D_mean) / 2   (n=30)
+    → Off-nail per subject = (A_mean + F_mean) / 2   (n=30)
+    """
+    areas = list(area_group_map.keys())
+    sub = df_in[df_in["Area"].isin(areas)].dropna(
+        subset=[sub_col, "Area", "Relative_Score"]
+    )
+    if force_val is not None:
+        sub = sub[np.isclose(sub["Force_Val"], force_val)]
+    if sub.empty:
+        return pd.DataFrame(columns=[sub_col, "Group", "accuracy"])
+
+    group_keys = [sub_col, "Area"] + (["Force_Val"] if force_val is None else [])
+    area_means = (
+        sub.groupby(group_keys, as_index=False)["Relative_Score"]
+        .mean()
+        .rename(columns={"Relative_Score": "area_acc"})
+    )
+    area_means["Group"] = area_means["Area"].map(area_group_map)
+
+    grp_keys = [sub_col, "Group"] + (["Force_Val"] if force_val is None else [])
+    result = (
+        area_means.groupby(grp_keys, as_index=False)["area_acc"]
+        .mean()
+        .rename(columns={"area_acc": "accuracy"})
+    )
+    return result
+
+
 def plot_region_boxes(
     ax,
     plot_df,
@@ -1125,7 +1220,7 @@ else:
         )
         ax5.axhline(80, color=CRITERION_COLOR, linestyle="--", linewidth=1.0, alpha=0.85,
                     zorder=atd_c1.REF_LINE_ZORDER)
-        _set_force_title_above(ax5, fval, y=1.10)
+        _set_force_title_above(ax5, fval, y=1.04)
         ax5.tick_params(axis="x", labelsize=FONT_FIG5_XTICK)
         ax5.tick_params(axis="y", labelsize=FONT_TICK)
 
@@ -1163,8 +1258,254 @@ else:
     ]
     add_fig5_legend(fig5, leg_handles_f5, ncol=len(REGION_ORDER))
     # Larger ``top`` → subplots move up → less white gap under the legend
-    fig5.subplots_adjust(left=0.08, right=0.97, top=0.83, bottom=0.12, wspace=0.18)
+    fig5.subplots_adjust(left=0.08, right=0.97, top=0.88, bottom=0.12, wspace=0.18)
     out_f5 = os.path.join(FIG_DIR, "onnail_vs_offnail_by_force.png")
     save_png_at_width(fig5, out_f5, width_px=EXPORT_WIDTH_2COL)
     print(f"Saved: {out_f5}")
     plt.close(fig5)
+
+    # =========================================================================
+    # Figure 6: On-nail (C+D, n=60) vs Off-nail (A+F, n=60) — pooled, by force
+    # Each subject contributes one mean per original area (C, D, A, F),
+    # giving 60 observations per group. Shown as 3 force panels.
+    # =========================================================================
+    POOL_GROUP_MAP = {
+        "C": "On-nail",
+        "D": "On-nail",
+        "A": "Off-nail",
+        "F": "Off-nail",
+    }
+    POOL_GROUP_ORDER = ["On-nail", "Off-nail"]
+    POOL_PALETTE = {
+        "On-nail":  ON_TOUCH,
+        "Off-nail": "#7C94B8",   # same as Off-Nail (A) in NAIL_PALETTE
+    }
+    POOL_X_LABELS = ["On-nail\n(C+D, n=60)", "Off-nail\n(A+F, n=60)"]
+
+    print("\n[Figure 6 — On-nail(C+D) vs Off-nail(A+F) | pooled area means, by force, RE=Subject]")
+
+    fig6, axes6 = plt.subplots(1, len(plot_forces), figsize=FIG5_SIZE, facecolor="white")
+    if len(plot_forces) == 1:
+        axes6 = [axes6]
+
+    rng6 = np.random.default_rng(42)
+
+    for ax6, fval in zip(axes6, plot_forces):
+        df_pool_f = subject_area_pool_as_separate(
+            df_analysis, sub_col, POOL_GROUP_MAP, force_val=fval
+        )
+
+        lme_pool_f = lme_two_groups_pooled(
+            df_pool_f, sub_col, ref_group="Off-nail", target_group="On-nail"
+        )
+        if lme_pool_f:
+            star_f = ("***" if lme_pool_f["p"] < 0.001 else
+                      "**"  if lme_pool_f["p"] < 0.01  else
+                      "*"   if lme_pool_f["p"] < 0.05  else "n.s.")
+            print(f"  {fval}g  On-nail vs Off-nail: Δ={lme_pool_f['coef']:.3f} "
+                  f"[{lme_pool_f['ci_lo']:.3f}, {lme_pool_f['ci_hi']:.3f}], "
+                  f"p={lme_pool_f['p']:.4f}  {star_f}")
+        else:
+            print(f"  {fval}g  LME failed")
+
+        tops_f = {}
+        for xi, grp in enumerate(POOL_GROUP_ORDER):
+            grp_data = df_pool_f[df_pool_f["Group"] == grp]["accuracy"].dropna().values
+            bp = ax6.boxplot(
+                [grp_data],
+                positions=[xi],
+                widths=0.45,
+                patch_artist=True,
+                showfliers=False,
+                zorder=2,
+                whiskerprops=dict(color=BLACK, linewidth=BOX_LINEWIDTH),
+                capprops=dict(color=BLACK, linewidth=CAP_LINEWIDTH),
+                medianprops=dict(color=ACCENT_RED, linewidth=2.0),
+                boxprops=dict(
+                    facecolor=pale_box_face(POOL_PALETTE[grp]),
+                    edgecolor=BLACK,
+                    linewidth=BOX_LINEWIDTH,
+                ),
+            )
+            whisker_ys = [w.get_ydata()[1] for w in bp["whiskers"]]
+            tops_f[grp] = max(whisker_ys) if whisker_ys else 0.0
+
+            jitter = rng6.uniform(-0.12, 0.12, size=len(grp_data))
+            rgba = _hsb_scatter_rgba(POOL_PALETTE[grp])
+            ax6.scatter(
+                xi + jitter, grp_data,
+                c=[rgba] * len(grp_data),
+                s=3.5 ** 2,
+                linewidths=0,
+                zorder=3,
+                clip_on=False,
+            )
+
+        if lme_pool_f:
+            star6 = ("***" if lme_pool_f["p"] < 0.001 else
+                     "**"  if lme_pool_f["p"] < 0.01  else
+                     "*"   if lme_pool_f["p"] < 0.05  else "n.s.")
+            p_txt = f"p={lme_pool_f['p']:.3f}"
+            y_brk = max(tops_f.values()) + 4
+            _add_sig_bracket(ax6, 0, 1, y_brk, text=f"{star6}  {p_txt}")
+
+        ax6.axhline(80, color=CRITERION_COLOR, linestyle="--", linewidth=1.0,
+                    alpha=0.85, zorder=atd_c1.REF_LINE_ZORDER)
+        _set_force_title_above(ax6, fval, y=0.95)
+        ax6.set_xticks([0, 1])
+        ax6.set_xticklabels(POOL_X_LABELS, fontsize=FONT_FIG5_XTICK)
+        ax6.set_yticks(FIG5_Y_TICKS)
+        ax6.yaxis.set_major_locator(FixedLocator(FIG5_Y_TICKS))
+        ax6.tick_params(axis="y", labelsize=FONT_TICK)
+        ax6.tick_params(axis="x", length=0)
+        y_top6 = min(FIG5_YLIM_TOP_CAP, max(tops_f.values()) + 20)
+        ax6.set_ylim(-5, y_top6)
+        ax6.spines["left"].set_bounds(-5, FIG5_Y_AXIS_TOP)
+        sns.despine(ax=ax6)
+        add_inward_tick_guides(ax6, x_positions=[0, 1], y_ticks=FIG5_Y_TICKS)
+        if fval == plot_forces[0]:
+            ax6.set_ylabel(Y_LABEL, fontsize=FONT_LABEL)
+        else:
+            ax6.set_ylabel("")
+
+    leg_handles_f6 = [
+        mpatches.Patch(
+            facecolor=pale_box_face(POOL_PALETTE[grp]),
+            edgecolor=BLACK,
+            linewidth=BOX_LINEWIDTH,
+            label=POOL_X_LABELS[i].replace("\n", " "),
+        )
+        for i, grp in enumerate(POOL_GROUP_ORDER)
+    ]
+    add_fig5_legend(fig6, leg_handles_f6, ncol=len(POOL_GROUP_ORDER))
+    fig6.subplots_adjust(left=0.08, right=0.97, top=0.88, bottom=0.12, wspace=0.18)
+    out_f6 = os.path.join(FIG_DIR, "onnail_vs_offnail_pooled.png")
+    save_png_at_width(fig6, out_f6, width_px=EXPORT_WIDTH_2COL)
+    print(f"Saved: {out_f6}")
+    plt.close(fig6)
+
+    # =========================================================================
+    # Figure 7: On-nail (C+D trials pooled) vs Off-nail (A+F trials pooled)
+    # Same trial-level pooling as current On-nail approach, extended to A+F.
+    # Per subject: mean of ALL C+D trials → On-nail (n=30)
+    #              mean of ALL A+F trials → Off-nail (n=30)
+    # =========================================================================
+    # Relabel C,D→On-nail and A,F→Off-nail in the dataframe, then use
+    # subject_mean_accuracy_regions_by_force for per-force subject means.
+    df_pool2 = df_analysis.copy()
+    df_pool2["Area"] = df_pool2["Area"].replace(
+        {"C": "On-nail", "D": "On-nail", "A": "Off-nail", "F": "Off-nail"}
+    )
+
+    MOA_GROUP_ORDER = ["On-nail", "Off-nail"]
+    MOA_PALETTE = {
+        "On-nail":  ON_TOUCH,
+        "Off-nail": "#7C94B8",
+    }
+    MOA_X_LABELS = ["On-nail\n(C+D)", "Off-nail\n(A+F)"]
+
+    print("\n[Figure 7 — On-nail (C+D pooled) vs Off-nail (A+F pooled) | trial-level mean, n=30, by force, RE=Subject]")
+
+    df_pool2_by_force = subject_mean_accuracy_regions_by_force(
+        df_pool2, sub_col, MOA_GROUP_ORDER
+    )
+
+    fig7, axes7 = plt.subplots(1, len(plot_forces), figsize=FIG5_SIZE, facecolor="white")
+    if len(plot_forces) == 1:
+        axes7 = [axes7]
+
+    rng7 = np.random.default_rng(7)
+
+    for ax7, fval in zip(axes7, plot_forces):
+        df_moa_f = df_pool2_by_force[
+            np.isclose(df_pool2_by_force["Force_Val"], fval)
+        ].rename(columns={"Area": "Group"})
+
+        lme_moa_f = lme_two_groups_pooled(
+            df_moa_f, sub_col, ref_group="Off-nail", target_group="On-nail"
+        )
+        if lme_moa_f:
+            star_m = ("***" if lme_moa_f["p"] < 0.001 else
+                      "**"  if lme_moa_f["p"] < 0.01  else
+                      "*"   if lme_moa_f["p"] < 0.05  else "n.s.")
+            print(f"  {fval}g  On-nail vs Off-nail: Δ={lme_moa_f['coef']:.3f} "
+                  f"[{lme_moa_f['ci_lo']:.3f}, {lme_moa_f['ci_hi']:.3f}], "
+                  f"p={lme_moa_f['p']:.4f}  {star_m}")
+        else:
+            print(f"  {fval}g  LME failed")
+
+        tops_m = {}
+        for xi, grp in enumerate(MOA_GROUP_ORDER):
+            grp_data = df_moa_f[df_moa_f["Group"] == grp]["accuracy"].dropna().values
+            bp = ax7.boxplot(
+                [grp_data],
+                positions=[xi],
+                widths=0.45,
+                patch_artist=True,
+                showfliers=False,
+                zorder=2,
+                whiskerprops=dict(color=BLACK, linewidth=BOX_LINEWIDTH),
+                capprops=dict(color=BLACK, linewidth=CAP_LINEWIDTH),
+                medianprops=dict(color=ACCENT_RED, linewidth=2.0),
+                boxprops=dict(
+                    facecolor=pale_box_face(MOA_PALETTE[grp]),
+                    edgecolor=BLACK,
+                    linewidth=BOX_LINEWIDTH,
+                ),
+            )
+            whisker_ys = [w.get_ydata()[1] for w in bp["whiskers"]]
+            tops_m[grp] = max(whisker_ys) if whisker_ys else 0.0
+
+            jitter = rng7.uniform(-0.12, 0.12, size=len(grp_data))
+            rgba = _hsb_scatter_rgba(MOA_PALETTE[grp])
+            ax7.scatter(
+                xi + jitter, grp_data,
+                c=[rgba] * len(grp_data),
+                s=3.5 ** 2,
+                linewidths=0,
+                zorder=3,
+                clip_on=False,
+            )
+
+        if lme_moa_f:
+            star7 = ("***" if lme_moa_f["p"] < 0.001 else
+                     "**"  if lme_moa_f["p"] < 0.01  else
+                     "*"   if lme_moa_f["p"] < 0.05  else "n.s.")
+            p_txt = f"p={lme_moa_f['p']:.3f}"
+            y_brk = max(tops_m.values()) + 4
+            _add_sig_bracket(ax7, 0, 1, y_brk, text=f"{star7}  {p_txt}")
+
+        ax7.axhline(80, color=CRITERION_COLOR, linestyle="--", linewidth=1.0,
+                    alpha=0.85, zorder=atd_c1.REF_LINE_ZORDER)
+        _set_force_title_above(ax7, fval, y=1.04)
+        ax7.set_xticks([0, 1])
+        ax7.set_xticklabels(MOA_X_LABELS, fontsize=FONT_FIG5_XTICK)
+        ax7.set_yticks(FIG5_Y_TICKS)
+        ax7.yaxis.set_major_locator(FixedLocator(FIG5_Y_TICKS))
+        ax7.tick_params(axis="y", labelsize=FONT_TICK)
+        ax7.tick_params(axis="x", length=0)
+        y_top7 = min(FIG5_YLIM_TOP_CAP, max(tops_m.values()) + 20)
+        ax7.set_ylim(-5, y_top7)
+        ax7.spines["left"].set_bounds(-5, FIG5_Y_AXIS_TOP)
+        sns.despine(ax=ax7)
+        add_inward_tick_guides(ax7, x_positions=[0, 1], y_ticks=FIG5_Y_TICKS)
+        if fval == plot_forces[0]:
+            ax7.set_ylabel(Y_LABEL, fontsize=FONT_LABEL)
+        else:
+            ax7.set_ylabel("")
+
+    leg_handles_f7 = [
+        mpatches.Patch(
+            facecolor=pale_box_face(MOA_PALETTE[grp]),
+            edgecolor=BLACK,
+            linewidth=BOX_LINEWIDTH,
+            label=MOA_X_LABELS[i].replace("\n", " "),
+        )
+        for i, grp in enumerate(MOA_GROUP_ORDER)
+    ]
+    add_fig5_legend(fig7, leg_handles_f7, ncol=len(MOA_GROUP_ORDER))
+    fig7.subplots_adjust(left=0.08, right=0.97, top=0.88, bottom=0.12, wspace=0.18)
+    out_f7 = os.path.join(FIG_DIR, "onnail_vs_offnail_pooled_n30.png")
+    save_png_at_width(fig7, out_f7, width_px=EXPORT_WIDTH_2COL)
+    print(f"Saved: {out_f7}")
+    plt.close(fig7)

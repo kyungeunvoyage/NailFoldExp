@@ -1,11 +1,11 @@
 """
 ATD Comparison Figures
 ======================
-Figure 1: Kao fingerpad Paint vs. Periungual In-air (this study)
+Figure 1: Kao fingerpad No-paint vs. Periungual In-air (this study)
 Figure 2: Periungual On-touch vs. In-air (this study)
-Figure 3: Kao fingerpad Paint vs. Periungual On-touch (Mid) (this study)
+Figure 3: Kao fingerpad No-paint vs. Periungual On-touch (Mid) (this study)
 
-Kao et al. 2022 Paint condition values are digitized from published Fig. A (n=5).
+Kao et al. 2022 No-paint condition values are digitized from published Fig. A (n=5).
 """
 
 import os
@@ -1069,19 +1069,19 @@ def apply_scatter_hsb_brightness(
         coll.set_linewidths(0)
 
 # =============================================================================
-# Kao et al. 2022 — Paint condition (panel A, dark grey boxes)
-# Digitized from published Fig. A Paint trace (n=5, index fingerpad).
+# Kao et al. 2022 — No-paint condition (panel A, light grey boxes)
+# Digitized from published Fig. A No-paint trace (n=5, index fingerpad).
 # Values chosen so matplotlib boxplots match panel box/median/whisker layout.
 # y = Percent correct (%)
 # =============================================================================
 KAO_PAINT_RAW = {
     # force(g) : [P1, P2, P3, P4, P5]
-    0.02: [  0,  25,  48,  72,  88],   # box ~25–72%, median ~48%, whisker to 0%
-    0.04: [  0,  50,  80,  90,  95],   # box ~50–90%, median ~80%, whisker to 0%
-    0.07: [ 60,  68,  82,  85,  95],   # Paint Fig. A: box 68–85%, median ~82% (no 35% — No paint outlier)
-    0.40: [ 50, 100, 100, 100, 100],   # ceiling ~100%; ~50% low (outlier in panel)
+    0.02: [  0,   8,  20,  58,  58],
+    0.04: [ 42,  58,  70,  90, 100],
+    0.07: [ 35,  68,  80,  88,  95],
+    0.40: [ 90,  91,  93, 100, 100],
     1.00: [100, 100, 100, 100, 100],
-    1.40: [ 82, 100, 100, 100, 100],   # ceiling ~100%; ~82% low (outlier in panel)
+    1.40: [ 82, 100, 100, 100, 100],
 }
 KAO_N = 5
 
@@ -1092,7 +1092,7 @@ for force, vals in KAO_PAINT_RAW.items():
         kao_rows.append({
             "Force_Val":  float(force),
             "Score":      float(v),
-            "Source":     "Kao_Paint",
+            "Source":     "Kao_NoPaint",
             "Participant": f"KP{pid+1}",
         })
 df_kao = pd.DataFrame(kao_rows)
@@ -1201,7 +1201,7 @@ def plot_kao_vs_periungual(df_periungual, peri_label, peri_color, save_stem,
                            highlight_forces=None,
                            highlight_force_color="#B0B0B0",
                            highlight_force_alpha=0.10):
-    """Box/strip plot: Kao fingerpad Paint vs one periungual condition."""
+    """Box/strip plot: Kao fingerpad No-paint vs one periungual condition."""
     df_peri = df_periungual.copy()
     df_peri["Source"] = peri_label
 
@@ -1367,7 +1367,7 @@ def run_all_figures(export_widths=None, in_air=IN_AIR, on_touch=ON_TOUCH,
         df_raw[df_raw["Condition"] == "In-air"],
         INAIR_LABEL,
         in_air,
-        "Fig1_fingerpad_paint_vs_inair",
+        "Fig1_fingerpad_nopaint_vs_inair",
         export_widths=export_widths,
         scatter_brightness=scatter_brightness,
         **pale_box_kw,
@@ -1377,7 +1377,7 @@ def run_all_figures(export_widths=None, in_air=IN_AIR, on_touch=ON_TOUCH,
         df_raw[df_raw["Condition"] == "On-touch (Mid)"],
         ONTouch_LABEL,
         on_touch,
-        "Fig3_fingerpad_paint_vs_periungual_ontouch",
+        "Fig3_fingerpad_nopaint_vs_periungual_ontouch",
         export_widths=export_widths,
         scatter_brightness=scatter_brightness,
         **pale_box_kw,
@@ -1404,7 +1404,7 @@ def export_fig3_10559A_2col(scatter_brightness=SCATTER_HSB_BRIGHTNESS, **pale_bo
         df_raw[df_raw["Condition"] == "On-touch (Mid)"],
         ONTouch_LABEL,
         ON_TOUCH,
-        "Fig3_fingerpad_paint_vs_periungual_ontouch_10559A",
+        "Fig3_fingerpad_nopaint_vs_periungual_ontouch_10559A",
         export_widths=(("2col", 2102),),
         region_background=False,
         region_labels=False,
