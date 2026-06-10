@@ -1508,4 +1508,200 @@ else:
     out_f7 = os.path.join(FIG_DIR, "onnail_vs_offnail_pooled_n30.png")
     save_png_at_width(fig7, out_f7, width_px=EXPORT_WIDTH_2COL)
     print(f"Saved: {out_f7}")
+
+    # =========================================================================
+    # Figure 8a: On-nail (B+C+D+E) vs Off-nail (A+F) — trial-level pooling, n=30
+    # Per subject per force: mean of ALL B+C+D+E trials → On-nail (n=30)
+    #                        mean of ALL A+F trials     → Off-nail (n=30)
+    # Equal sample sizes; On-nail estimate uses 2× more trials (more stable).
+    # =========================================================================
+    df_pool8 = df_analysis.copy()
+    df_pool8["Area"] = df_pool8["Area"].replace({
+        "B": "On-nail", "C": "On-nail", "D": "On-nail", "E": "On-nail",
+        "A": "Off-nail", "F": "Off-nail",
+    })
+
+    F8A_GROUP_ORDER = ["On-nail", "Off-nail"]
+    F8A_PALETTE = {
+        "On-nail":  ON_TOUCH,
+        "Off-nail": "#7C94B8",
+    }
+    F8A_X_LABELS = ["On-nail\n(B+C+D+E)", "Off-nail\n(A+F)"]
+
+    print("\n[Figure 8a — On-nail(B+C+D+E) vs Off-nail(A+F) | trial-level pool, n=30, by force]")
+
+    df_pool8_by_force = subject_mean_accuracy_regions_by_force(
+        df_pool8, sub_col, F8A_GROUP_ORDER
+    )
+
+    fig8a, axes8a = plt.subplots(1, len(plot_forces), figsize=FIG5_SIZE, facecolor="white")
+    if len(plot_forces) == 1:
+        axes8a = [axes8a]
+
+    rng8a = np.random.default_rng(8)
+
+    for ax8a, fval in zip(axes8a, plot_forces):
+        df_f8a = df_pool8_by_force[
+            np.isclose(df_pool8_by_force["Force_Val"], fval)
+        ].rename(columns={"Area": "Group"})
+
+        lme_f8a = lme_two_groups_pooled(
+            df_f8a, sub_col, ref_group="Off-nail", target_group="On-nail"
+        )
+        if lme_f8a:
+            star_8a = ("***" if lme_f8a["p"] < 0.001 else
+                       "**"  if lme_f8a["p"] < 0.01  else
+                       "*"   if lme_f8a["p"] < 0.05  else "n.s.")
+            print(f"  {fval}g  On-nail vs Off-nail: Δ={lme_f8a['coef']:.3f} "
+                  f"[{lme_f8a['ci_lo']:.3f}, {lme_f8a['ci_hi']:.3f}], "
+                  f"p={lme_f8a['p']:.4f}  {star_8a}")
+        else:
+            print(f"  {fval}g  LME failed")
+
+        tops_8a = {}
+        for xi, grp in enumerate(F8A_GROUP_ORDER):
+            grp_data = df_f8a[df_f8a["Group"] == grp]["accuracy"].dropna().values
+            bp = ax8a.boxplot(
+                [grp_data], positions=[xi], widths=0.45,
+                patch_artist=True, showfliers=False, zorder=2,
+                whiskerprops=dict(color=BLACK, linewidth=BOX_LINEWIDTH),
+                capprops=dict(color=BLACK, linewidth=CAP_LINEWIDTH),
+                medianprops=dict(color=ACCENT_RED, linewidth=2.0),
+                boxprops=dict(facecolor=pale_box_face(F8A_PALETTE[grp]),
+                              edgecolor=BLACK, linewidth=BOX_LINEWIDTH),
+            )
+            tops_8a[grp] = max(w.get_ydata()[1] for w in bp["whiskers"])
+            jitter = rng8a.uniform(-0.12, 0.12, size=len(grp_data))
+            ax8a.scatter(xi + jitter, grp_data,
+                         c=[_hsb_scatter_rgba(F8A_PALETTE[grp])] * len(grp_data),
+                         s=3.5 ** 2, linewidths=0, zorder=3, clip_on=False)
+
+        if lme_f8a:
+            star8a = ("***" if lme_f8a["p"] < 0.001 else "**" if lme_f8a["p"] < 0.01
+                      else "*" if lme_f8a["p"] < 0.05 else "n.s.")
+            _add_sig_bracket(ax8a, 0, 1, max(tops_8a.values()) + 4,
+                             text=f"{star8a}  p={lme_f8a['p']:.3f}")
+
+        ax8a.axhline(80, color=CRITERION_COLOR, linestyle="--", linewidth=1.0,
+                     alpha=0.85, zorder=atd_c1.REF_LINE_ZORDER)
+        _set_force_title_above(ax8a, fval, y=1.04)
+        ax8a.set_xticks([0, 1])
+        ax8a.set_xticklabels(F8A_X_LABELS, fontsize=FONT_FIG5_XTICK)
+        ax8a.set_yticks(FIG5_Y_TICKS)
+        ax8a.yaxis.set_major_locator(FixedLocator(FIG5_Y_TICKS))
+        ax8a.tick_params(axis="y", labelsize=FONT_TICK)
+        ax8a.tick_params(axis="x", length=0)
+        ax8a.set_ylim(-5, min(FIG5_YLIM_TOP_CAP, max(tops_8a.values()) + 20))
+        ax8a.spines["left"].set_bounds(-5, FIG5_Y_AXIS_TOP)
+        sns.despine(ax=ax8a)
+        add_inward_tick_guides(ax8a, x_positions=[0, 1], y_ticks=FIG5_Y_TICKS)
+        if fval == plot_forces[0]:
+            ax8a.set_ylabel(Y_LABEL, fontsize=FONT_LABEL)
+
+    leg_f8a = [
+        mpatches.Patch(facecolor=pale_box_face(F8A_PALETTE[g]), edgecolor=BLACK,
+                       linewidth=BOX_LINEWIDTH, label=F8A_X_LABELS[i].replace("\n", " "))
+        for i, g in enumerate(F8A_GROUP_ORDER)
+    ]
+    add_fig5_legend(fig8a, leg_f8a, ncol=len(F8A_GROUP_ORDER))
+    fig8a.subplots_adjust(left=0.08, right=0.97, top=0.88, bottom=0.12, wspace=0.18)
+    out_f8a = os.path.join(FIG_DIR, "onnail_bcde_vs_offnail_af_n30.png")
+    save_png_at_width(fig8a, out_f8a, width_px=EXPORT_WIDTH_2COL)
+    print(f"Saved: {out_f8a}")
+    plt.close(fig8a)
+
+    # =========================================================================
+    # Figure 8b: On-nail (B+C+D+E) vs Off-nail (A+F) — per-region pooling
+    # Each subject contributes 4 obs to On-nail (B,C,D,E means) and
+    # 2 obs to Off-nail (A,F means) → n=120 vs n=60 (unequal).
+    # LME with random intercept for Subject handles the imbalance.
+    # =========================================================================
+    F8B_GROUP_MAP = {
+        "B": "On-nail", "C": "On-nail", "D": "On-nail", "E": "On-nail",
+        "A": "Off-nail", "F": "Off-nail",
+    }
+    F8B_GROUP_ORDER = ["On-nail", "Off-nail"]
+    F8B_PALETTE = {
+        "On-nail":  ON_TOUCH,
+        "Off-nail": "#7C94B8",
+    }
+    F8B_X_LABELS = ["On-nail\n(B+C+D+E, n=120)", "Off-nail\n(A+F, n=60)"]
+
+    print("\n[Figure 8b — On-nail(B+C+D+E) vs Off-nail(A+F) | per-region pool, n=120 vs 60, by force]")
+
+    fig8b, axes8b = plt.subplots(1, len(plot_forces), figsize=FIG5_SIZE, facecolor="white")
+    if len(plot_forces) == 1:
+        axes8b = [axes8b]
+
+    rng8b = np.random.default_rng(9)
+
+    for ax8b, fval in zip(axes8b, plot_forces):
+        df_pool8b_f = subject_area_pool_as_separate(
+            df_analysis, sub_col, F8B_GROUP_MAP, force_val=fval
+        )
+
+        lme_f8b = lme_two_groups_pooled(
+            df_pool8b_f, sub_col, ref_group="Off-nail", target_group="On-nail"
+        )
+        if lme_f8b:
+            star_8b = ("***" if lme_f8b["p"] < 0.001 else
+                       "**"  if lme_f8b["p"] < 0.01  else
+                       "*"   if lme_f8b["p"] < 0.05  else "n.s.")
+            print(f"  {fval}g  On-nail vs Off-nail: Δ={lme_f8b['coef']:.3f} "
+                  f"[{lme_f8b['ci_lo']:.3f}, {lme_f8b['ci_hi']:.3f}], "
+                  f"p={lme_f8b['p']:.4f}  {star_8b}")
+        else:
+            print(f"  {fval}g  LME failed")
+
+        tops_8b = {}
+        for xi, grp in enumerate(F8B_GROUP_ORDER):
+            grp_data = df_pool8b_f[df_pool8b_f["Group"] == grp]["accuracy"].dropna().values
+            bp = ax8b.boxplot(
+                [grp_data], positions=[xi], widths=0.45,
+                patch_artist=True, showfliers=False, zorder=2,
+                whiskerprops=dict(color=BLACK, linewidth=BOX_LINEWIDTH),
+                capprops=dict(color=BLACK, linewidth=CAP_LINEWIDTH),
+                medianprops=dict(color=ACCENT_RED, linewidth=2.0),
+                boxprops=dict(facecolor=pale_box_face(F8B_PALETTE[grp]),
+                              edgecolor=BLACK, linewidth=BOX_LINEWIDTH),
+            )
+            tops_8b[grp] = max(w.get_ydata()[1] for w in bp["whiskers"])
+            jitter = rng8b.uniform(-0.12, 0.12, size=len(grp_data))
+            ax8b.scatter(xi + jitter, grp_data,
+                         c=[_hsb_scatter_rgba(F8B_PALETTE[grp])] * len(grp_data),
+                         s=3.5 ** 2, linewidths=0, zorder=3, clip_on=False)
+
+        if lme_f8b:
+            star8b = ("***" if lme_f8b["p"] < 0.001 else "**" if lme_f8b["p"] < 0.01
+                      else "*" if lme_f8b["p"] < 0.05 else "n.s.")
+            _add_sig_bracket(ax8b, 0, 1, max(tops_8b.values()) + 4,
+                             text=f"{star8b}  p={lme_f8b['p']:.3f}")
+
+        ax8b.axhline(80, color=CRITERION_COLOR, linestyle="--", linewidth=1.0,
+                     alpha=0.85, zorder=atd_c1.REF_LINE_ZORDER)
+        _set_force_title_above(ax8b, fval, y=1.04)
+        ax8b.set_xticks([0, 1])
+        ax8b.set_xticklabels(F8B_X_LABELS, fontsize=FONT_FIG5_XTICK)
+        ax8b.set_yticks(FIG5_Y_TICKS)
+        ax8b.yaxis.set_major_locator(FixedLocator(FIG5_Y_TICKS))
+        ax8b.tick_params(axis="y", labelsize=FONT_TICK)
+        ax8b.tick_params(axis="x", length=0)
+        ax8b.set_ylim(-5, min(FIG5_YLIM_TOP_CAP, max(tops_8b.values()) + 20))
+        ax8b.spines["left"].set_bounds(-5, FIG5_Y_AXIS_TOP)
+        sns.despine(ax=ax8b)
+        add_inward_tick_guides(ax8b, x_positions=[0, 1], y_ticks=FIG5_Y_TICKS)
+        if fval == plot_forces[0]:
+            ax8b.set_ylabel(Y_LABEL, fontsize=FONT_LABEL)
+
+    leg_f8b = [
+        mpatches.Patch(facecolor=pale_box_face(F8B_PALETTE[g]), edgecolor=BLACK,
+                       linewidth=BOX_LINEWIDTH, label=F8B_X_LABELS[i].replace("\n", " "))
+        for i, g in enumerate(F8B_GROUP_ORDER)
+    ]
+    add_fig5_legend(fig8b, leg_f8b, ncol=len(F8B_GROUP_ORDER))
+    fig8b.subplots_adjust(left=0.08, right=0.97, top=0.88, bottom=0.12, wspace=0.18)
+    out_f8b = os.path.join(FIG_DIR, "onnail_bcde_vs_offnail_af_pooled.png")
+    save_png_at_width(fig8b, out_f8b, width_px=EXPORT_WIDTH_2COL)
+    print(f"Saved: {out_f8b}")
+    plt.close(fig8b)
     plt.close(fig7)
