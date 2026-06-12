@@ -302,34 +302,44 @@ def draw_fig3_stripplot(
     size=3.8,
     jitter_frac=FIG3_STRIP_JITTER_FRAC,
     seed=0,
+    participant_median=False,
+    triangle_keys=None,
 ):
-    """Strip points at ``Plot_X``; narrow centered jitter inside each box."""
+    """Strip points at ``Plot_X``; narrow centered jitter inside each box.
+
+    triangle_keys: set of (source_name, force_val) tuples → use '^' marker.
+    """
     rng = np.random.default_rng(seed)
     half_span = (box_width / 2) * jitter_frac
     for src in source_order:
         sub = df_plot[df_plot["Source"] == src]
         if sub.empty:
             continue
-        xs, ys = [], []
-        for _, grp in sub.groupby("Plot_X", sort=False):
-            x0 = float(grp["Plot_X"].iloc[0])
-            y = grp["Score"].to_numpy(dtype=float)
-            xs.append(x0 + _centered_strip_offsets(len(y), half_span, rng))
-            ys.append(y)
-        x = np.concatenate(xs)
-        y = np.concatenate(ys)
+        if participant_median and "Participant" in sub.columns:
+            grp_cols = ["Participant", "Plot_X"]
+            if "Force_Val" in sub.columns:
+                grp_cols = ["Participant", "Plot_X", "Force_Val"]
+            sub = sub.groupby(grp_cols, as_index=False)["Score"].median()
         rgba = _hsb_scatter_rgba(source_colors[src], brightness)
-        ax.scatter(
-            x,
-            y,
-            c=[rgba] * len(x),
-            s=size ** 2,
-            linewidths=0,
-            edgecolors="none",
-            alpha=alpha,
-            zorder=3,
-            clip_on=False,
-        )
+        xs_circ, ys_circ = [], []
+        xs_tri,  ys_tri  = [], []
+        for _, grp in sub.groupby("Plot_X", sort=False):
+            x0   = float(grp["Plot_X"].iloc[0])
+            fval = float(grp["Force_Val"].iloc[0]) if "Force_Val" in grp.columns else None
+            y    = grp["Score"].to_numpy(dtype=float)
+            offsets = x0 + _centered_strip_offsets(len(y), half_span, rng)
+            if triangle_keys is not None and (src, fval) in triangle_keys:
+                xs_tri.append(offsets);  ys_tri.append(y)
+            else:
+                xs_circ.append(offsets); ys_circ.append(y)
+        scatter_kw = dict(linewidths=0, edgecolors="none", alpha=alpha,
+                          zorder=3, clip_on=False)
+        if xs_circ:
+            xc = np.concatenate(xs_circ); yc = np.concatenate(ys_circ)
+            ax.scatter(xc, yc, c=[rgba]*len(xc), s=size**2, marker="o", **scatter_kw)
+        if xs_tri:
+            xt = np.concatenate(xs_tri);  yt = np.concatenate(ys_tri)
+            ax.scatter(xt, yt, c=[rgba]*len(xt), s=(size*1.3)**2, marker="^", **scatter_kw)
 
 
 def sns_boxplot_width(n_x_categories, reference_n=None):
@@ -559,13 +569,13 @@ def _add_condition_sig_bracket(ax, x_l, x_r, y_base, text="", tick_h=FIG2_BRACKE
         [x_l, x_l, x_r, x_r],
         [y_base, y_top, y_top, y_base],
         color=ACCENT_RED,
-        linewidth=1.4,
+        linewidth=2.0,
         clip_on=False,
         zorder=FIG2_BRACKET_ZORDER,
     )
     ax.text(
         x_center,
-        y_top + FIG2_BRACKET_TEXT_PAD,
+        y_top - 1.5,
         text,
         ha="center",
         va="bottom",
@@ -627,7 +637,7 @@ def annotate_fig2_condition_brackets(
         if not tops:
             continue
         y_base = max(tops) + FIG2_BRACKET_BASE_PAD
-        sig_text = f"{_star_from_p(stat['p'])}  p={stat['p']:.3f}"
+        sig_text = _star_from_p(stat['p'])
         text_top = _add_condition_sig_bracket(
             ax, xs[ref_cond], xs[test_cond], y_base, text=sig_text,
         )
@@ -1200,18 +1210,39 @@ def plot_kao_vs_periungual(df_periungual, peri_label, peri_color, save_stem,
                            region_labels=True,
                            highlight_forces=None,
                            highlight_force_color="#B0B0B0",
-                           highlight_force_alpha=0.10):
-    """Box/strip plot: Kao fingerpad No-paint vs one periungual condition."""
+                           highlight_force_alpha=0.10,
+                           participant_median=False,
+                           kao_df_override=None,
+                           triangle_keys=None,
+                           extra_leg_handles=None):
+    """Box/strip plot: Kao fingerpad No-paint vs one periungual condition.
+
+    kao_df_override: replace module-level df_kao_plot with a custom Kao DataFrame.
+    triangle_keys:   set of (source_name, force_val) → triangle scatter marker.
+    extra_leg_handles: additional legend patches appended after the default two.
+    """
     df_peri = df_periungual.copy()
     df_peri["Source"] = peri_label
+    if SUBJECT_COL in df_peri.columns:
+        df_peri["Participant"] = df_peri[SUBJECT_COL]
 
+    df_kao_local = kao_df_override if kao_df_override is not None else df_kao_plot
+    kao_plot_cols = df_kao_local.columns.tolist()
+    peri_plot_cols = ["Force_Val", "Score", "Source", "Participant"]
+    peri_available = [c for c in peri_plot_cols if c in df_peri.columns]
     df_plot = pd.concat(
-        [df_kao_plot[["Force_Val", "Score", "Source"]],
-         df_peri[["Force_Val", "Score", "Source"]]],
+        [df_kao_local[kao_plot_cols],
+         df_peri[peri_available]],
         ignore_index=True,
     )
-    n_forces = len(COMBINED_FORCES)
-    force_to_idx = {f: i for i, f in enumerate(COMBINED_FORCES)}
+
+    # Derive forces from actual data (supports custom kao_df_override)
+    kao_forces_local  = sorted(df_kao_local["Force_Val"].unique())
+    peri_forces_local = sorted(df_peri["Force_Val"].unique())
+    combined_forces   = sorted(set(kao_forces_local) | set(peri_forces_local))
+
+    n_forces = len(combined_forces)
+    force_to_idx = {f: i for i, f in enumerate(combined_forces)}
     df_plot["Force_idx"] = df_plot["Force_Val"].map(force_to_idx)
     force_idx_order = list(range(n_forces))
     source_order = [KAO_LABEL, peri_label]
@@ -1226,14 +1257,14 @@ def plot_kao_vs_periungual(df_periungual, peri_label, peri_color, save_stem,
     box_palette = box_fill_palette(source_colors)
     box_palette[peri_label] = peri_box_face
 
-    kao_only = [f for f in KAO_FORCES if f not in USER_FORCES]
-    peri_only = [f for f in USER_FORCES if f not in KAO_FORCES]
+    kao_only  = [f for f in kao_forces_local  if f not in peri_forces_local]
+    peri_only = [f for f in peri_forces_local if f not in kao_forces_local]
 
     apply_plot_style()
     fig, ax = plt.subplots(figsize=FIG_SIZE)
 
     bp, box_positions, flat_flags, box_sources, box_forces = draw_fig3_boxplot(
-        ax, df_plot, COMBINED_FORCES, source_order, box_palette, box_w,
+        ax, df_plot, combined_forces, source_order, box_palette, box_w,
         hollow_source=KAO_LABEL,
     )
     if bp is not None:
@@ -1242,6 +1273,8 @@ def plot_kao_vs_periungual(df_periungual, peri_label, peri_color, save_stem,
     draw_fig3_stripplot(
         ax, df_plot, source_order, source_colors, box_w,
         brightness=scatter_brightness,
+        participant_median=participant_median,
+        triangle_keys=triangle_keys,
     )
     lower_stripplot_zorder(ax)
     finalize_boxplot_lines(ax, median_color=ACCENT_RED, median_lw=2.0)
@@ -1250,7 +1283,7 @@ def plot_kao_vs_periungual(df_periungual, peri_label, peri_color, save_stem,
     )
 
     draw_force_highlight_background(
-        ax, highlight_forces, COMBINED_FORCES, n_forces, box_w,
+        ax, highlight_forces, combined_forces, n_forces, box_w,
         color=highlight_force_color, alpha=highlight_force_alpha,
     )
 
@@ -1258,8 +1291,8 @@ def plot_kao_vs_periungual(df_periungual, peri_label, peri_color, save_stem,
                zorder=REF_LINE_ZORDER)
 
     if region_background or region_labels:
-        sp_kao = xspan(kao_only, COMBINED_FORCES)
-        sp_peri = xspan(peri_only, COMBINED_FORCES)
+        sp_kao  = xspan(kao_only,  combined_forces)
+        sp_peri = xspan(peri_only, combined_forces)
         if region_background and sp_kao:
             ax.axvspan(*sp_kao, color=KAO_COLOR, alpha=0.08, zorder=0)
         if region_labels and sp_kao:
@@ -1281,9 +1314,11 @@ def plot_kao_vs_periungual(df_periungual, peri_label, peri_color, save_stem,
         mpatches.Patch(facecolor=peri_box_face,
                        edgecolor=BLACK, linewidth=BOX_LINEWIDTH, label=peri_label),
     ]
+    if extra_leg_handles:
+        leg_handles.extend(extra_leg_handles)
     finalize_accuracy_axes(
         fig, ax, n_forces, force_idx_order,
-        [str(f) for f in COMBINED_FORCES], leg_handles,
+        [str(f) for f in combined_forces], leg_handles,
     )
     save_figure(fig, save_stem, export_widths=export_widths)
     plt.close(fig)
@@ -1396,6 +1431,8 @@ def run_all_figures(export_widths=None, in_air=IN_AIR, on_touch=ON_TOUCH,
     )
 
     export_fig3_10559A_2col(scatter_brightness=scatter_brightness, **pale_box_kw)
+    export_fig3_10559A_2col_v2(scatter_brightness=scatter_brightness, **pale_box_kw)
+    export_fig3_future_0p4g(scatter_brightness=scatter_brightness, **pale_box_kw)
 
 
 def export_fig3_10559A_2col(scatter_brightness=SCATTER_HSB_BRIGHTNESS, **pale_box_kw):
@@ -1410,6 +1447,77 @@ def export_fig3_10559A_2col(scatter_brightness=SCATTER_HSB_BRIGHTNESS, **pale_bo
         region_labels=False,
         highlight_forces=[0.07],
         scatter_brightness=scatter_brightness,
+        **pale_box_kw,
+    )
+
+
+def export_fig3_10559A_2col_v2(scatter_brightness=SCATTER_HSB_BRIGHTNESS, **pale_box_kw):
+    """Fig3 v2: scatter collapsed to 1 point per participant (participant median)."""
+    plot_kao_vs_periungual(
+        df_raw[df_raw["Condition"] == "On-touch (Mid)"],
+        ONTouch_LABEL,
+        ON_TOUCH,
+        "Fig3_fingerpad_nopaint_vs_periungual_ontouch_10559A_v2",
+        export_widths=(("2col", 2102),),
+        region_background=False,
+        region_labels=False,
+        highlight_forces=[0.07],
+        scatter_brightness=scatter_brightness,
+        participant_median=True,
+        **pale_box_kw,
+    )
+
+
+def export_fig3_future_0p4g(scatter_brightness=SCATTER_HSB_BRIGHTNESS, **pale_box_kw):
+    """Future figure: adds placeholder 0.4 g periungual data (triangles) + Kao 0.4 g.
+
+    Synthetic 0.4 g scores (n=30, seeded) have median < 80% to represent expected
+    performance between the 0.16 g and 0.6 g conditions.
+    """
+    # --- Kao data extended to include 0.4 g ---
+    kao_rows_ext = []
+    for force, vals in KAO_PAINT_RAW.items():
+        if force <= 0.4:
+            for pid, v in enumerate(vals):
+                kao_rows_ext.append({
+                    "Force_Val": float(force),
+                    "Score":     float(v),
+                    "Source":    KAO_LABEL,
+                    "Participant": f"KP{pid + 1}",
+                })
+    df_kao_ext = pd.DataFrame(kao_rows_ext)
+
+    # --- Synthetic 0.4 g this-study data: 30 participants, median ~ 70% ---
+    participant_ids = sorted(df_raw[SUBJECT_COL].unique())
+    rng_mock = np.random.default_rng(404)
+    mock_scores = np.clip(rng_mock.beta(4.0, 2.2, len(participant_ids)) * 100, 0, 100)
+    mock_rows = []
+    for pid, score in zip(participant_ids, mock_scores):
+        mock_rows.append({
+            "Force_Val":  0.4,
+            "Score":      score,
+            "Condition":  "On-touch (Mid)",
+            SUBJECT_COL:  pid,
+        })
+    df_mock = pd.DataFrame(mock_rows)
+
+    # Combine real On-touch data + synthetic 0.4 g rows
+    df_peri_real = df_raw[df_raw["Condition"] == "On-touch (Mid)"].copy()
+    df_peri_combined = pd.concat([df_peri_real, df_mock], ignore_index=True)
+
+    plot_kao_vs_periungual(
+        df_peri_combined,
+        ONTouch_LABEL,
+        ON_TOUCH,
+        "Fig3_future_0p4g",
+        export_widths=(("2col", 2102),),
+        region_background=False,
+        region_labels=False,
+        highlight_forces=[0.07, 0.4],
+        scatter_brightness=scatter_brightness,
+        kao_df_override=df_kao_ext,
+        triangle_keys={(ONTouch_LABEL, 0.4)},
+        participant_median=True,
         **pale_box_kw,
     )
 

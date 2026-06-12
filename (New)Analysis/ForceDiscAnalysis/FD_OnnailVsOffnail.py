@@ -199,7 +199,7 @@ BANDS = [
 ]
 
 BOX_W    = 0.28
-GAP      = 0.08
+GAP      = -0.05
 TICK_LEN = ATD.TICK_LEN_AXES
 Y_TICKS  = [0, 25, 50, 75, 100]
 YLIM_BOT = -5
@@ -224,7 +224,11 @@ def draw_fd_figure(agg_df, stat_fn, stat_label, fname,
     ATD.apply_plot_style()
     sns.set_theme(style="white")
 
-    fig, axes = plt.subplots(1, 2, figsize=(10.0, 4.5), facecolor="white")
+    _target_w_px = EXPORT_WIDTH_2COL   # 2102
+    _target_h_px = 1182
+    _fig_w_in = 10.0
+    _fig_h_in = _fig_w_in * _target_h_px / _target_w_px  # ≈ 5.62 — matches 2102:1182 aspect
+    fig, axes = plt.subplots(1, 2, figsize=(_fig_w_in, _fig_h_in), facecolor="white")
     rng = np.random.default_rng(42)
 
     print(f"\n[FD — {stat_label} | On-nail (C+D) vs Off-nail (A+F)]")
@@ -304,7 +308,7 @@ def draw_fd_figure(agg_df, stat_fn, stat_label, fname,
                    linewidth=1.0, alpha=0.85, zorder=REF_LINE_ZORDER)
         ax.set_title(band_title, fontsize=FONT_LABEL, fontweight="bold", pad=6)
         ax.set_xticks(x_centers)
-        ax.set_xticklabels([f"{p} g" for p in pairs], fontsize=FONT_TICK - 2)
+        ax.set_xticklabels([f"{p} g" for p in pairs], fontsize=FONT_TICK)
         ax.set_yticks(Y_TICKS)
         ax.yaxis.set_major_locator(FixedLocator(Y_TICKS))
         ax.tick_params(axis="y", labelsize=FONT_TICK)
@@ -336,18 +340,30 @@ def draw_fd_figure(agg_df, stat_fn, stat_label, fname,
                        label=GROUP_LABELS[i])
         for i, g in enumerate(GROUP_ORDER)
     ]
-    add_legend_outside(fig, axes[0], leg_handles, ncol=2,
-                       top=FIG_LEGEND_TOP, bottom=FIG_LEGEND_BOTTOM,
-                       left=0.07, right=0.97,
-                       above_axes=ATD.FIG_LEGEND_ABOVE_AXES)
+    fig.subplots_adjust(left=0.07, right=0.97, top=0.82, bottom=0.12, wspace=0.28)
+    fig.legend(
+        handles=leg_handles,
+        loc="upper center",
+        bbox_to_anchor=(0.5, 0.97),
+        bbox_transform=fig.transFigure,
+        ncol=2,
+        fontsize=FONT_LABEL,
+        frameon=False,
+        columnspacing=2.0,
+        handletextpad=0.5,
+        handlelength=1.6,
+    )
 
-    fig.subplots_adjust(left=0.07, right=0.97, top=0.88, bottom=0.12, wspace=0.28)
-
+    import io as _io
+    from PIL import Image as _Image
     out_path = os.path.join(OUTPUT_DIR, fname)
-    w_in, _ = fig.get_size_inches()
-    fig.savefig(out_path, dpi=EXPORT_WIDTH_2COL / w_in,
+    _buf = _io.BytesIO()
+    fig.savefig(_buf, format="png", dpi=600,
                 bbox_inches="tight", pad_inches=0.04, facecolor="white")
-    print(f"\nSaved: {out_path}")
+    _buf.seek(0)
+    _master = _Image.open(_buf).convert("RGB")
+    _master.resize((2102, 1182), _Image.Resampling.LANCZOS).save(out_path)
+    print(f"\nSaved: {out_path}  (2102×1182 px @ 600 dpi)")
     plt.close(fig)
 
 
@@ -671,12 +687,19 @@ def draw_fd_meanCI_figure():
                    label=GROUP_LABELS[i])
         for i, g in enumerate(GROUP_ORDER)
     ]
-    add_legend_outside(fig_d, axes_d[0], leg_handles_d, ncol=2,
-                       top=FIG_LEGEND_TOP, bottom=FIG_LEGEND_BOTTOM,
-                       left=0.07, right=0.97,
-                       above_axes=ATD.FIG_LEGEND_ABOVE_AXES)
-
-    fig_d.subplots_adjust(left=0.07, right=0.97, top=0.88, bottom=0.12, wspace=0.28)
+    fig_d.subplots_adjust(left=0.07, right=0.97, top=0.79, bottom=0.12, wspace=0.28)
+    fig_d.legend(
+        handles=leg_handles_d,
+        loc="upper center",
+        bbox_to_anchor=(0.5, 0.97),
+        bbox_transform=fig_d.transFigure,
+        ncol=2,
+        fontsize=FONT_LABEL,
+        frameon=False,
+        columnspacing=2.0,
+        handletextpad=0.5,
+        handlelength=1.6,
+    )
 
     out_d = os.path.join(OUTPUT_DIR, "fd_onnail_vs_offnail_meanCI.png")
     w_in_d, _ = fig_d.get_size_inches()

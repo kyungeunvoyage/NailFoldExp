@@ -723,3 +723,215 @@ _h2col = Path(OUTPUT_DIR) / "gee_pairwise_plot_horizontal_2col.png"
 if _h2col.exists():
     shutil.copy2(_h2col, _root_alias)
     print(f"Copied → {_root_alias}")
+
+# ── REGION ANALYSIS: On-nail (C+D) vs Off-nail (A+F) ──────────────────────────
+
+# 1. Region 분류
+REGION_MAP = {"C": "On-nail", "D": "On-nail", "A": "Off-nail", "F": "Off-nail"}
+df_region = df[df["Region"].isin(REGION_MAP.keys())].copy()
+df_region["region_group"] = df_region["Region"].map(REGION_MAP)
+
+# 2. Per-subject accuracy by region_group × band × pair
+subj_acc_region = (
+    df_region.groupby(["Subject", "band", "pair_label", "region_group"])["correct"]
+    .mean()
+    .reset_index()
+    .rename(columns={"correct": "accuracy"})
+)
+
+# 3. GEE: On-nail vs Off-nail per force pair, per band
+def run_gee_region(band_label, pair_order):
+    """
+    For each force pair, test On-nail vs Off-nail using trial-level GEE.
+    Returns dict: pair_label -> p_value
+    """
+    sub = df_region[df_region["band"] == band_label].copy()
+    sub = sub[sub["pair_label"].isin(pair_order)]
+    results = {}
+
+    for pair in pair_order:
+        chunk = sub[sub["pair_label"] == pair].copy()
+        if chunk["Subject"].nunique() < 2:
+            results[pair] = np.nan
+            continue
+
+        chunk["region_dummy"] = (chunk["region_group"] == "On-nail").astype(int)
+        chunk = chunk.rename(columns={"Subject": "subj_id"})
+
+        if USE_GEE:
+            try:
+                model = GEE.from_formula(
+                    "correct ~ region_dummy",
+                    groups="subj_id",
+                    data=chunk,
+                    family=Binomial(),
+                )
+                fit = model.fit(maxiter=60)
+                results[pair] = fit.pvalues["region_dummy"]
+            except Exception as e:
+                print(f"  GEE region failed ({pair}): {e}")
+                results[pair] = np.nan
+        else:
+            # Wilcoxon fallback: per-subject means
+            pivot = (
+                subj_acc_region[
+                    (subj_acc_region["band"] == band_label) &
+                    (subj_acc_region["pair_label"] == pair)
+                ]
+                .pivot(index="Subject", columns="region_group", values="accuracy")
+                .dropna()
+            )
+            if len(pivot) < 5:
+                results[pair] = np.nan
+            elif USE_WILCOXON:
+                from scipy.stats import wilcoxon
+                try:
+                    _, pval = wilcoxon(pivot["On-nail"].values, pivot["Off-nail"].values)
+                    results[pair] = pval
+                except Exception:
+                    results[pair] = _permutation_pval(
+                        pivot["On-nail"].values, pivot["Off-nail"].values
+                    )
+            else:
+                results[pair] = _permutation_pval(
+                    pivot["On-nail"].values, pivot["Off-nail"].values
+                )
+
+    return results
+
+
+low_region_pvals  = run_gee_region("Low",  low_order)
+high_region_pvals = run_gee_region("High", high_order)
+
+# 4. Figure: On-nail vs Off-nail side by side per force pair
+COLOR_ON_NAIL  = "#7FB3D3"   # darker blue
+COLOR_OFF_NAIL = "#D3E9F5"   # lighter blue
+
+REGION_COLORS = {"On-nail": COLOR_ON_NAIL, "Off-nail": COLOR_OFF_NAIL}
+REGION_GROUPS = ["On-nail", "Off-nail"]
+SIDE_OFFSET   = 0.22  # x offset between On-nail and Off-nail boxes within a pair
+
+
+def plot_region_band(ax, band_label, order, region_pvals,
+                     show_xlabel=True, show_ylabel=True):
+    sub = subj_acc_region[subj_acc_region["band"] == band_label].copy()
+    bw = boxplot_width(len(order)) * 0.45  # narrower boxes (two per slot)
+    band_max_pct = 0.0
+
+    for xi, pair in enumerate(order):
+        for gi, grp in enumerate(REGION_GROUPS):
+            x_pos = xi + SIDE_OFFSET * (gi - 0.5)
+            pdata = sub.loc[
+                (sub["pair_label"] == pair) & (sub["region_group"] == grp),
+                "accuracy"
+            ].values * 100.0
+            if len(pdata) == 0:
+                continue
+
+            color = REGION_COLORS[grp]
+            band_max_pct = max(band_max_pct, float(np.max(pdata)))
+
+            bp = ax.boxplot(
+                [pdata], positions=[x_pos], widths=bw,
+                patch_artist=True, showfliers=False,
+                capwidths=ATD.CAP_WIDTH,
+                whiskerprops={"linewidth": BOX_LINEWIDTH, "color": BOX_STROKE},
+                capprops={"linewidth": BOX_LINEWIDTH, "color": BOX_STROKE},
+                medianprops={"color": ACCENT_RED, "linewidth": MEDIAN_LINEWIDTH},
+                boxprops={"linewidth": BOX_LINEWIDTH, "edgecolor": BOX_STROKE},
+            )
+            for patch in bp["boxes"]:
+                patch.set_facecolor(ATD.pale_box_face(color))
+                patch.set_edgecolor(BOX_STROKE)
+                patch.set_zorder(BOX_PATCH_ZORDER)
+            for line in bp["medians"]:
+                line.set_color(ACCENT_RED)
+                line.set_linewidth(MEDIAN_LINEWIDTH)
+                line.set_zorder(MEDIAN_ZORDER)
+
+            # Jittered dots
+            x_strip = np.full(len(pdata), x_pos) + jitter(len(pdata), width=bw * 0.4)
+            strip_rgba = ATD._hsb_scatter_rgba(color, SCATTER_HSB_BRIGHTNESS, STRIP_ALPHA)
+            ax.scatter(x_strip, pdata, c=[strip_rgba]*len(pdata),
+                       s=STRIP_SIZE**2, linewidths=0, edgecolors="none",
+                       alpha=STRIP_ALPHA, zorder=SCATTER_ZORDER, clip_on=False)
+
+        # n.s. / sig bracket between On-nail and Off-nail for this pair
+        pval = region_pvals.get(pair, np.nan)
+        label = pval_label(pval)
+        if np.isnan(pval):
+            sig_text = ""
+        elif label:
+            sig_text = f"{label}  p={pval:.3f}"
+        else:
+            sig_text = f"n.s.  p={pval:.3f}"
+
+        # Draw bracket just above the boxes
+        y_bracket = band_max_pct + 8.0
+        x1 = xi - SIDE_OFFSET * 0.5
+        x2 = xi + SIDE_OFFSET * 0.5
+        draw_bracket(ax, x1, x2, y_bracket, sig_text)
+
+    ax.axhline(JND_PCT, color=CRITERION_COLOR, linestyle="--",
+               linewidth=1.0, alpha=0.85, zorder=REF_LINE_ZORDER)
+    ax.axhline(CHANCE_PCT, color=BLACK, linestyle=":", linewidth=0.8,
+               alpha=0.5, zorder=1)
+
+    ax.set_xticks(range(len(order)))
+    ax.set_xticklabels(order, fontsize=FONT_TICK)
+    ax.set_xlim(-0.6, len(order) - 0.4)
+    ylim_top = max(ATD.ACCURACY_YLIM_TOP, band_max_pct + 25.0)
+    finalize_gee_axes(ax, len(order), ylim_top,
+                      show_ylabel=show_ylabel, show_xlabel=show_xlabel)
+
+
+REGION_LEGEND_ELEMENTS = [
+    mpatches.Patch(facecolor=ATD.pale_box_face(COLOR_ON_NAIL),
+                   edgecolor=BOX_STROKE, linewidth=BOX_LINEWIDTH, label="On-nail (C+D)"),
+    mpatches.Patch(facecolor=ATD.pale_box_face(COLOR_OFF_NAIL),
+                   edgecolor=BOX_STROKE, linewidth=BOX_LINEWIDTH, label="Off-nail (A+F)"),
+]
+
+
+def make_region_figure():
+    sns.set_theme(style="white")
+    ATD.apply_plot_style()
+    px, py, pw, ph = _panel_size_inches()
+    left_in  = 0.07 * FIG_SIZE[0]
+    right_in = (1 - 0.98) * FIG_SIZE[0]
+    bottom_in = MARGIN_BOTTOM * FIG_SIZE[1]
+
+    fig_w = left_in + pw + GAP_BAND_IN + pw + right_in
+    fig_h = FIG_SIZE[1] + LEGEND_HEADROOM_IN
+    ax_y  = py / fig_h
+    ax_h  = ph / fig_h
+
+    fig   = plt.figure(figsize=(fig_w, fig_h), facecolor="#FFFFFF")
+    ax_low  = fig.add_axes([left_in / fig_w, ax_y, pw / fig_w, ax_h])
+    x_high  = (left_in + pw + GAP_BAND_IN) / fig_w
+    ax_high = fig.add_axes([x_high, ax_y, pw / fig_w, ax_h])
+
+    # Titles
+    ax_low.set_title("Low Band  (ref = 1g)",  fontsize=FONT_LABEL, fontweight="bold", pad=6)
+    ax_high.set_title("High Band  (ref = 26g)", fontsize=FONT_LABEL, fontweight="bold", pad=6)
+
+    plot_region_band(ax_low,  "Low",  low_order,  low_region_pvals,
+                     show_xlabel=True, show_ylabel=True)
+    plot_region_band(ax_high, "High", high_order, high_region_pvals,
+                     show_xlabel=True, show_ylabel=False)
+
+    fig.legend(
+        handles=REGION_LEGEND_ELEMENTS,
+        loc="upper center",
+        bbox_to_anchor=(0.5, FIG_LEGEND_ANCHOR_Y),
+        bbox_transform=fig.transFigure,
+        ncol=2, fontsize=FONT_LABEL, frameon=False,
+        columnspacing=2.0, handletextpad=0.5, handlelength=1.6,
+    )
+    return fig
+
+
+fig_region = make_region_figure()
+save_gee_figure(fig_region, "gee_region_onnail_vs_offnail")
+plt.close(fig_region)
+print("Saved: On-nail vs Off-nail regional comparison figure")

@@ -294,7 +294,7 @@ def _add_sig_bracket(ax, x_l, x_r, y_base, tick_h=0.45, text=""):
         [x_l, x_l, x_r, x_r],
         [y_base, y_top, y_top, y_base],
         color=ACCENT_RED,
-        linewidth=0.75,
+        linewidth=1.5,
         clip_on=False,
         zorder=5,
     )
@@ -1280,7 +1280,7 @@ else:
         "On-nail":  ON_TOUCH,
         "Off-nail": "#7C94B8",   # same as Off-Nail (A) in NAIL_PALETTE
     }
-    POOL_X_LABELS = ["On-nail\n(C+D, n=60)", "Off-nail\n(A+F, n=60)"]
+    POOL_X_LABELS = ["On-nail\n(C+D)", "Off-nail\n(A+F)"]
 
     print("\n[Figure 6 — On-nail(C+D) vs Off-nail(A+F) | pooled area means, by force, RE=Subject]")
 
@@ -1345,9 +1345,8 @@ else:
             star6 = ("***" if lme_pool_f["p"] < 0.001 else
                      "**"  if lme_pool_f["p"] < 0.01  else
                      "*"   if lme_pool_f["p"] < 0.05  else "n.s.")
-            p_txt = f"p={lme_pool_f['p']:.3f}"
             y_brk = max(tops_f.values()) + 4
-            _add_sig_bracket(ax6, 0, 1, y_brk, text=f"{star6}  {p_txt}")
+            _add_sig_bracket(ax6, 0, 1, y_brk, text=star6)
 
         ax6.axhline(80, color=CRITERION_COLOR, linestyle="--", linewidth=1.0,
                     alpha=0.85, zorder=atd_c1.REF_LINE_ZORDER)
@@ -1378,7 +1377,7 @@ else:
         for i, grp in enumerate(POOL_GROUP_ORDER)
     ]
     add_fig5_legend(fig6, leg_handles_f6, ncol=len(POOL_GROUP_ORDER))
-    fig6.subplots_adjust(left=0.08, right=0.97, top=0.88, bottom=0.12, wspace=0.18)
+    fig6.subplots_adjust(left=0.08, right=0.97, top=1.0, bottom=0.12, wspace=0.18)
     out_f6 = os.path.join(FIG_DIR, "onnail_vs_offnail_pooled.png")
     save_png_at_width(fig6, out_f6, width_px=EXPORT_WIDTH_2COL)
     print(f"Saved: {out_f6}")

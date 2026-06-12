@@ -1,0 +1,257 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <title>Absolute Threshold Detection</title>
+    <style>
+        body { font-family: 'Segoe UI', sans-serif; display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 100vh; margin: 0; background-color: #f4f7f6; }
+        #container { background: white; padding: 30px; border-radius: 20px; box-shadow: 0 10px 30px rgba(0,0,0,0.1); text-align: center; width: 550px; }
+        .subject-info-box { background: #fff; border: 2px solid #1a73e8; padding: 15px; border-radius: 10px; margin-bottom: 20px; display: flex; align-items: center; justify-content: center; gap: 15px; }
+        .subject-info-box label { font-weight: bold; font-size: 14px; }
+        .subject-info-box input { padding: 8px; border: 1px solid #ccc; border-radius: 5px; width: 80px; text-align: center; }
+        .setup-info { display: flex; justify-content: space-around; margin-bottom: 20px; background: #e3f2fd; padding: 15px; border-radius: 10px; font-weight: bold; }
+        #target-display { background: #fff9c4; border: 2px dashed #fbc02d; padding: 20px; border-radius: 10px; margin-bottom: 20px; }
+        #target-number { font-size: 50px; color: #d32f2f; font-weight: bold; }
+        .progress-bar { width: 100%; height: 15px; background: #e8eaed; border-radius: 10px; overflow: hidden; margin-bottom: 20px; position: relative; }
+        #progress { width: 0%; height: 100%; background: #1a73e8; }
+        #flash { width: 100%; height: 100%; position: absolute; top: 0; left: 0; background: rgba(255,255,255,0.6); opacity: 0; pointer-events: none; }
+        .flash-active { animation: blink 0.15s; }
+        @keyframes blink { 0% { opacity: 0; } 50% { opacity: 1; } 100% { opacity: 0; } }
+        button { padding: 15px; font-size: 16px; cursor: pointer; border: none; border-radius: 8px; transition: 0.2s; width: 100%; font-weight: bold; margin-top: 10px; }
+        #startBtn { background: #1a73e8; color: white; }
+        #popBtn { background: #9c27b0; color: white; margin-bottom: 10px; }
+        #nextBtn { background: #ff9800; color: white; display: none; }
+        #input-section { display: none; margin-top: 20px; border-top: 2px solid #f1f3f4; padding-top: 20px; }
+        input.subject-input { padding: 12px; width: 100px; font-size: 20px; text-align: center; border: 2px solid #ddd; border-radius: 8px; margin-bottom: 10px; }
+        #log-container { margin-top: 25px; text-align: left; font-size: 12px; max-height: 200px; overflow-y: auto; background: #fafafa; padding: 10px; border: 1px solid #eee; }
+        .cond-air { color: #03a9f4; }
+        .cond-mid { color: #f39c12; } 
+    </style>
+</head>
+<body>
+
+<div id="container">
+    <button id="popBtn" onclick="openSubjectWindow()">1. 피험자용 창 열기 (Subject Window)</button>
+    <div class="subject-info-box">
+        <label>Subject ID:</label>
+        <input type="text" id="subjectId" value="P1">
+        <label style="margin-left:10px;">Session No:</label>
+        <input type="text" id="sessNo" value="S01">
+    </div>
+    
+    <h2 id="condition-title">Condition: Ready</h2>
+    <div class="setup-info">
+        <div>Area: <span id="current-area">-</span></div>
+        <div>Force: <span id="current-force">-</span></div>
+        <div>Trial: <span id="trial-count">0</span> / <span id="total-trials-display">-</span></div>
+    </div>
+
+    <div id="target-display"><div style="font-size: 14px; color: #666;">Target (Admin Only)</div><div id="target-number">?</div></div>
+    <div class="progress-bar"><div id="progress"></div><div id="flash"></div></div>
+
+    <button id="startBtn" onclick="startTrial()">2. 시행 시작 (Start)</button>
+    <button id="nextBtn" onclick="proceedToNextCondition()">다음 컨디션으로 이동</button>
+
+    <div id="input-section">
+        <input type="number" id="subjectResponse" class="subject-input" placeholder="#" autofocus> <br>
+        <button style="background:#34a853; color:white;" onclick="logData()">Save & Next</button>
+    </div>
+
+    <div id="log-container"><strong>Session Logs:</strong><div id="logContent"></div></div>
+    <button style="background:#5f6368; color:white;" onclick="downloadCSV()">Download Results (CSV)</button>
+</div>
+
+<script>
+    let subjectWindow = null;
+    const areas = ['A','B','C','D','E','F'];
+    const forces = ['0.16g', '0.4g', '0.6g'];
+    const TRIAL_DURATION = 11;
+    
+    let conditionSequence = []; // ["In-air", "On-touch (Mid)"] 순서 보관
+    let currentConditionIdx = 0;
+    let trialPools = []; // 각 컨디션별 셔플된 트라이얼들 보관
+    let currentIdxInSet = 0;
+    let experimentalData = [];
+    let timerInterval;
+    let timeLeft = TRIAL_DURATION;
+    let currentTarget = 0;
+
+    function openSubjectWindow() {
+        subjectWindow = window.open("", "SubjectWindow", "width=800,height=600");
+        subjectWindow.document.write(`
+            <html><head><style>
+                body { margin: 0; display: flex; align-items: center; justify-content: center; height: 100vh; font-family: sans-serif; background-color: #333; transition: background-color 0.5s; }
+                h1 { color: white; font-size: 3.5rem; text-align: center; }
+            </style></head><body>
+                <h1 id="msg">Ready</h1>
+                <script>function updateState(state, text) {
+                    const b = document.body; const m = document.getElementById('msg');
+                    if(state==='start'){ b.style.backgroundColor='#2ecc71'; m.innerText='Concentrate...'; }
+                    else if(state==='end'){ b.style.backgroundColor='#e74c3c'; m.innerText='How many?'; }
+                    else { b.style.backgroundColor='#333'; m.innerText= text || 'Ready'; }
+                }<\/script>
+            </body></html>
+        `);
+    }
+
+    function setupExp() {
+        // 1. 컨디션 순서 결정 (In-air와 On-touch 중 무엇을 먼저 할지 랜덤)
+        conditionSequence = ["In-air", "On-touch (Mid)"].sort(() => Math.random() - 0.5);
+        
+        // 2. 각 컨디션별로 독립적인 풀 생성 (각 풀 내에서만 셔플)
+        conditionSequence.forEach((condName, index) => {
+            let base = [];
+            areas.forEach(a => {
+                forces.forEach(f => {
+                    // 각 조합당 1회씩 하면 20회입니다. 40회를 원하시면 이 루프를 2번 돌리거나 base.push를 두번 하세요.
+                    base.push({ condition: condName, area: a, force: f });
+                    base.push({ condition: condName, area: a, force: f }); // 조합당 2회 = 컨디션당 총 40회
+                });
+            });
+            // 해당 컨디션 내의 40개 시행만 셔플
+            trialPools[index] = base.sort(() => Math.random() - 0.5);
+        });
+
+        currentConditionIdx = 0;
+        currentIdxInSet = 0;
+        
+        updateUI();
+    }
+
+    function updateUI() {
+        const condTitle = document.getElementById('condition-title');
+        const startBtn = document.getElementById('startBtn');
+        const nextBtn = document.getElementById('nextBtn');
+        const totalDisplay = document.getElementById('total-trials-display');
+
+        if (currentConditionIdx >= conditionSequence.length) {
+            condTitle.innerText = "All Experiments Completed!";
+            startBtn.style.display = 'none';
+            nextBtn.style.display = 'none';
+            if(subjectWindow) subjectWindow.updateState('ready', 'Finished');
+            return;
+        }
+
+        const currentPool = trialPools[currentConditionIdx];
+        totalDisplay.innerText = currentPool.length;
+
+        if (currentIdxInSet < currentPool.length) {
+            const t = currentPool[currentIdxInSet];
+            condTitle.innerText = `Condition: ${t.condition}`;
+            const cName = t.condition.toLowerCase();
+            
+            if (cName.includes("air")) condTitle.className = "cond-air";
+            else if (cName.includes("mid")) condTitle.className = "cond-mid";
+            
+            document.getElementById('current-area').innerText = t.area;
+            document.getElementById('current-force').innerText = t.force;
+            document.getElementById('trial-count').innerText = currentIdxInSet + 1;
+
+            startBtn.style.display = 'block';
+            startBtn.disabled = false;
+            nextBtn.style.display = 'none';
+        } else {
+            // 현재 컨디션의 모든 trial이 끝났을 때
+            condTitle.innerText = `${conditionSequence[currentConditionIdx]} Completed!`;
+            startBtn.style.display = 'none';
+            nextBtn.style.display = 'block';
+        }
+    }
+
+    function proceedToNextCondition() {
+        currentConditionIdx++;
+        currentIdxInSet = 0;
+        updateUI();
+        if(subjectWindow) subjectWindow.updateState('ready', 'Next Condition');
+    }
+
+    function startTrial() {
+        if (!subjectWindow || subjectWindow.closed) { alert("Open Subject Window!"); return; }
+        
+        currentTarget = Math.floor(Math.random() * 4) + 5;
+        document.getElementById('target-number').innerText = currentTarget;
+        
+        subjectWindow.updateState('start');
+        timeLeft = TRIAL_DURATION;
+        document.getElementById('startBtn').disabled = true;
+        document.getElementById('input-section').style.display = 'none';
+
+        let lastSec = TRIAL_DURATION;
+        timerInterval = setInterval(() => {
+            timeLeft -= 0.1;
+            
+            if (Math.floor(timeLeft) < lastSec) {
+                const flash = document.getElementById('flash');
+                flash.classList.remove('flash-active');
+                void flash.offsetWidth; 
+                flash.classList.add('flash-active');
+                lastSec = Math.floor(timeLeft);
+            }
+
+            if (timeLeft <= 0) {
+                clearInterval(timerInterval);
+                subjectWindow.updateState('end');
+                document.getElementById('input-section').style.display = 'block';
+                document.getElementById('subjectResponse').focus();
+                document.getElementById('progress').style.width = "100%";
+            } else {
+                document.getElementById('progress').style.width = ((TRIAL_DURATION - timeLeft) / TRIAL_DURATION * 100) + "%";
+            }
+        }, 100);
+    }
+
+    function logData() {
+        const resInput = document.getElementById('subjectResponse');
+        const res = resInput.value;
+        if (res === "") return;
+        
+        const currentPool = trialPools[currentConditionIdx];
+        const t = currentPool[currentIdxInSet];
+        const isCorrect = (currentTarget == res);
+        const subId = document.getElementById('subjectId').value;
+        const sessNo = document.getElementById('sessNo').value;
+        
+        experimentalData.push({
+            SubjectID: subId, 
+            Session: sessNo, 
+            Condition: t.condition, 
+            Area: t.area, 
+            Force: t.force, 
+            Target: currentTarget, 
+            Response: res, 
+            Correct: (isCorrect ? 1 : 0)
+        });
+
+        const log = document.createElement('div');
+        log.innerHTML = `<b>[${t.condition}]</b> ${t.area}-${t.force} | T:${currentTarget}, R:${res} ${isCorrect ? '✓' : '✗'}`;
+        document.getElementById('logContent').prepend(log);
+
+        resInput.value = "";
+        document.getElementById('input-section').style.display = 'none';
+        document.getElementById('progress').style.width = "0%";
+        document.getElementById('target-number').innerText = "?";
+        subjectWindow.updateState('ready');
+        
+        currentIdxInSet++;
+        updateUI();
+    }
+
+    function downloadCSV() {
+        const subId = document.getElementById('subjectId').value || "Unknown";
+        const sessNo = document.getElementById('sessNo').value || "Unknown";
+        
+        let csv = "\uFEFFSubjectID,Session,Condition,Area,Force,Target,Response,IsCorrect\n";
+        experimentalData.forEach(r => { 
+            csv += `${r.SubjectID},${r.Session},${r.Condition},${r.Area},${r.Force},${r.Target},${r.Response},${r.Correct}\n`; 
+        });
+        const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+        const a = document.createElement("a");
+        a.href = URL.createObjectURL(blob);
+        a.download = `${subId}_AbsoluteThresholdDetection.csv`;
+        a.click();
+    }
+
+    setupExp();
+</script>
+</body>
+</html>
