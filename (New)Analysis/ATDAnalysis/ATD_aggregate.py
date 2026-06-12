@@ -867,6 +867,12 @@ else:
 
     df["Relative_Score"] = df.apply(calc_relative_score, axis=1)
 
+    # P61, P62, P63: partial-protocol — only 0.4 g data should be included
+    _PARTIAL_SUBJ = {"P61", "P62", "P63"}
+    _is_partial = df[sub_col].isin(_PARTIAL_SUBJ)
+    df = df[~_is_partial | (df["Force_Val"] == 0.4)].copy()
+    print(f"After partial-subject filter: {len(df)} rows")
+
     all_forces = sorted(df["Force_Val"].unique())
     plot_forces = [f for f in all_forces if f not in EXCLUDE_FORCES]
     if not plot_forces:
@@ -1357,8 +1363,7 @@ else:
         ax6.yaxis.set_major_locator(FixedLocator(FIG5_Y_TICKS))
         ax6.tick_params(axis="y", labelsize=FONT_TICK)
         ax6.tick_params(axis="x", length=0)
-        y_top6 = min(FIG5_YLIM_TOP_CAP, max(tops_f.values()) + 20)
-        ax6.set_ylim(-5, y_top6)
+        ax6.set_ylim(-5, FIG5_YLIM_TOP_CAP)
         ax6.spines["left"].set_bounds(-5, FIG5_Y_AXIS_TOP)
         sns.despine(ax=ax6)
         add_inward_tick_guides(ax6, x_positions=[0, 1], y_ticks=FIG5_Y_TICKS)

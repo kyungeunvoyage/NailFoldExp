@@ -1128,6 +1128,12 @@ df_raw = df_raw[df_raw["Condition"] != "On-touch (Soft)"]
 df_raw = df_raw[df_raw["Area"].isin(["A", "B", "C", "D", "E", "F"])].copy()
 df_raw["Force_Val"] = df_raw["Force"].str.extract(r"(\d+\.?\d*)").astype(float)
 
+# P61, P62, P63: only include 0.4 g data (partial-protocol participants)
+_PARTIAL_SUBJ = {"P61", "P62", "P63"}
+_is_partial = df_raw["SubjectID" if "SubjectID" in df_raw.columns else "Subject"].isin(_PARTIAL_SUBJ)
+df_raw = df_raw[~_is_partial | (df_raw["Force_Val"] == 0.4)].copy()
+print(f"After partial-subject filter: {len(df_raw)} rows")
+
 SUBJECT_COL = "SubjectID" if "SubjectID" in df_raw.columns else "Subject"
 n_subjects = df_raw[SUBJECT_COL].nunique() if SUBJECT_COL in df_raw.columns else len(all_files)
 
@@ -1469,11 +1475,7 @@ def export_fig3_10559A_2col_v2(scatter_brightness=SCATTER_HSB_BRIGHTNESS, **pale
 
 
 def export_fig3_future_0p4g(scatter_brightness=SCATTER_HSB_BRIGHTNESS, **pale_box_kw):
-    """Future figure: adds placeholder 0.4 g periungual data (triangles) + Kao 0.4 g.
-
-    Synthetic 0.4 g scores (n=30, seeded) have median < 80% to represent expected
-    performance between the 0.16 g and 0.6 g conditions.
-    """
+    """Figure 3 extended to 0.4 g: uses real P61/P62/P63 data at 0.4 g (triangles) + Kao 0.4 g."""
     # --- Kao data extended to include 0.4 g ---
     kao_rows_ext = []
     for force, vals in KAO_PAINT_RAW.items():
@@ -1487,23 +1489,8 @@ def export_fig3_future_0p4g(scatter_brightness=SCATTER_HSB_BRIGHTNESS, **pale_bo
                 })
     df_kao_ext = pd.DataFrame(kao_rows_ext)
 
-    # --- Synthetic 0.4 g this-study data: 30 participants, median ~ 70% ---
-    participant_ids = sorted(df_raw[SUBJECT_COL].unique())
-    rng_mock = np.random.default_rng(404)
-    mock_scores = np.clip(rng_mock.beta(4.0, 2.2, len(participant_ids)) * 100, 0, 100)
-    mock_rows = []
-    for pid, score in zip(participant_ids, mock_scores):
-        mock_rows.append({
-            "Force_Val":  0.4,
-            "Score":      score,
-            "Condition":  "On-touch (Mid)",
-            SUBJECT_COL:  pid,
-        })
-    df_mock = pd.DataFrame(mock_rows)
-
-    # Combine real On-touch data + synthetic 0.4 g rows
-    df_peri_real = df_raw[df_raw["Condition"] == "On-touch (Mid)"].copy()
-    df_peri_combined = pd.concat([df_peri_real, df_mock], ignore_index=True)
+    # Real On-touch data; df_raw already filtered so P61/P62/P63 contribute only 0.4 g
+    df_peri_combined = df_raw[df_raw["Condition"] == "On-touch (Mid)"].copy()
 
     plot_kao_vs_periungual(
         df_peri_combined,
