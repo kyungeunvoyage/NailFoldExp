@@ -201,7 +201,7 @@ BANDS = [
 BOX_W    = 0.28
 GAP      = -0.05
 TICK_LEN = ATD.TICK_LEN_AXES
-Y_TICKS  = [0, 25, 50, 75, 100]
+Y_TICKS  = [0, 20, 40, 60, 80, 100]
 YLIM_BOT = -5
 YLIM_TOP_CAP = 130
 
@@ -566,16 +566,16 @@ plt.close(fig_c)
 # =============================================================================
 
 CI95_MULTIPLIER = 1.96
-DOT_SIZE = 7.0       # marker size (pt)
+DOT_SIZE = 12.0      # marker size (pt)
 DOT_LW   = 0.0       # no edge line on marker
 CAP_W    = 0.06      # error bar cap width in x-data units
-ERR_LW   = 1.5       # error bar line width
+ERR_LW   = 3.0       # error bar line width
 
 def draw_fd_meanCI_figure():
     ATD.apply_plot_style()
     sns.set_theme(style="white")
 
-    fig_d, axes_d = plt.subplots(1, 2, figsize=(10.0, 4.5), facecolor="white")
+    fig_d, axes_d = plt.subplots(1, 2, figsize=(8.0, 4.5), facecolor="white")
     print("\n[FD — Method 3: Mean ± 95% CI per force pair | GEE stats]")
 
     for ax, band_cfg in zip(axes_d, BANDS):
@@ -625,7 +625,6 @@ def draw_fd_meanCI_figure():
             if stat_res:
                 x_on  = xi + (0 - 0.5) * (BOX_W * 2 + GAP)
                 x_off = xi + (1 - 0.5) * (BOX_W * 2 + GAP)
-                # find top ci_hi among the two groups for bracket base
                 ci_tops = []
                 for gi, grp in enumerate(GROUP_ORDER):
                     dx   = (gi - 0.5) * (BOX_W * 2 + GAP)
@@ -653,9 +652,9 @@ def draw_fd_meanCI_figure():
 
         ax.axhline(JND_PCT, color=CRITERION_COLOR, linestyle="--",
                    linewidth=1.0, alpha=0.85, zorder=REF_LINE_ZORDER)
-        ax.set_title(band_title, fontsize=FONT_LABEL, fontweight="bold", pad=6)
+        ax.set_title("")
         ax.set_xticks(x_centers)
-        ax.set_xticklabels([f"{p} g" for p in pairs], fontsize=FONT_TICK - 2)
+        ax.set_xticklabels([str(p) for p in pairs], fontsize=FONT_TICK)
         ax.set_yticks(Y_TICKS)
         ax.yaxis.set_major_locator(FixedLocator(Y_TICKS))
         ax.tick_params(axis="y", labelsize=FONT_TICK)
@@ -687,11 +686,11 @@ def draw_fd_meanCI_figure():
                    label=GROUP_LABELS[i])
         for i, g in enumerate(GROUP_ORDER)
     ]
-    fig_d.subplots_adjust(left=0.07, right=0.97, top=0.79, bottom=0.12, wspace=0.28)
+    fig_d.subplots_adjust(left=0.07, right=0.97, top=0.84, bottom=0.12, wspace=0.28)
     fig_d.legend(
         handles=leg_handles_d,
         loc="upper center",
-        bbox_to_anchor=(0.5, 0.97),
+        bbox_to_anchor=(0.5, 1.03),
         bbox_transform=fig_d.transFigure,
         ncol=2,
         fontsize=FONT_LABEL,
@@ -702,14 +701,22 @@ def draw_fd_meanCI_figure():
     )
 
     out_d = os.path.join(OUTPUT_DIR, "fd_onnail_vs_offnail_meanCI.png")
-    w_in_d, _ = fig_d.get_size_inches()
-    fig_d.savefig(out_d, dpi=EXPORT_WIDTH_2COL / w_in_d,
-                  bbox_inches="tight", pad_inches=0.04, facecolor="white")
-    print(f"\nSaved: {out_d}")
+    import io as _io_d; from PIL import Image as _Img_d
+    _buf_d = _io_d.BytesIO()
+    fig_d.savefig(_buf_d, format="png", dpi=600, bbox_inches="tight",
+                  pad_inches=0.04, facecolor="white")
+    _buf_d.seek(0)
+    _master_d = _Img_d.open(_buf_d).convert("RGB")
+    _W_D, _H_D = EXPORT_WIDTH_2COL, 1113
+    _master_d.resize((_W_D, _H_D), _Img_d.Resampling.LANCZOS).save(out_d)
+    print(f"\nSaved: {out_d}  ({_W_D}×{_H_D} px)")
+    if os.getenv("PAPER_RENDER"):
+        return fig_d
     plt.close(fig_d)
 
 
-draw_fd_meanCI_figure()
+if not os.getenv("PAPER_RENDER"):
+    draw_fd_meanCI_figure()
 
 
 # =============================================================================

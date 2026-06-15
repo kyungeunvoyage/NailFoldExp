@@ -86,11 +86,12 @@ COLOR_DIFF_NEU  = "#AAAAAA"
 BOX_WIDTH_REF_N      = 3
 BOX_WIDTH_AT_REF     = 0.42
 STRIP_JITTER_AT_REF  = 0.14
-BRACKET_TEXT_HEIGHT  = 4.5
-BRACKET_TIER_GAP     = 1.2
+BRACKET_TEXT_HEIGHT  = 2.5
+BRACKET_TIER_GAP     = 0.5
+BRACKET_TICK_H       = 2.0   # local override (no vertical ticks drawn)
 BRACKET_YLIM_PAD     = 1.5
 FIG_PANEL_TOP_FRAC   = 0.80
-FIG_LEGEND_ANCHOR_Y  = 0.975
+FIG_LEGEND_ANCHOR_Y  = 0.88
 LEGEND_HEADROOM_IN   = 0.55
 MARGIN_BOTTOM        = ATD.FIG_LEGEND_BOTTOM
 GAP_BAND_IN          = 1.5
@@ -343,13 +344,15 @@ def pval_text_full(p):
 def pval_color(p):
     return ACCENT_RED if (not np.isnan(p) and p < 0.05) else "#888888"
 
-def draw_bracket(ax, x1, x2, y, label, tick_h=ATD.FIG2_BRACKET_TICK_H):
+def draw_bracket(ax, x1, x2, y, label, tick_h=None):
+    if tick_h is None:
+        tick_h = BRACKET_TICK_H
     y_top = y + tick_h
-    ax.plot([x1, x1, x2, x2], [y, y_top, y_top, y],
+    ax.plot([x1, x2], [y_top, y_top],
             color=ACCENT_RED, linewidth=1.5, clip_on=False,
             zorder=ATD.FIG2_BRACKET_ZORDER)
     if label:
-        ax.text((x1+x2)/2, y_top - 1.8, label,
+        ax.text((x1+x2)/2, y_top, label,
                 ha="center", va="bottom", fontsize=FONT_ANNOT + 2,
                 color=ACCENT_RED, fontweight="bold", clip_on=False,
                 zorder=ATD.FIG2_BRACKET_ZORDER + 1)
@@ -358,11 +361,11 @@ def _bracket_intervals_overlap(i1, i2, a, b):
     return i1 <= b and a <= i2
 
 def bracket_tier_step():
-    return (ATD.FIG2_BRACKET_TICK_H + ATD.FIG2_BRACKET_TEXT_PAD
+    return (BRACKET_TICK_H + ATD.FIG2_BRACKET_TEXT_PAD
             + BRACKET_TEXT_HEIGHT + BRACKET_TIER_GAP)
 
 def bracket_stack_top(y_base, label):
-    y_top = y_base + ATD.FIG2_BRACKET_TICK_H
+    y_top = y_base + BRACKET_TICK_H
     if label:
         return y_top + ATD.FIG2_BRACKET_TEXT_PAD + BRACKET_TEXT_HEIGHT
     return y_top
@@ -546,7 +549,7 @@ def plot_band_overall(ax, band_label, order, pvals_dict,
     max_level  = max((lv for _,_,lv in placed), default=-1)
     tier_step  = bracket_tier_step()
     y_base     = max(102.0, band_max_pct + ATD.FIG2_BRACKET_BASE_PAD)
-    ylim_top   = max(ATD.ACCURACY_YLIM_TOP, band_max_pct + 8.0)
+    ylim_top   = ATD.ACCURACY_YLIM_TOP
     if placed:
         ylim_top = max(ylim_top,
                        bracket_stack_top(y_base + max_level*tier_step, "*** p=0.000")
@@ -595,11 +598,12 @@ def make_pairwise_figure(orientation):
     _add_legend(fig, OVERALL_LEGEND)
     return fig
 
-for ori, stem in [("horizontal", "gee_pairwise_plot_horizontal"),
-                  ("vertical",   "gee_pairwise_plot_vertical")]:
-    fig = make_pairwise_figure(ori)
-    save_figure(fig, stem)
-    plt.close(fig)
+if not os.getenv("PAPER_RENDER"):
+    for ori, stem in [("horizontal", "gee_pairwise_plot_horizontal"),
+                      ("vertical",   "gee_pairwise_plot_vertical")]:
+        fig = make_pairwise_figure(ori)
+        save_figure(fig, stem)
+        plt.close(fig)
 
 # =============================================================================
 # 11. Figure 3: On-nail vs Off-nail boxplot
