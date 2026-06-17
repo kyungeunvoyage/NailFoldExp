@@ -1,0 +1,73 @@
+﻿SubjectID,Session,Condition,Area,Force,Target,Response,IsCorrect
+P66,S01,In-air,A,0.4g,7,2,0
+P66,S01,In-air,C,0.16g,8,2,0
+P66,S01,In-air,B,0.16g,8,3,0
+P66,S01,In-air,C,0.16g,8,1,0
+P66,S01,In-air,F,0.6g,8,4,0
+P66,S01,In-air,C,0.4g,5,3,0
+P66,S01,In-air,E,0.6g,8,4,0
+P66,S01,In-air,E,0.4g,6,4,0
+P66,S01,In-air,C,0.4g,6,2,0
+P66,S01,In-air,F,0.4g,5,1,0
+P66,S01,In-air,A,0.16g,5,2,0
+P66,S01,In-air,E,0.4g,8,4,0
+P66,S01,In-air,D,0.16g,6,2,0
+P66,S01,In-air,B,0.4g,5,2,0
+P66,S01,In-air,D,0.4g,7,5,0
+P66,S01,In-air,E,0.16g,6,2,0
+P66,S01,In-air,F,0.6g,6,3,0
+P66,S01,In-air,B,0.4g,8,2,0
+P66,S01,In-air,E,0.6g,8,4,0
+P66,S01,In-air,D,0.6g,5,4,0
+P66,S01,In-air,A,0.6g,6,4,0
+P66,S01,In-air,A,0.6g,5,5,1
+P66,S01,In-air,D,0.6g,7,3,0
+P66,S01,In-air,C,0.6g,5,2,0
+P66,S01,In-air,A,0.16g,7,0,0
+P66,S01,In-air,F,0.16g,5,0,0
+P66,S01,In-air,E,0.16g,8,0,0
+P66,S01,In-air,B,0.6g,6,6,1
+P66,S01,In-air,A,0.4g,8,2,0
+P66,S01,In-air,F,0.4g,7,3,0
+P66,S01,In-air,F,0.16g,7,1,0
+P66,S01,In-air,D,0.16g,8,3,0
+P66,S01,In-air,B,0.6g,7,7,1
+P66,S01,In-air,B,0.16g,5,4,0
+P66,S01,In-air,D,0.4g,5,2,0
+P66,S01,In-air,C,0.6g,8,2,0
+P66,S01,On-touch (Mid),E,0.4g,8,6,0
+P66,S01,On-touch (Mid),C,0.16g,6,1,0
+P66,S01,On-touch (Mid),A,0.16g,7,0,0
+P66,S01,On-touch (Mid),F,0.16g,8,1,0
+P66,S01,On-touch (Mid),F,0.4g,7,3,0
+P66,S01,On-touch (Mid),F,0.16g,7,1,0
+P66,S01,On-touch (Mid),E,0.6g,7,5,0
+P66,S01,On-touch (Mid),D,0.4g,8,6,0
+P66,S01,On-touch (Mid),D,0.16g,6,1,0
+P66,S01,On-touch (Mid),C,0.6g,7,5,0
+P66,S01,On-touch (Mid),D,0.16g,5,2,0
+P66,S01,On-touch (Mid),B,0.16g,6,3,0
+P66,S01,On-touch (Mid),A,0.16g,7,1,0
+P66,S01,On-touch (Mid),C,0.16g,6,2,0
+P66,S01,On-touch (Mid),D,0.6g,8,5,0
+P66,S01,On-touch (Mid),D,0.4g,8,6,0
+P66,S01,On-touch (Mid),C,0.4g,8,5,0
+P66,S01,On-touch (Mid),E,0.4g,7,7,1
+P66,S01,On-touch (Mid),A,0.6g,6,3,0
+P66,S01,On-touch (Mid),B,0.4g,7,5,0
+P66,S01,On-touch (Mid),E,0.16g,7,4,0
+P66,S01,On-touch (Mid),B,0.4g,8,5,0
+P66,S01,On-touch (Mid),F,0.4g,6,4,0
+P66,S01,On-touch (Mid),B,0.6g,7,7,1
+P66,S01,On-touch (Mid),E,0.16g,7,3,0
+P66,S01,On-touch (Mid),A,0.4g,5,3,0
+P66,S01,On-touch (Mid),D,0.6g,5,5,1
+P66,S01,On-touch (Mid),C,0.4g,5,3,0
+P66,S01,On-touch (Mid),B,0.16g,7,4,0
+P66,S01,On-touch (Mid),F,0.6g,8,6,0
+P66,S01,On-touch (Mid),A,0.4g,8,3,0
+P66,S01,On-touch (Mid),E,0.6g,5,4,0
+P66,S01,On-touch (Mid),A,0.6g,7,4,0
+P66,S01,On-touch (Mid),C,0.6g,8,6,0
+P66,S01,On-touch (Mid),F,0.6g,5,6,0
+P66,S01,On-touch (Mid),B,0.6g,8,6,0

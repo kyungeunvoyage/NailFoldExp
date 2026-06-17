@@ -1351,7 +1351,7 @@ else:
             star6 = ("***" if lme_pool_f["p"] < 0.001 else
                      "**"  if lme_pool_f["p"] < 0.01  else
                      "*"   if lme_pool_f["p"] < 0.05  else "n.s.")
-            y_brk = max(tops_f.values()) + 4
+            y_brk = max(max(tops_f.values()) + 4, 104)
             _add_sig_bracket(ax6, 0, 1, y_brk, text=star6)
 
         ax6.axhline(80, color=CRITERION_COLOR, linestyle="--", linewidth=1.0,
@@ -1371,6 +1371,7 @@ else:
             ax6.set_ylabel(Y_LABEL, fontsize=FONT_LABEL)
         else:
             ax6.set_ylabel("")
+            ax6.tick_params(axis="y", labelleft=False)
 
     leg_handles_f6 = [
         mpatches.Patch(

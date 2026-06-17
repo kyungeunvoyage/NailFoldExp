@@ -383,7 +383,7 @@ def assign_bracket_levels(combos):
     return placed
 
 def finalize_axes(ax, n_x, ylim_top, *, show_ylabel=True, show_xlabel=True,
-                  xlabel="Force pair (g)", ylabel="Detection Accuracy (%)"):
+                  xlabel="Force pair (g)", ylabel="Discrimination Accuracy (%)"):
     ax.set_ylim(ATD.ACCURACY_YMIN, min(ATD.FIG2_BRACKET_YLIM_CAP, ylim_top))
     ax.set_yticks(ATD.ACCURACY_YTICKS)
     ax.grid(False)
@@ -534,8 +534,6 @@ def plot_band_overall(ax, band_label, order, pvals_dict,
 
     ax.axhline(JND_PCT, color=CRITERION_COLOR, linestyle="--",
                linewidth=1.0, alpha=0.85, zorder=REF_LINE_ZORDER)
-    ax.axhline(CHANCE_PCT, color=BLACK, linestyle=":", linewidth=0.8,
-               alpha=0.5, zorder=1)
 
     sig_combos = []
     for i1, i2 in sorted(itertools.combinations(range(len(order)), 2),
@@ -656,8 +654,6 @@ def plot_region_band_box(ax, band_label, order, region_pvals,
 
     ax.axhline(JND_PCT, color=CRITERION_COLOR, linestyle="--",
                linewidth=1.0, alpha=0.85, zorder=REF_LINE_ZORDER)
-    ax.axhline(CHANCE_PCT, color=BLACK, linestyle=":", linewidth=0.8,
-               alpha=0.5, zorder=1)
     ax.set_xticks(range(len(order)))
     ax.set_xticklabels(order, fontsize=FONT_TICK)
     ax.set_xlim(-0.6, len(order) - 0.4)
@@ -738,7 +734,7 @@ def plot_slope_panel(ax, band_label, order, region_pvals, show_ylabel):
     ax.set_xlim(-0.6, len(order)-0.4)
     ax.tick_params(axis="both", which="both", length=0, labelsize=FONT_TICK)
     if show_ylabel:
-        ax.set_ylabel("Detection Accuracy (%)", fontsize=FONT_LABEL,
+        ax.set_ylabel("Discrimination Accuracy (%)", fontsize=FONT_LABEL,
                       labelpad=ATD.FIG_AXIS_LABELPAD)
     ax.set_xlabel("Force pair (g)", fontsize=FONT_LABEL, labelpad=ATD.FIG_AXIS_LABELPAD)
     ax.grid(False); sns.despine(ax=ax)

@@ -82,7 +82,7 @@ ACCURACY_YSPINE = (ACCURACY_YMIN, 100)   # left spine extends to ylim bottom so 
 ACCURACY_YLIM_TOP = 103      # data ylim above 100 so 100% scatter is not clipped
 
 # Inward tick guides drawn manually (seaborn categorical axes hide mpl ticks)
-TICK_LEN_AXES = 0.016  # fraction of axis length into the plot
+TICK_LEN_AXES = 0.009  # fraction of axis length into the plot
 FIG_LEGEND_TOP = 0.92          # subplots_adjust top — raise (e.g. 0.96) = plot closer to legend
 FIG_LEGEND_BOTTOM = 0.12
 FIG_LEGEND_ABOVE_AXES = 0.01   # gap in axes coords (smaller → tighter; 0 = flush to plot top)

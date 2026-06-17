@@ -720,6 +720,221 @@ if not os.getenv("PAPER_RENDER"):
 
 
 # =============================================================================
+#  Post-hoc figure: Omnibus GEE + FDR-corrected pairwise comparisons
+# =============================================================================
+
+def _omnibus_gee_interaction(band_name):
+    """
+    Fit GEE with Group × pair_label interaction for one band.
+    Returns Wald-test p-value for the interaction term set (all interaction
+    columns jointly), or None on failure.
+    """
+    trial_df = df_cd_af[df_cd_af["band"] == band_name].copy()
+    try:
+        model = smf.gee(
+            "correct ~ C(Group) * C(pair_label)",
+            groups="Subject",
+            data=trial_df,
+            family=Binomial(),
+            cov_struct=Exchangeable(),
+        )
+        res = model.fit()
+        # Wald test for the joint interaction block
+        interaction_terms = [c for c in res.model.exog_names if ":" in c]
+        if not interaction_terms:
+            return None
+        wt = res.wald_test_terms(skip_single=False)
+        # wald_test_terms returns a table; find the row for the interaction
+        wt_df = wt.summary_frame()
+        for row_label in wt_df.index:
+            if ":" in str(row_label):
+                return float(wt_df.loc[row_label, "P>chi2"])
+        return None
+    except Exception as e:
+        print(f"  Omnibus GEE ({band_name}) failed: {e}")
+        return None
+
+
+def draw_fd_posthoc_figure():
+    """
+    Post-hoc analysis:
+      1. Omnibus GEE: correct ~ C(Group) * C(pair_label), per band
+         → Wald test for the Group × pair_label interaction
+      2. Per-pair GEE p-values (same as draw_fd_meanCI_figure)
+         → FDR correction (Benjamini-Hochberg) across all pairs within band
+      3. Visualization: same Mean ± 95% CI layout, brackets show p_adj
+    """
+    from statsmodels.stats.multitest import multipletests
+
+    ATD.apply_plot_style()
+    sns.set_theme(style="white")
+
+    fig, axes = plt.subplots(1, 2, figsize=(8.0, 4.5), facecolor="white")
+    print("\n[FD — Post-hoc: Omnibus GEE + FDR-corrected pairwise]")
+
+    for ax, band_cfg in zip(axes, BANDS):
+        band_name = band_cfg["name"]
+        band_df   = subj_acc[subj_acc["band"] == band_name]
+        pairs     = sorted(band_df["pair_label"].unique(),
+                           key=lambda s: float(s.split("–")[1]))
+        n_pairs   = len(pairs)
+        x_centers = np.arange(n_pairs)
+
+        # ── Step 1: Omnibus GEE ──────────────────────────────────────────────
+        omnibus_p = _omnibus_gee_interaction(band_name)
+        if omnibus_p is not None:
+            print(f"  [{band_name}]  Omnibus Group×pair interaction: "
+                  f"p = {omnibus_p:.4f}  {star(omnibus_p)}")
+        else:
+            print(f"  [{band_name}]  Omnibus GEE could not be computed")
+
+        # ── Step 2: Per-pair raw GEE p-values ────────────────────────────────
+        raw_ps = []
+        for pair in pairs:
+            res_pair = _stat_B(pair, band_name)
+            raw_ps.append(res_pair["p"] if res_pair else 1.0)
+
+        # FDR (BH) correction within this band
+        _, p_adj, _, _ = multipletests(raw_ps, method="fdr_bh")
+
+        print(f"  {'Pair':8s}  {'raw p':>8s}  {'FDR p':>8s}  sig")
+        for pair, p_r, p_c in zip(pairs, raw_ps, p_adj):
+            print(f"  {pair:8s}  {p_r:8.4f}  {p_c:8.4f}  {star(p_c)}")
+
+        # ── Step 3: Mean ± 95% CI dots ───────────────────────────────────────
+        y_max_used = 0.0
+        for xi, pair in enumerate(pairs):
+            pair_df = band_df[band_df["pair_label"] == pair]
+            for gi, grp in enumerate(GROUP_ORDER):
+                dx   = (gi - 0.5) * (BOX_W * 2 + GAP)
+                xpos = xi + dx
+                data = pair_df[pair_df["Group"] == grp]["accuracy"].dropna().values
+                if len(data) == 0:
+                    continue
+                n     = len(data)
+                mean  = float(np.mean(data))
+                sem   = float(np.std(data, ddof=1) / np.sqrt(n))
+                ci    = CI95_MULTIPLIER * sem
+                ci_lo, ci_hi = mean - ci, mean + ci
+                color = GROUP_PALETTE[grp]
+                ax.plot([xpos, xpos], [ci_lo, ci_hi],
+                        color=color, linewidth=ERR_LW, zorder=2, clip_on=False)
+                for cap_y in (ci_lo, ci_hi):
+                    ax.plot([xpos - CAP_W, xpos + CAP_W], [cap_y, cap_y],
+                            color=color, linewidth=ERR_LW, zorder=2, clip_on=False)
+                ax.scatter([xpos], [mean], c=[color], s=DOT_SIZE**2,
+                           linewidths=DOT_LW, zorder=4, clip_on=False)
+                y_max_used = max(y_max_used, ci_hi)
+
+        # ── Step 4: Brackets with FDR-corrected p-values ─────────────────────
+        for xi, (pair, p_corr) in enumerate(zip(pairs, p_adj)):
+            pair_df = band_df[band_df["pair_label"] == pair]
+            x_on    = xi + (0 - 0.5) * (BOX_W * 2 + GAP)
+            x_off   = xi + (1 - 0.5) * (BOX_W * 2 + GAP)
+            ci_tops = []
+            for gi, grp in enumerate(GROUP_ORDER):
+                data = pair_df[pair_df["Group"] == grp]["accuracy"].dropna().values
+                if len(data):
+                    n = len(data)
+                    ci_tops.append(float(
+                        np.mean(data) + CI95_MULTIPLIER * np.std(data, ddof=1) / np.sqrt(n)
+                    ))
+            y_brk     = max(ci_tops) + 2.5 if ci_tops else y_max_used + 2.5
+            y_top_brk = y_brk + 0.5
+            x_mid     = (x_on + x_off) / 2
+            ax.plot([x_on, x_on, x_off, x_off],
+                    [y_brk, y_top_brk, y_top_brk, y_brk],
+                    color=ACCENT_RED, linewidth=0.75, clip_on=False, zorder=5)
+            p_txt = f"{star(p_corr)}  p_adj={p_corr:.3f}"
+            ax.text(x_mid, y_top_brk + 0.6, p_txt,
+                    ha="center", va="bottom",
+                    fontsize=max(8, FONT_ANNOT - 1),
+                    color=ACCENT_RED, fontweight="bold",
+                    clip_on=False, zorder=6)
+
+        # ── Step 5: Omnibus annotation inside panel ───────────────────────────
+        omni_txt = (f"Omnibus interaction: p={omnibus_p:.3f}  {star(omnibus_p)}"
+                    if omnibus_p is not None else "Omnibus GEE: N/A")
+        ax.text(0.5, 0.01, omni_txt,
+                transform=ax.transAxes, ha="center", va="bottom",
+                fontsize=max(7, FONT_ANNOT - 2), color="#555555",
+                style="italic")
+
+        ax.axhline(JND_PCT, color=CRITERION_COLOR,
+                   linestyle="--", linewidth=1.0, alpha=0.85, zorder=2)
+        ax.set_title("")
+        ax.set_xticks(x_centers)
+        ax.set_xticklabels([str(p) for p in pairs], fontsize=FONT_TICK)
+        ax.set_yticks(Y_TICKS)
+        ax.yaxis.set_major_locator(FixedLocator(Y_TICKS))
+        ax.tick_params(axis="y", labelsize=FONT_TICK)
+        ax.tick_params(axis="x", length=0)
+        y_top = min(YLIM_TOP_CAP, y_max_used + 22)
+        ax.set_ylim(YLIM_BOT, y_top)
+        ax.spines["left"].set_bounds(YLIM_BOT, 100)
+        sns.despine(ax=ax)
+
+        x_trans = ax.get_xaxis_transform()
+        for xi in x_centers:
+            ax.plot([xi, xi], [0, TICK_LEN], color=BLACK,
+                    linewidth=1.0, solid_capstyle="butt",
+                    transform=x_trans, clip_on=False, zorder=6)
+        y_trans = ax.get_yaxis_transform()
+        y_lo, y_hi = ax.get_ylim()
+        for y in Y_TICKS:
+            if y_lo - 1e-9 <= y <= y_hi + 1e-9:
+                ax.plot([0, TICK_LEN], [y, y], color=BLACK,
+                        linewidth=1.0, solid_capstyle="butt",
+                        transform=y_trans, clip_on=False, zorder=6)
+
+    axes[0].set_ylabel("Accuracy (%)", fontsize=FONT_LABEL)
+    axes[1].set_ylabel("")
+
+    leg_handles = [
+        plt.Line2D([0], [0], color=GROUP_PALETTE[g], marker="o",
+                   markersize=DOT_SIZE * 0.7, linewidth=ERR_LW,
+                   label=GROUP_LABELS[i])
+        for i, g in enumerate(GROUP_ORDER)
+    ]
+    fig.subplots_adjust(left=0.07, right=0.97, top=0.84, bottom=0.12, wspace=0.28)
+    fig.legend(
+        handles=leg_handles,
+        loc="upper center",
+        bbox_to_anchor=(0.5, 1.03),
+        bbox_transform=fig.transFigure,
+        ncol=2,
+        fontsize=FONT_LABEL,
+        frameon=False,
+        columnspacing=2.0,
+        handletextpad=0.5,
+        handlelength=1.6,
+    )
+
+    # FDR-corrected note
+    fig.text(0.5, 0.00, "p-values: FDR-corrected (Benjamini–Hochberg) within each band",
+             ha="center", va="bottom", fontsize=max(7, FONT_ANNOT - 2),
+             color="#555555", style="italic")
+
+    out = os.path.join(OUTPUT_DIR, "fd_onnail_vs_offnail_posthoc.png")
+    import io as _io_ph; from PIL import Image as _Img_ph
+    _buf = _io_ph.BytesIO()
+    fig.savefig(_buf, format="png", dpi=600, bbox_inches="tight",
+                pad_inches=0.05, facecolor="white")
+    _buf.seek(0)
+    _master = _Img_ph.open(_buf).convert("RGB")
+    _W, _H = EXPORT_WIDTH_2COL, round(EXPORT_WIDTH_2COL * _master.height / _master.width)
+    _master.resize((_W, _H), _Img_ph.Resampling.LANCZOS).save(out)
+    print(f"\nSaved: {out}  ({_W}×{_H} px)")
+    if os.getenv("PAPER_RENDER"):
+        return fig
+    plt.close(fig)
+
+
+if not os.getenv("PAPER_RENDER"):
+    draw_fd_posthoc_figure()
+
+
+# =============================================================================
 #  Region-pair comparison: A-C, A-D, F-C, F-D
 #  Two figures:
 #    (R1) Band-level box + scatter  (force pairs collapsed → more continuous)
