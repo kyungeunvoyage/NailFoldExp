@@ -2,11 +2,11 @@
 <html lang="ko">
 <head>
     <meta charset="UTF-8">
-    <title>Force Discrimination - 2AFC JND (In-air & On-touch)</title>
+    <title>Force Discrimination - Oddity (3AFC) Task (On-touch)</title>
     <style>
         body { font-family: 'Segoe UI', sans-serif; display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 100vh; margin: 0; background-color: #f0f4f8; }
-        #container { background: white; padding: 30px; border-radius: 20px; box-shadow: 0 10px 30px rgba(0,0,0,0.1); text-align: center; width: 620px; }
-        
+        #container { background: white; padding: 30px; border-radius: 20px; box-shadow: 0 10px 30px rgba(0,0,0,0.1); text-align: center; width: 660px; }
+
         .input-group { display: flex; justify-content: center; gap: 15px; margin-bottom: 20px; padding: 15px; background: #f8f9fa; border-radius: 10px; border: 1px solid #dee2e6; }
         .input-group div { display: flex; flex-direction: column; align-items: flex-start; }
         .input-group label { font-size: 12px; color: #666; margin-bottom: 4px; font-weight: bold; }
@@ -14,12 +14,13 @@
 
         .setup-info { display: flex; justify-content: space-around; margin-bottom: 20px; background: #ede7f6; padding: 15px; border-radius: 10px; font-weight: bold; }
         #admin-display { background: #fff9c4; border: 2px dashed #fbc02d; padding: 15px; border-radius: 10px; margin-bottom: 20px; }
+        #current-interval-guide { font-size: 22px; font-weight: bold; padding: 10px; color: #b71c1c; min-height: 30px; }
         #status-display { background: #e3f2fd; border: 2px solid #2196f3; padding: 10px; border-radius: 10px; margin-bottom: 15px; font-weight: bold; color: #0d47a1; }
         .progress-bar { width: 100%; height: 15px; background: #e8eaed; border-radius: 10px; overflow: hidden; margin-bottom: 20px; }
         #progress { width: 0%; height: 100%; background: #673ab7; transition: width 0.1s; }
         button { padding: 15px; font-size: 16px; cursor: pointer; border: none; border-radius: 8px; width: 100%; font-weight: bold; margin-top: 10px; transition: 0.2s; }
         #startBtn { background: #673ab7; color: white; }
-        #ansBtn1, #ansBtn2 { background: #3f51b5; color: white; width: 48%; }
+        .ansBtn { background: #3f51b5; color: white; width: 31%; }
         #input-section { display: none; margin-top: 20px; border-top: 2px solid #eee; padding-top: 20px; }
         #log-container { margin-top: 25px; text-align: left; font-size: 12px; max-height: 150px; overflow-y: auto; background: #fafafa; padding: 10px; border: 1px solid #ddd; }
         .condition-badge { background: #e74c3c; color: white; padding: 5px 15px; border-radius: 20px; font-size: 0.9rem; margin-bottom: 10px; display: inline-block; }
@@ -30,9 +31,9 @@
 <body>
 
     <div id="container">
-    <h2>Force Discrimination</h2>
+    <h2>Force Discrimination — Oddity (3AFC)</h2>
     <div id="current-condition-display" class="condition-badge">Condition: Ready</div>
-    
+
     <div class="input-group">
         <div>
             <label for="subID">Subject ID</label>
@@ -45,27 +46,29 @@
     </div>
 
     <button onclick="openSubjectWindow()" style="background:#9c27b0; color:white; margin-bottom:10px;">1. Subject Window Open</button>
-    
+
     <div class="setup-info">
         <div>Region: <span id="current-region">-</span></div>
         <div>Trial: <span id="trial-count">0</span> / <span id="total-trials">0</span></div>
     </div>
 
     <div id="admin-display">
-        <div style="font-size:12px; color:#888; padding-top:5px;">Admin Guide (Target: <span id="target-reg" style="color:red; font-weight:bold;">-</span>)</div>
-        <div style="font-size:20px; font-weight:bold; padding:10px;">1st: <span id="s1" style="color:blue;">-</span> vs 2nd: <span id="s2" style="color:red;">-</span></div>
+        <div style="font-size:12px; color:#888;">Admin Guide (Target Region: <span id="target-reg" style="color:red; font-weight:bold;">-</span>)</div>
+        <div style="font-size:14px; color:#555; margin-top:6px;">Stimuli this trial (presentation order): <span id="stim-preview" style="font-weight:bold;">-</span></div>
+        <div id="current-interval-guide">Press "다음 시행 시작" to begin</div>
     </div>
-    
+
     <div id="status-display">Waiting for Admin to Start</div>
     <div class="progress-bar"><div id="progress"></div></div>
-    
+
     <button id="startBtn" onclick="runTrial()">다음 시행 시작 (Start Sequence)</button>
 
     <div id="input-section">
-        <p style="font-size:1.1rem; font-weight:bold;">Q. Were the two stimuli the SAME or DIFFERENT?<br><span style="font-size:0.9rem; color:#666;">(두 자극이 같았나요, 달랐나요?)</span></p>
+        <p style="font-size:1.1rem; font-weight:bold;">Q. Which stimulus was DIFFERENT?</p>
         <div style="display:flex; justify-content:space-between;">
-            <button id="ansBtn1" onclick="logResponse(1)">SAME (같음)</button>
-            <button id="ansBtn2" onclick="logResponse(2)">DIFFERENT (다름)</button>
+            <button class="ansBtn" onclick="logResponse(1)">1번</button>
+            <button class="ansBtn" onclick="logResponse(2)">2번</button>
+            <button class="ansBtn" onclick="logResponse(3)">3번</button>
         </div>
     </div>
 
@@ -76,11 +79,24 @@
 
 <script>
     let subjectWindow = null;
-    const regions = ['A', 'B', 'C', 'D','E','F'];
-    
+    const regions = ['A', 'B', 'C', 'D', 'E', 'F'];
+
+    // ── Timing (ms). The previous version had NO timer/cue marking the
+    // boundary between stimulus 1 and stimulus 2 -- that ambiguity is the
+    // most likely source of the systematic reversal seen on closely-spaced
+    // force pairs. This version shows an explicit, real-time
+    // "NOW APPLY: Xg (Stimulus i/3)" guide for every stimulus. ──
+    const STIM_DURATION_MS = 1500;   // how long each stimulus is signaled for
+    const ISI_MS = 500;              // gap between stimuli (not after the last one)
+    const RESPONSE_PREP_MS = 500;    // brief pause before the response buttons appear
+
     //------------------------
+    // HIGH BAND (ref=26g) commented out per request -- low band only for now.
+    // const stimConfigs = [
+    //     { ref: 26.0, comps: [10.0, 15.0, 60.0] },
+    //     { ref: 1.00, comps: [0.40, 0.60, 1.40, 2.00] }
+    // ];
     const stimConfigs = [
-        { ref: 26.0, comps: [10.0, 15.0, 60.0] },
         { ref: 1.00, comps: [0.40, 0.60, 1.40, 2.00] }
     ];
     // -----------------------
@@ -88,10 +104,10 @@
     const sessionConditions = ['On-touch'];
     let currentConditionIdx = 0;
 
-    let trialPool = []; 
+    let trialPool = [];
     let currentIdx = 0;
     let experimentalData = [];
-    let firstStim = 0, secondStim = 0;
+    let currentStims = [0, 0, 0];   // [stim1, stim2, stim3] for the active trial
 
     function openSubjectWindow() {
         subjectWindow = window.open("", "SubWin", "width=800,height=500");
@@ -102,25 +118,47 @@
             </body>`);
     }
 
-    // --- 수정된 풀 생성 로직: Reference 그룹별로 섞은 후 순차적으로 합침 ---
+    // ── Build the 3 stimulus values for one trial, given which value is the
+    // "odd" one (ref or comp) and which position (1,2,3) it occupies. ──
+    function buildStimArray(ref, comp, oddType, oddPosition) {
+        const sameVal = (oddType === 'comp_odd') ? ref : comp;
+        const oddVal  = (oddType === 'comp_odd') ? comp : ref;
+        const arr = [sameVal, sameVal, sameVal];
+        arr[oddPosition - 1] = oddVal;
+        return arr;
+    }
+
+    // ── Trial-pool generator: every (region, comp) combination is crossed
+    // with BOTH oddType values (ref_odd / comp_odd) AND all 3 oddPosition
+    // values, so the design is fully counterbalanced by construction --
+    // no reliance on random shuffling alone to achieve balance. ──
     function createTrialPool(condition) {
         let fullList = [];
-        
+
         stimConfigs.forEach(config => {
             let groupList = [];
             regions.forEach(reg => {
                 config.comps.forEach(cVal => {
-                    for(let i=0; i<3; i++) { 
-                        groupList.push({ref: config.ref, comp: cVal, region: reg, condition: condition});
-                    }
+                    ['comp_odd', 'ref_odd'].forEach(oddType => {
+                        [1, 2, 3].forEach(oddPosition => {
+                            groupList.push({
+                                ref: config.ref,
+                                comp: cVal,
+                                oddType: oddType,
+                                oddPosition: oddPosition,
+                                region: reg,
+                                condition: condition
+                            });
+                        });
+                    });
                 });
             });
-            // 해당 Reference 그룹 내에서만 랜덤 셔플
+            // shuffle the ORDER trials are presented in (not which trials exist --
+            // the counterbalanced set above is fixed; only presentation order is randomized)
             groupList.sort(() => Math.random() - 0.5);
-            // 전체 리스트에 추가 (이전 그룹 뒤에 붙음)
             fullList = fullList.concat(groupList);
         });
-        
+
         return fullList;
     }
     // --------------------------------------------------------
@@ -129,7 +167,7 @@
         currentConditionIdx = 0;
         currentIdx = 0;
         trialPool = createTrialPool(sessionConditions[currentConditionIdx]);
-        
+
         document.getElementById('total-trials').innerText = trialPool.length;
         document.getElementById('current-condition-display').innerText = "Condition: " + sessionConditions[currentConditionIdx];
         prepareTrial();
@@ -137,69 +175,88 @@
 
     function prepareTrial() {
         const t = trialPool[currentIdx];
-        const isRefFirst = Math.random() > 0.5;
-        firstStim = isRefFirst ? t.ref : t.comp;
-        secondStim = isRefFirst ? t.comp : t.ref;
+        currentStims = buildStimArray(t.ref, t.comp, t.oddType, t.oddPosition);
 
         document.getElementById('current-region').innerText = t.region;
         document.getElementById('target-reg').innerText = t.region;
-        document.getElementById('s1').innerText = firstStim.toFixed(2) + "g";
-        document.getElementById('s2').innerText = secondStim.toFixed(2) + "g";
+        document.getElementById('stim-preview').innerText =
+            currentStims.map(v => v.toFixed(2) + "g").join("  →  ");
+        document.getElementById('current-interval-guide').innerText = 'Press "다음 시행 시작" to begin';
         document.getElementById('trial-count').innerText = currentIdx + 1;
     }
 
     async function runTrial() {
-        if(!subjectWindow) return alert("피험자 창을 먼저 열어주세요.");
+        if (!subjectWindow) return alert("피험자 창을 먼저 열어주세요.");
         document.getElementById('startBtn').disabled = true;
         document.getElementById('input-section').style.display = 'none';
 
-        document.getElementById('status-display').innerText = "첫 번째 자극 제시 중...";
-        subjectWindow.update("Concentrate ..", "#2196F3");
-        await progress(8000); 
-        
-        document.getElementById('status-display').innerText = "피험자 응답 대기 중";
-        subjectWindow.update("SAME or DIFFERENT?", "#9C27B0");
+        for (let i = 0; i < 3; i++) {
+            const val = currentStims[i];
+            document.getElementById('status-display').innerText = `Stimulus ${i + 1} / 3 in progress...`;
+            document.getElementById('current-interval-guide').innerText =
+                `>> NOW APPLY: ${val.toFixed(2)}g   (Stimulus ${i + 1} / 3) <<`;
+            subjectWindow.update("Concentrate....", "#2196F3");
+
+            await progress(STIM_DURATION_MS);
+
+            if (i < 2) {
+                document.getElementById('status-display').innerText = "Inter-stimulus interval...";
+                document.getElementById('current-interval-guide').innerText = "··· wait ···";
+                subjectWindow.update("Concentrate....", "#2196F3");
+                await progress(ISI_MS);
+            }
+        }
+
+        document.getElementById('current-interval-guide').innerText = "Trial complete.";
+        document.getElementById('status-display').innerText = "Waiting for participant response";
+        subjectWindow.update("Which stimulus was DIFFERENT? 1, 2 or 3", "#9C27B0");
+        await progress(RESPONSE_PREP_MS);
         document.getElementById('input-section').style.display = 'block';
     }
 
     function progress(ms) {
+        document.getElementById('progress').style.width = "0%";
         return new Promise(res => {
             let start = Date.now();
             let timer = setInterval(() => {
                 let p = (Date.now() - start) / ms * 100;
-                document.getElementById('progress').style.width = p + "%";
-                if(p >= 100) { clearInterval(timer); res(); }
+                document.getElementById('progress').style.width = Math.min(p, 100) + "%";
+                if (p >= 100) { clearInterval(timer); res(); }
             }, 30);
         });
     }
 
     function logResponse(choice) {
         const t = trialPool[currentIdx];
-        const response = (choice === 1) ? "Same" : "Different";
+        const isCorrect = (choice === t.oddPosition) ? 1 : 0;
 
         const subID = document.getElementById('subID').value;
         const sessNo = document.getElementById('sessNo').value;
 
         experimentalData.push({
-            Subject: subID, 
+            Subject: subID,
             Session: sessNo,
             Condition: t.condition,
-            Region: t.region, 
-            Ref: t.ref, 
+            Region: t.region,
+            Ref: t.ref,
             Comp: t.comp,
-            First: firstStim, 
-            Second: secondStim, 
-            Response: response
+            OddType: t.oddType,          // 'comp_odd' = the comparison value was the odd one out; 'ref_odd' = reference was odd
+            Stim1: currentStims[0],
+            Stim2: currentStims[1],
+            Stim3: currentStims[2],
+            OddPosition: t.oddPosition,  // ground truth: which stimulus (1/2/3) was actually different
+            UserChoice: choice,          // which stimulus the participant picked
+            IsCorrect: isCorrect
         });
 
         const log = document.createElement('div');
-        log.innerText = `[${t.condition}-${t.region}] Trial ${currentIdx+1}: ${response} (Ref:${t.ref}g vs Comp:${t.comp}g)`;
+        log.innerText = `[${t.condition}-${t.region}] Trial ${currentIdx + 1}: 선택=${choice}, 정답=${t.oddPosition}, ${isCorrect ? 'O' : 'X'}`;
         document.getElementById('logContent').prepend(log);
 
         document.getElementById('input-section').style.display = 'none';
         document.getElementById('progress').style.width = "0%";
         currentIdx++;
-        
+
         if (currentIdx < trialPool.length) {
             document.getElementById('startBtn').disabled = false;
             prepareTrial();
@@ -213,15 +270,14 @@
         if (currentConditionIdx < sessionConditions.length) {
             const nextCond = sessionConditions[currentConditionIdx];
 
-            if(subjectWindow)
-            {
+            if (subjectWindow) {
                 subjectWindow.update("Ready for Next Session", "#333");
             }
-            alert(`'${sessionConditions[currentConditionIdx-1]}' 조건이 끝났습니다.\n다음 조건인 '${nextCond}'을 시작합니다.`);
-            
+            alert(`'${sessionConditions[currentConditionIdx - 1]}' 조건이 끝났습니다.\n다음 조건인 '${nextCond}'을 시작합니다.`);
+
             currentIdx = 0;
             trialPool = createTrialPool(nextCond);
-            
+
             document.getElementById('total-trials').innerText = trialPool.length;
             document.getElementById('current-condition-display').innerText = "Condition: " + nextCond;
             document.getElementById('startBtn').disabled = false;
@@ -229,24 +285,35 @@
         } else {
             document.getElementById('status-display').innerText = "모든 실험 종료";
             document.getElementById('current-condition-display').innerText = "Status: All Finished";
-            subjectWindow.update("모든 실험이 완료되었습니다.", "#2E7D32");
+            subjectWindow.update("All experiments completed.", "#2E7D32");
         }
     }
 
     function downloadCSV() {
         const subID = document.getElementById('subID').value || "Unknown";
         const sessNo = document.getElementById('sessNo').value || "Unknown";
-        
-        let csv = "\uFEFFSubject,Session,Condition,Region,Reference,Comparison,FirstStim,SecondStim,Response\n";
+
+        let csv = "\uFEFFSubject,Session,Condition,Region,Reference,Comparison,OddType,Stim1,Stim2,Stim3,OddPosition,UserChoice,IsCorrect\n";
         experimentalData.forEach(r => {
-            csv += `${r.Subject},${r.Session},${r.Condition},${r.Region},${r.Ref},${r.Comp},${r.First},${r.Second},${r.Response}\n`;
+            csv += `${r.Subject},${r.Session},${r.Condition},${r.Region},${r.Ref},${r.Comp},${r.OddType},${r.Stim1},${r.Stim2},${r.Stim3},${r.OddPosition},${r.UserChoice},${r.IsCorrect}\n`;
         });
         const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
         const a = document.createElement("a");
         a.href = URL.createObjectURL(blob);
-        a.download = `${subID}_ForceDiscrimination.csv`;
+        a.download = `${subID}_ForceDiscrimination_Oddity.csv`;
         a.click();
     }
+
+    // Keyboard shortcuts: press 1, 2, or 3 to log a response -- handy when
+    // your hands are occupied holding the filament and the participant is
+    // answering out loud rather than pressing the on-screen buttons.
+    document.addEventListener('keydown', (e) => {
+        const inputVisible = document.getElementById('input-section').style.display === 'block';
+        if (!inputVisible) return;
+        if (e.key === '1' || e.key === '2' || e.key === '3') {
+            logResponse(parseInt(e.key, 10));
+        }
+    });
 
     setupExp();
 </script>

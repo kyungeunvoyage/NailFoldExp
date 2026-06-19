@@ -82,7 +82,7 @@ ACCURACY_YSPINE = (ACCURACY_YMIN, 100)   # left spine extends to ylim bottom so 
 ACCURACY_YLIM_TOP = 103      # data ylim above 100 so 100% scatter is not clipped
 
 # Inward tick guides drawn manually (seaborn categorical axes hide mpl ticks)
-TICK_LEN_AXES = 0.009  # fraction of axis length into the plot
+TICK_LEN_AXES = 0.016  # fraction of axis length into the plot
 FIG_LEGEND_TOP = 0.92          # subplots_adjust top — raise (e.g. 0.96) = plot closer to legend
 FIG_LEGEND_BOTTOM = 0.12
 FIG_LEGEND_ABOVE_AXES = 0.01   # gap in axes coords (smaller → tighter; 0 = flush to plot top)
@@ -90,8 +90,8 @@ FIG_LEGEND_PAD_PT = 1.0        # borderaxespad (points) between legend box and a
 FIG_LEGEND_TOP_MULTILINE = 0.90  # slightly lower axes top when legend has \\n lines
 FIG_AXIS_LABELPAD = 6
 
-BOX_LINEWIDTH = 1.4
-KAO_BOX_LINEWIDTH = 1.4   # thicker stroke for hollow Kao boxes
+BOX_LINEWIDTH = 0.8
+KAO_BOX_LINEWIDTH = 0.8   # thicker stroke for hollow Kao boxes
 CAP_LINEWIDTH = 0.5
 CAP_WIDTH     = 0.10   # matplotlib capwidths — short end ticks (default ~0.5× box)
 REGION_BOX_WIDTH = 0.55  # sns ``width`` on Fig2 (5 forces, 2 hues)
@@ -304,10 +304,13 @@ def draw_fig3_stripplot(
     seed=0,
     participant_median=False,
     triangle_keys=None,
+    partial_subjects=None,
 ):
     """Strip points at ``Plot_X``; narrow centered jitter inside each box.
 
-    triangle_keys: set of (source_name, force_val) tuples → use '^' marker.
+    triangle_keys:    set of (source_name, force_val) tuples → entire group uses '^'.
+    partial_subjects: set of participant IDs → those specific points use '^' regardless
+                      of force/source; overrides triangle_keys when both are supplied.
     """
     rng = np.random.default_rng(seed)
     half_span = (box_width / 2) * jitter_frac
@@ -326,12 +329,27 @@ def draw_fig3_stripplot(
         for _, grp in sub.groupby("Plot_X", sort=False):
             x0   = float(grp["Plot_X"].iloc[0])
             fval = float(grp["Force_Val"].iloc[0]) if "Force_Val" in grp.columns else None
-            y    = grp["Score"].to_numpy(dtype=float)
-            offsets = x0 + _centered_strip_offsets(len(y), half_span, rng)
-            if triangle_keys is not None and (src, fval) in triangle_keys:
-                xs_tri.append(offsets);  ys_tri.append(y)
+
+            if partial_subjects is not None and "Participant" in grp.columns:
+                # Split within each (source, force) group by participant ID
+                mask_par = grp["Participant"].isin(partial_subjects)
+                for rows, is_tri in [(grp[~mask_par], False), (grp[mask_par], True)]:
+                    if rows.empty:
+                        continue
+                    y   = rows["Score"].to_numpy(dtype=float)
+                    off = x0 + _centered_strip_offsets(len(y), half_span, rng)
+                    if is_tri:
+                        xs_tri.append(off);  ys_tri.append(y)
+                    else:
+                        xs_circ.append(off); ys_circ.append(y)
             else:
-                xs_circ.append(offsets); ys_circ.append(y)
+                y       = grp["Score"].to_numpy(dtype=float)
+                offsets = x0 + _centered_strip_offsets(len(y), half_span, rng)
+                if triangle_keys is not None and (src, fval) in triangle_keys:
+                    xs_tri.append(offsets);  ys_tri.append(y)
+                else:
+                    xs_circ.append(offsets); ys_circ.append(y)
+
         scatter_kw = dict(linewidths=0, edgecolors="none", alpha=alpha,
                           zorder=3, clip_on=False)
         if xs_circ:
@@ -1128,10 +1146,14 @@ df_raw = df_raw[df_raw["Condition"] != "On-touch (Soft)"]
 df_raw = df_raw[df_raw["Area"].isin(["A", "B", "C", "D", "E", "F"])].copy()
 df_raw["Force_Val"] = df_raw["Force"].str.extract(r"(\d+\.?\d*)").astype(float)
 
-# P61, P62, P63: only include 0.4 g data (partial-protocol participants)
-_PARTIAL_SUBJ = {"P61", "P62", "P63"}
-_is_partial = df_raw["SubjectID" if "SubjectID" in df_raw.columns else "Subject"].isin(_PARTIAL_SUBJ)
-df_raw = df_raw[~_is_partial | (df_raw["Force_Val"] == 0.4)].copy()
+# Partial-protocol participants: any subject with numeric ID >= 61
+# (they only ran 0.16, 0.4, 0.6 g conditions)
+_subj_col_raw = "SubjectID" if "SubjectID" in df_raw.columns else "Subject"
+_subj_nums    = df_raw[_subj_col_raw].str.extract(r"(\d+)")[0].astype(int)
+_PARTIAL_SUBJ = set(df_raw.loc[_subj_nums >= 61, _subj_col_raw].unique())
+_is_partial   = df_raw[_subj_col_raw].isin(_PARTIAL_SUBJ)
+df_raw = df_raw[~_is_partial | (df_raw["Force_Val"].isin([0.16, 0.4, 0.6]))].copy()
+print(f"Partial-protocol subjects (n={len(_PARTIAL_SUBJ)}): {sorted(_PARTIAL_SUBJ)}")
 print(f"After partial-subject filter: {len(df_raw)} rows")
 
 SUBJECT_COL = "SubjectID" if "SubjectID" in df_raw.columns else "Subject"
@@ -1212,6 +1234,7 @@ def plot_kao_vs_periungual(df_periungual, peri_label, peri_color, save_stem,
                            peri_box_brightness=None,
                            peri_box_alpha_hex=None,
                            peri_box_saturation_scale=None,
+                           partial_subjects=None,
                            region_background=True,
                            region_labels=True,
                            highlight_forces=None,
@@ -1281,6 +1304,7 @@ def plot_kao_vs_periungual(df_periungual, peri_label, peri_color, save_stem,
         brightness=scatter_brightness,
         participant_median=participant_median,
         triangle_keys=triangle_keys,
+        partial_subjects=partial_subjects,
     )
     lower_stripplot_zorder(ax)
     finalize_boxplot_lines(ax, median_color=ACCENT_RED, median_lw=2.0)
@@ -1341,10 +1365,14 @@ ONTouch_LABEL = f"Periungual: On-touch\n(this study, n={n_subjects})"
 
 def plot_ontouch_vs_inair(df, cond_list, cond_colors, save_stem,
                           export_widths=None,
-                          scatter_brightness=SCATTER_HSB_BRIGHTNESS):
+                          scatter_brightness=SCATTER_HSB_BRIGHTNESS,
+                          partial_subjects=None):
     """Fig2: Periungual On-touch vs In-air (matplotlib boxes + centered strip)."""
     df_plot = df.copy()
     df_plot["Source"] = df_plot["Condition"]
+    # ensure "Participant" column exists for partial-subject triangle logic
+    if "Participant" not in df_plot.columns and SUBJECT_COL in df_plot.columns:
+        df_plot["Participant"] = df_plot[SUBJECT_COL]
     n_forces = len(USER_FORCES)
     force_to_idx = {f: i for i, f in enumerate(USER_FORCES)}
     df_plot = assign_fig3_plot_x(df_plot, force_to_idx, cond_list, n_forces)
@@ -1364,6 +1392,7 @@ def plot_ontouch_vs_inair(df, cond_list, cond_colors, save_stem,
     draw_fig3_stripplot(
         ax, df_plot, cond_list, cond_colors, box_w,
         brightness=scatter_brightness,
+        partial_subjects=partial_subjects,
     )
     lower_stripplot_zorder(ax)
     finalize_boxplot_lines(ax, median_color=ACCENT_RED, median_lw=2.0)
@@ -1411,6 +1440,7 @@ def run_all_figures(export_widths=None, in_air=IN_AIR, on_touch=ON_TOUCH,
         "Fig1_fingerpad_nopaint_vs_inair",
         export_widths=export_widths,
         scatter_brightness=scatter_brightness,
+        partial_subjects=_PARTIAL_SUBJ,
         **pale_box_kw,
     )
 
@@ -1421,6 +1451,7 @@ def run_all_figures(export_widths=None, in_air=IN_AIR, on_touch=ON_TOUCH,
         "Fig3_fingerpad_nopaint_vs_periungual_ontouch",
         export_widths=export_widths,
         scatter_brightness=scatter_brightness,
+        partial_subjects=_PARTIAL_SUBJ,
         **pale_box_kw,
     )
 
@@ -1434,6 +1465,7 @@ def run_all_figures(export_widths=None, in_air=IN_AIR, on_touch=ON_TOUCH,
         "Fig2_ontouch_vs_inair",
         export_widths=export_widths,
         scatter_brightness=scatter_brightness,
+        partial_subjects=_PARTIAL_SUBJ,
     )
 
     export_fig3_10559A_2col(scatter_brightness=scatter_brightness, **pale_box_kw)
@@ -1453,6 +1485,7 @@ def export_fig3_10559A_2col(scatter_brightness=SCATTER_HSB_BRIGHTNESS, **pale_bo
         region_labels=False,
         highlight_forces=[0.07],
         scatter_brightness=scatter_brightness,
+        partial_subjects=_PARTIAL_SUBJ,
         **pale_box_kw,
     )
 
@@ -1470,12 +1503,13 @@ def export_fig3_10559A_2col_v2(scatter_brightness=SCATTER_HSB_BRIGHTNESS, **pale
         highlight_forces=[0.07],
         scatter_brightness=scatter_brightness,
         participant_median=True,
+        partial_subjects=_PARTIAL_SUBJ,
         **pale_box_kw,
     )
 
 
 def export_fig3_future_0p4g(scatter_brightness=SCATTER_HSB_BRIGHTNESS, **pale_box_kw):
-    """Figure 3 extended to 0.4 g: uses real P61/P62/P63 data at 0.4 g (triangles) + Kao 0.4 g."""
+    """Figure 3 extended: uses real P61/P62/P63 data at 0.16, 0.4, 0.6 g (triangles) + Kao 0.4 g."""
     # --- Kao data extended to include 0.4 g ---
     kao_rows_ext = []
     for force, vals in KAO_PAINT_RAW.items():
@@ -1489,7 +1523,7 @@ def export_fig3_future_0p4g(scatter_brightness=SCATTER_HSB_BRIGHTNESS, **pale_bo
                 })
     df_kao_ext = pd.DataFrame(kao_rows_ext)
 
-    # Real On-touch data; df_raw already filtered so P61/P62/P63 contribute only 0.4 g
+    # On-touch data: P61/P62/P63 now included at 0.16, 0.4, 0.6 g
     df_peri_combined = df_raw[df_raw["Condition"] == "On-touch (Mid)"].copy()
 
     plot_kao_vs_periungual(
@@ -1503,7 +1537,7 @@ def export_fig3_future_0p4g(scatter_brightness=SCATTER_HSB_BRIGHTNESS, **pale_bo
         highlight_forces=[0.07, 0.4],
         scatter_brightness=scatter_brightness,
         kao_df_override=df_kao_ext,
-        triangle_keys={(ONTouch_LABEL, 0.4)},
+        partial_subjects=_PARTIAL_SUBJ,
         participant_median=True,
         **pale_box_kw,
     )

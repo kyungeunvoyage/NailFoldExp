@@ -115,6 +115,34 @@ def add_inward_tick_guides(ax, x_positions=None, y_ticks=None):
         )
 
 
+def _scatter_partial(ax, x_pos, vals, subject_ids, partial_subjects, color, *,
+                     jitter_arr, size=3.5, alpha=None):
+    """Scatter strip that draws circles for regular subjects and triangles for partial ones.
+
+    Parameters
+    ----------
+    x_pos       : float — centre x position of the box
+    vals        : array of y values (per-subject accuracies)
+    subject_ids : array of subject ID strings (same length as vals)
+    partial_subjects : set of subject ID strings that should be triangles
+    jitter_arr  : pre-computed x jitter (same length as vals)
+    """
+    rgba = _hsb_scatter_rgba(color)
+    kw = dict(linewidths=0, zorder=3, clip_on=False)
+    if alpha is not None:
+        kw["alpha"] = alpha
+
+    mask_par = np.array([s in partial_subjects for s in subject_ids])
+    if np.any(~mask_par):
+        ax.scatter(x_pos + jitter_arr[~mask_par], vals[~mask_par],
+                   c=[rgba] * int((~mask_par).sum()),
+                   s=size ** 2, marker="o", **kw)
+    if np.any(mask_par):
+        ax.scatter(x_pos + jitter_arr[mask_par], vals[mask_par],
+                   c=[rgba] * int(mask_par.sum()),
+                   s=(size * 1.3) ** 2, marker="^", **kw)
+
+
 def save_png_at_width(fig, out_path, width_px=EXPORT_WIDTH_2COL, *, pad_inches=0.04):
     w_in, _ = fig.get_size_inches()
     dpi = width_px / w_in
@@ -867,10 +895,13 @@ else:
 
     df["Relative_Score"] = df.apply(calc_relative_score, axis=1)
 
-    # P61, P62, P63: partial-protocol — only 0.4 g data should be included
-    _PARTIAL_SUBJ = {"P61", "P62", "P63"}
-    _is_partial = df[sub_col].isin(_PARTIAL_SUBJ)
-    df = df[~_is_partial | (df["Force_Val"] == 0.4)].copy()
+    # Partial-protocol participants: any subject with numeric ID >= 61
+    # (they only ran 0.16, 0.4, 0.6 g conditions)
+    _subj_nums    = df[sub_col].str.extract(r"(\d+)")[0].astype(int)
+    _PARTIAL_SUBJ = set(df.loc[_subj_nums >= 61, sub_col].unique())
+    _is_partial   = df[sub_col].isin(_PARTIAL_SUBJ)
+    df = df[~_is_partial | (df["Force_Val"].isin([0.16, 0.4, 0.6]))].copy()
+    print(f"Partial-protocol subjects (n={len(_PARTIAL_SUBJ)}): {sorted(_PARTIAL_SUBJ)}")
     print(f"After partial-subject filter: {len(df)} rows")
 
     all_forces = sorted(df["Force_Val"].unique())
@@ -1316,7 +1347,9 @@ else:
 
         tops_f = {}
         for xi, grp in enumerate(POOL_GROUP_ORDER):
-            grp_data = df_pool_f[df_pool_f["Group"] == grp]["accuracy"].dropna().values
+            grp_rows = df_pool_f[df_pool_f["Group"] == grp].dropna(subset=["accuracy"])
+            grp_data = grp_rows["accuracy"].values
+            grp_subjs = grp_rows[sub_col].values
             bp = ax6.boxplot(
                 [grp_data],
                 positions=[xi],
@@ -1337,15 +1370,8 @@ else:
             tops_f[grp] = max(whisker_ys) if whisker_ys else 0.0
 
             jitter = rng6.uniform(-0.12, 0.12, size=len(grp_data))
-            rgba = _hsb_scatter_rgba(POOL_PALETTE[grp])
-            ax6.scatter(
-                xi + jitter, grp_data,
-                c=[rgba] * len(grp_data),
-                s=3.5 ** 2,
-                linewidths=0,
-                zorder=3,
-                clip_on=False,
-            )
+            _scatter_partial(ax6, xi, grp_data, grp_subjs, _PARTIAL_SUBJ,
+                             POOL_PALETTE[grp], jitter_arr=jitter)
 
         if lme_pool_f:
             star6 = ("***" if lme_pool_f["p"] < 0.001 else
@@ -1441,7 +1467,9 @@ else:
 
         tops_m = {}
         for xi, grp in enumerate(MOA_GROUP_ORDER):
-            grp_data = df_moa_f[df_moa_f["Group"] == grp]["accuracy"].dropna().values
+            grp_rows = df_moa_f[df_moa_f["Group"] == grp].dropna(subset=["accuracy"])
+            grp_data = grp_rows["accuracy"].values
+            grp_subjs = grp_rows[sub_col].values
             bp = ax7.boxplot(
                 [grp_data],
                 positions=[xi],
@@ -1462,15 +1490,8 @@ else:
             tops_m[grp] = max(whisker_ys) if whisker_ys else 0.0
 
             jitter = rng7.uniform(-0.12, 0.12, size=len(grp_data))
-            rgba = _hsb_scatter_rgba(MOA_PALETTE[grp])
-            ax7.scatter(
-                xi + jitter, grp_data,
-                c=[rgba] * len(grp_data),
-                s=3.5 ** 2,
-                linewidths=0,
-                zorder=3,
-                clip_on=False,
-            )
+            _scatter_partial(ax7, xi, grp_data, grp_subjs, _PARTIAL_SUBJ,
+                             MOA_PALETTE[grp], jitter_arr=jitter)
 
         if lme_moa_f:
             star7 = ("***" if lme_moa_f["p"] < 0.001 else
@@ -1565,7 +1586,9 @@ else:
 
         tops_8a = {}
         for xi, grp in enumerate(F8A_GROUP_ORDER):
-            grp_data = df_f8a[df_f8a["Group"] == grp]["accuracy"].dropna().values
+            grp_rows = df_f8a[df_f8a["Group"] == grp].dropna(subset=["accuracy"])
+            grp_data = grp_rows["accuracy"].values
+            grp_subjs = grp_rows[sub_col].values
             bp = ax8a.boxplot(
                 [grp_data], positions=[xi], widths=0.45,
                 patch_artist=True, showfliers=False, zorder=2,
@@ -1577,9 +1600,8 @@ else:
             )
             tops_8a[grp] = max(w.get_ydata()[1] for w in bp["whiskers"])
             jitter = rng8a.uniform(-0.12, 0.12, size=len(grp_data))
-            ax8a.scatter(xi + jitter, grp_data,
-                         c=[_hsb_scatter_rgba(F8A_PALETTE[grp])] * len(grp_data),
-                         s=3.5 ** 2, linewidths=0, zorder=3, clip_on=False)
+            _scatter_partial(ax8a, xi, grp_data, grp_subjs, _PARTIAL_SUBJ,
+                             F8A_PALETTE[grp], jitter_arr=jitter)
 
         if lme_f8a:
             star8a = ("***" if lme_f8a["p"] < 0.001 else "**" if lme_f8a["p"] < 0.01
@@ -1660,7 +1682,9 @@ else:
 
         tops_8b = {}
         for xi, grp in enumerate(F8B_GROUP_ORDER):
-            grp_data = df_pool8b_f[df_pool8b_f["Group"] == grp]["accuracy"].dropna().values
+            grp_rows = df_pool8b_f[df_pool8b_f["Group"] == grp].dropna(subset=["accuracy"])
+            grp_data = grp_rows["accuracy"].values
+            grp_subjs = grp_rows[sub_col].values
             bp = ax8b.boxplot(
                 [grp_data], positions=[xi], widths=0.45,
                 patch_artist=True, showfliers=False, zorder=2,
@@ -1672,9 +1696,8 @@ else:
             )
             tops_8b[grp] = max(w.get_ydata()[1] for w in bp["whiskers"])
             jitter = rng8b.uniform(-0.12, 0.12, size=len(grp_data))
-            ax8b.scatter(xi + jitter, grp_data,
-                         c=[_hsb_scatter_rgba(F8B_PALETTE[grp])] * len(grp_data),
-                         s=3.5 ** 2, linewidths=0, zorder=3, clip_on=False)
+            _scatter_partial(ax8b, xi, grp_data, grp_subjs, _PARTIAL_SUBJ,
+                             F8B_PALETTE[grp], jitter_arr=jitter)
 
         if lme_f8b:
             star8b = ("***" if lme_f8b["p"] < 0.001 else "**" if lme_f8b["p"] < 0.01
