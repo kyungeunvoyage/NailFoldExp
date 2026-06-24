@@ -1,0 +1,13 @@
+figure,metric,value,note
+Fig2_ontouch_vs_inair(final),n_subjects_full_protocol,30,Subjects with all force levels (0.07–1.4 g)
+Fig2_ontouch_vs_inair(final),n_subjects_partial_protocol,15,"Subjects with 0.16, 0.4, 0.6 g only (shown as △ in figure)"
+Fig2_ontouch_vs_inair(final),n_subjects_total,45,Unique subjects contributing to any force in Fig2
+Fig3_future_full_kao(final),n_subjects_fingerpad_kao,5,Kao et al. 2022 digitized fingerpad (independent sample)
+Fig3_future_full_kao(final),n_subjects_periungual_full,30,"This study, full protocol (● in figure legend)"
+Fig3_future_full_kao(final),n_subjects_periungual_partial,15,"This study, partial protocol (△ in figure legend)"
+onnail_vs_offnail_pooled(final),n_subjects_full_protocol,30,"Areas A,C,D,F at 0.16/0.6/1.0 g"
+onnail_vs_offnail_pooled(final),n_subjects_partial_protocol,15,"Areas A,C,D,F at 0.16/0.4/0.6 g only"
+onnail_vs_offnail_pooled(final),n_subjects_total,45,Unique subjects in on-nail pooled analysis
+ALL,sensitivity_1,sensitivity_full_n30,Exclude partial-protocol subjects P61–P75; primary comparison repeated at n=30
+ALL,sensitivity_2,sensitivity_partial_n15,Partial-protocol only; applicable at 0.16/0.4/0.6 g
+onnail_vs_offnail_pooled(final),sensitivity_3,sensitivity_trial_pooled_n30,Alternative aggregation: one trial-pooled mean per subject per group (n=30)

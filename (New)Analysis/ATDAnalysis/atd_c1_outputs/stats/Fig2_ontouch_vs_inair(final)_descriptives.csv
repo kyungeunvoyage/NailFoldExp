@@ -1,0 +1,37 @@
+figure,analysis_cohort,cohort_label,force_g,condition,condition_raw,n_trials,n_subjects,q1,median,q3,iqr,whisker_lo,whisker_hi,mean,sd
+Fig2_ontouch_vs_inair(final),primary_all,Primary: all included subjects (matches final figures),0.0700,In-air,In-air,360,30,0.0000,0.0000,0.0000,0.0000,0.0000,0.0000,5.4114,13.8351
+Fig2_ontouch_vs_inair(final),primary_all,Primary: all included subjects (matches final figures),0.0700,On-touch,On-touch (Mid),360,30,0.0000,0.0000,0.0000,0.0000,0.0000,0.0000,7.5582,17.4373
+Fig2_ontouch_vs_inair(final),primary_all,Primary: all included subjects (matches final figures),0.1600,In-air,In-air,540,45,0.0000,14.2857,33.3333,33.3333,0.0000,83.3333,19.7174,23.1433
+Fig2_ontouch_vs_inair(final),primary_all,Primary: all included subjects (matches final figures),0.1600,On-touch,On-touch (Mid),540,45,0.0000,33.3333,50.0000,50.0000,0.0000,100.0000,32.9932,29.5839
+Fig2_ontouch_vs_inair(final),primary_all,Primary: all included subjects (matches final figures),0.4000,In-air,In-air,180,15,33.3333,41.4286,60.0000,26.6667,0.0000,100.0000,46.6032,21.9686
+Fig2_ontouch_vs_inair(final),primary_all,Primary: all included subjects (matches final figures),0.4000,On-touch,On-touch (Mid),180,15,50.0000,62.5000,75.0000,25.0000,12.5000,100.0000,63.3968,22.4219
+Fig2_ontouch_vs_inair(final),primary_all,Primary: all included subjects (matches final figures),0.6000,In-air,In-air,540,45,37.5000,60.0000,83.3333,45.8333,0.0000,100.0000,58.6757,29.0499
+Fig2_ontouch_vs_inair(final),primary_all,Primary: all included subjects (matches final figures),0.6000,On-touch,On-touch (Mid),540,45,60.0000,80.0000,100.0000,40.0000,0.0000,100.0000,75.7813,23.4345
+Fig2_ontouch_vs_inair(final),primary_all,Primary: all included subjects (matches final figures),1.0000,In-air,In-air,360,30,80.0000,100.0000,100.0000,20.0000,50.0000,100.0000,87.3366,17.1837
+Fig2_ontouch_vs_inair(final),primary_all,Primary: all included subjects (matches final figures),1.0000,On-touch,On-touch (Mid),360,30,75.0000,87.5000,100.0000,25.0000,40.0000,100.0000,85.2004,18.2997
+Fig2_ontouch_vs_inair(final),primary_all,Primary: all included subjects (matches final figures),1.4000,In-air,In-air,360,30,100.0000,100.0000,100.0000,0.0000,100.0000,100.0000,96.7341,8.6519
+Fig2_ontouch_vs_inair(final),primary_all,Primary: all included subjects (matches final figures),1.4000,On-touch,On-touch (Mid),360,30,100.0000,100.0000,100.0000,0.0000,100.0000,100.0000,96.4428,8.9437
+Fig2_ontouch_vs_inair(final),sensitivity_full_n30,"Sensitivity: full protocol only (P1–P60, n=30)",0.0700,In-air,In-air,360,30,0.0000,0.0000,0.0000,0.0000,0.0000,0.0000,5.4114,13.8351
+Fig2_ontouch_vs_inair(final),sensitivity_full_n30,"Sensitivity: full protocol only (P1–P60, n=30)",0.0700,On-touch,On-touch (Mid),360,30,0.0000,0.0000,0.0000,0.0000,0.0000,0.0000,7.5582,17.4373
+Fig2_ontouch_vs_inair(final),sensitivity_full_n30,"Sensitivity: full protocol only (P1–P60, n=30)",0.1600,In-air,In-air,360,30,0.0000,12.5000,29.7619,29.7619,0.0000,71.4286,18.7381,23.8209
+Fig2_ontouch_vs_inair(final),sensitivity_full_n30,"Sensitivity: full protocol only (P1–P60, n=30)",0.1600,On-touch,On-touch (Mid),360,30,0.0000,37.5000,60.0000,60.0000,0.0000,100.0000,35.6921,31.5060
+Fig2_ontouch_vs_inair(final),sensitivity_full_n30,"Sensitivity: full protocol only (P1–P60, n=30)",0.4000,In-air,In-air,0,0,,,,,,,,
+Fig2_ontouch_vs_inair(final),sensitivity_full_n30,"Sensitivity: full protocol only (P1–P60, n=30)",0.4000,On-touch,On-touch (Mid),0,0,,,,,,,,
+Fig2_ontouch_vs_inair(final),sensitivity_full_n30,"Sensitivity: full protocol only (P1–P60, n=30)",0.6000,In-air,In-air,360,30,28.5714,50.0000,83.3333,54.7619,0.0000,100.0000,55.6680,30.9149
+Fig2_ontouch_vs_inair(final),sensitivity_full_n30,"Sensitivity: full protocol only (P1–P60, n=30)",0.6000,On-touch,On-touch (Mid),360,30,60.0000,83.3333,100.0000,40.0000,0.0000,100.0000,77.6253,23.0859
+Fig2_ontouch_vs_inair(final),sensitivity_full_n30,"Sensitivity: full protocol only (P1–P60, n=30)",1.0000,In-air,In-air,360,30,80.0000,100.0000,100.0000,20.0000,50.0000,100.0000,87.3366,17.1837
+Fig2_ontouch_vs_inair(final),sensitivity_full_n30,"Sensitivity: full protocol only (P1–P60, n=30)",1.0000,On-touch,On-touch (Mid),360,30,75.0000,87.5000,100.0000,25.0000,40.0000,100.0000,85.2004,18.2997
+Fig2_ontouch_vs_inair(final),sensitivity_full_n30,"Sensitivity: full protocol only (P1–P60, n=30)",1.4000,In-air,In-air,360,30,100.0000,100.0000,100.0000,0.0000,100.0000,100.0000,96.7341,8.6519
+Fig2_ontouch_vs_inair(final),sensitivity_full_n30,"Sensitivity: full protocol only (P1–P60, n=30)",1.4000,On-touch,On-touch (Mid),360,30,100.0000,100.0000,100.0000,0.0000,100.0000,100.0000,96.4428,8.9437
+Fig2_ontouch_vs_inair(final),sensitivity_partial_n15,"Sensitivity: partial protocol only (P61–P75, n=15)",0.0700,In-air,In-air,0,0,,,,,,,,
+Fig2_ontouch_vs_inair(final),sensitivity_partial_n15,"Sensitivity: partial protocol only (P61–P75, n=15)",0.0700,On-touch,On-touch (Mid),0,0,,,,,,,,
+Fig2_ontouch_vs_inair(final),sensitivity_partial_n15,"Sensitivity: partial protocol only (P61–P75, n=15)",0.1600,In-air,In-air,180,15,0.0000,20.0000,37.5000,37.5000,0.0000,83.3333,21.6759,21.6563
+Fig2_ontouch_vs_inair(final),sensitivity_partial_n15,"Sensitivity: partial protocol only (P61–P75, n=15)",0.1600,On-touch,On-touch (Mid),180,15,0.0000,25.0000,42.8571,42.8571,0.0000,100.0000,27.5952,24.5081
+Fig2_ontouch_vs_inair(final),sensitivity_partial_n15,"Sensitivity: partial protocol only (P61–P75, n=15)",0.4000,In-air,In-air,180,15,33.3333,41.4286,60.0000,26.6667,0.0000,100.0000,46.6032,21.9686
+Fig2_ontouch_vs_inair(final),sensitivity_partial_n15,"Sensitivity: partial protocol only (P61–P75, n=15)",0.4000,On-touch,On-touch (Mid),180,15,50.0000,62.5000,75.0000,25.0000,12.5000,100.0000,63.3968,22.4219
+Fig2_ontouch_vs_inair(final),sensitivity_partial_n15,"Sensitivity: partial protocol only (P61–P75, n=15)",0.6000,In-air,In-air,180,15,50.0000,66.6667,83.3333,33.3333,0.0000,100.0000,64.6911,23.8691
+Fig2_ontouch_vs_inair(final),sensitivity_partial_n15,"Sensitivity: partial protocol only (P61–P75, n=15)",0.6000,On-touch,On-touch (Mid),180,15,60.0000,75.0000,87.5000,27.5000,28.5714,100.0000,72.0933,23.7542
+Fig2_ontouch_vs_inair(final),sensitivity_partial_n15,"Sensitivity: partial protocol only (P61–P75, n=15)",1.0000,In-air,In-air,0,0,,,,,,,,
+Fig2_ontouch_vs_inair(final),sensitivity_partial_n15,"Sensitivity: partial protocol only (P61–P75, n=15)",1.0000,On-touch,On-touch (Mid),0,0,,,,,,,,
+Fig2_ontouch_vs_inair(final),sensitivity_partial_n15,"Sensitivity: partial protocol only (P61–P75, n=15)",1.4000,In-air,In-air,0,0,,,,,,,,
+Fig2_ontouch_vs_inair(final),sensitivity_partial_n15,"Sensitivity: partial protocol only (P61–P75, n=15)",1.4000,On-touch,On-touch (Mid),0,0,,,,,,,,

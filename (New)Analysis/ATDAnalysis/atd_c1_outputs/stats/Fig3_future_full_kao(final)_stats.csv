@@ -1,0 +1,105 @@
+figure,analysis_cohort,cohort_label,force_g,source,source_raw,n_trials,n_subjects,both_conditions_at_force,q1,median,q3,iqr,whisker_lo,whisker_hi,mean,sd,row_type,comparison,test,reference,test_group,shown_on_figure,pooling_method,p_value,sig_star,lme_coef,lme_ci_lo,lme_ci_hi,n_ref_observations,n_test_observations,n_ref_subjects,n_test_subjects,n_paired_subjects,mean_ref,mean_test,mean_diff,cohens_d,hedges_g,cohens_d_ci_lo,cohens_d_ci_hi,effect_size_method,sensitivity_note
+Fig3_future_full_kao(final),primary_all,Primary: all included subjects (matches final figures),0.020000,Fingerpad (Kao et al. 2022),"Fingerpad 
+(Kao et al. 2022, n=5)",5.000000,5.000000,False,8.000000,20.000000,58.000000,50.000000,0.000000,58.000000,28.800000,27.589853,descriptive,,,,,,,,,,,,,,,,,,,,,,,,,
+Fig3_future_full_kao(final),primary_all,Primary: all included subjects (matches final figures),0.020000,Periungual: On-touch (this study),"Periungual: On-touch
+(this study, ● n=30, $\triangle$ n=15)",0.000000,0.000000,False,,,,,,,,,descriptive,,,,,,,,,,,,,,,,,,,,,,,,,
+Fig3_future_full_kao(final),primary_all,Primary: all included subjects (matches final figures),0.040000,Fingerpad (Kao et al. 2022),"Fingerpad 
+(Kao et al. 2022, n=5)",5.000000,5.000000,False,75.000000,85.000000,95.000000,20.000000,45.000000,100.000000,80.000000,21.794495,descriptive,,,,,,,,,,,,,,,,,,,,,,,,,
+Fig3_future_full_kao(final),primary_all,Primary: all included subjects (matches final figures),0.040000,Periungual: On-touch (this study),"Periungual: On-touch
+(this study, ● n=30, $\triangle$ n=15)",0.000000,0.000000,False,,,,,,,,,descriptive,,,,,,,,,,,,,,,,,,,,,,,,,
+Fig3_future_full_kao(final),primary_all,Primary: all included subjects (matches final figures),0.070000,Fingerpad (Kao et al. 2022),"Fingerpad 
+(Kao et al. 2022, n=5)",5.000000,5.000000,True,78.000000,80.000000,83.000000,5.000000,78.000000,83.000000,74.200000,22.884493,descriptive,,,,,,,,,,,,,,,,,,,,,,,,,
+Fig3_future_full_kao(final),primary_all,Primary: all included subjects (matches final figures),0.070000,Periungual: On-touch (this study),"Periungual: On-touch
+(this study, ● n=30, $\triangle$ n=15)",360.000000,30.000000,True,0.000000,0.000000,0.000000,0.000000,0.000000,0.000000,7.558201,17.437321,descriptive,,,,,,,,,,,,,,,,,,,,,,,,,
+Fig3_future_full_kao(final),primary_all,Primary: all included subjects (matches final figures),0.160000,Fingerpad (Kao et al. 2022),"Fingerpad 
+(Kao et al. 2022, n=5)",0.000000,0.000000,False,,,,,,,,,descriptive,,,,,,,,,,,,,,,,,,,,,,,,,
+Fig3_future_full_kao(final),primary_all,Primary: all included subjects (matches final figures),0.160000,Periungual: On-touch (this study),"Periungual: On-touch
+(this study, ● n=30, $\triangle$ n=15)",540.000000,45.000000,False,0.000000,33.333333,50.000000,50.000000,0.000000,100.000000,32.993166,29.583907,descriptive,,,,,,,,,,,,,,,,,,,,,,,,,
+Fig3_future_full_kao(final),primary_all,Primary: all included subjects (matches final figures),0.400000,Fingerpad (Kao et al. 2022),"Fingerpad 
+(Kao et al. 2022, n=5)",5.000000,5.000000,True,91.000000,93.000000,100.000000,9.000000,90.000000,100.000000,94.800000,4.868265,descriptive,,,,,,,,,,,,,,,,,,,,,,,,,
+Fig3_future_full_kao(final),primary_all,Primary: all included subjects (matches final figures),0.400000,Periungual: On-touch (this study),"Periungual: On-touch
+(this study, ● n=30, $\triangle$ n=15)",180.000000,15.000000,True,50.000000,62.500000,75.000000,25.000000,12.500000,100.000000,63.396825,22.421854,descriptive,,,,,,,,,,,,,,,,,,,,,,,,,
+Fig3_future_full_kao(final),primary_all,Primary: all included subjects (matches final figures),0.600000,Fingerpad (Kao et al. 2022),"Fingerpad 
+(Kao et al. 2022, n=5)",0.000000,0.000000,False,,,,,,,,,descriptive,,,,,,,,,,,,,,,,,,,,,,,,,
+Fig3_future_full_kao(final),primary_all,Primary: all included subjects (matches final figures),0.600000,Periungual: On-touch (this study),"Periungual: On-touch
+(this study, ● n=30, $\triangle$ n=15)",540.000000,45.000000,False,60.000000,80.000000,100.000000,40.000000,0.000000,100.000000,75.781305,23.434550,descriptive,,,,,,,,,,,,,,,,,,,,,,,,,
+Fig3_future_full_kao(final),primary_all,Primary: all included subjects (matches final figures),1.000000,Fingerpad (Kao et al. 2022),"Fingerpad 
+(Kao et al. 2022, n=5)",5.000000,5.000000,True,100.000000,100.000000,100.000000,0.000000,100.000000,100.000000,100.000000,0.000000,descriptive,,,,,,,,,,,,,,,,,,,,,,,,,
+Fig3_future_full_kao(final),primary_all,Primary: all included subjects (matches final figures),1.000000,Periungual: On-touch (this study),"Periungual: On-touch
+(this study, ● n=30, $\triangle$ n=15)",360.000000,30.000000,True,75.000000,87.500000,100.000000,25.000000,40.000000,100.000000,85.200397,18.299691,descriptive,,,,,,,,,,,,,,,,,,,,,,,,,
+Fig3_future_full_kao(final),primary_all,Primary: all included subjects (matches final figures),1.400000,Fingerpad (Kao et al. 2022),"Fingerpad 
+(Kao et al. 2022, n=5)",5.000000,5.000000,True,100.000000,100.000000,100.000000,0.000000,100.000000,100.000000,96.400000,8.049845,descriptive,,,,,,,,,,,,,,,,,,,,,,,,,
+Fig3_future_full_kao(final),primary_all,Primary: all included subjects (matches final figures),1.400000,Periungual: On-touch (this study),"Periungual: On-touch
+(this study, ● n=30, $\triangle$ n=15)",360.000000,30.000000,True,100.000000,100.000000,100.000000,0.000000,100.000000,100.000000,96.442791,8.943744,descriptive,,,,,,,,,,,,,,,,,,,,,,,,,
+Fig3_future_full_kao(final),sensitivity_full_n30,"Sensitivity: full protocol only (P1–P60, n=30)",0.020000,Fingerpad (Kao et al. 2022),"Fingerpad 
+(Kao et al. 2022, n=5)",5.000000,5.000000,False,8.000000,20.000000,58.000000,50.000000,0.000000,58.000000,28.800000,27.589853,descriptive,,,,,,,,,,,,,,,,,,,,,,,,,
+Fig3_future_full_kao(final),sensitivity_full_n30,"Sensitivity: full protocol only (P1–P60, n=30)",0.020000,Periungual: On-touch (this study),"Periungual: On-touch
+(this study, ● n=30, $\triangle$ n=15)",0.000000,0.000000,False,,,,,,,,,descriptive,,,,,,,,,,,,,,,,,,,,,,,,,
+Fig3_future_full_kao(final),sensitivity_full_n30,"Sensitivity: full protocol only (P1–P60, n=30)",0.040000,Fingerpad (Kao et al. 2022),"Fingerpad 
+(Kao et al. 2022, n=5)",5.000000,5.000000,False,75.000000,85.000000,95.000000,20.000000,45.000000,100.000000,80.000000,21.794495,descriptive,,,,,,,,,,,,,,,,,,,,,,,,,
+Fig3_future_full_kao(final),sensitivity_full_n30,"Sensitivity: full protocol only (P1–P60, n=30)",0.040000,Periungual: On-touch (this study),"Periungual: On-touch
+(this study, ● n=30, $\triangle$ n=15)",0.000000,0.000000,False,,,,,,,,,descriptive,,,,,,,,,,,,,,,,,,,,,,,,,
+Fig3_future_full_kao(final),sensitivity_full_n30,"Sensitivity: full protocol only (P1–P60, n=30)",0.070000,Fingerpad (Kao et al. 2022),"Fingerpad 
+(Kao et al. 2022, n=5)",5.000000,5.000000,True,78.000000,80.000000,83.000000,5.000000,78.000000,83.000000,74.200000,22.884493,descriptive,,,,,,,,,,,,,,,,,,,,,,,,,
+Fig3_future_full_kao(final),sensitivity_full_n30,"Sensitivity: full protocol only (P1–P60, n=30)",0.070000,Periungual: On-touch (this study),"Periungual: On-touch
+(this study, ● n=30, $\triangle$ n=15)",360.000000,30.000000,True,0.000000,0.000000,0.000000,0.000000,0.000000,0.000000,7.558201,17.437321,descriptive,,,,,,,,,,,,,,,,,,,,,,,,,
+Fig3_future_full_kao(final),sensitivity_full_n30,"Sensitivity: full protocol only (P1–P60, n=30)",0.160000,Fingerpad (Kao et al. 2022),"Fingerpad 
+(Kao et al. 2022, n=5)",0.000000,0.000000,False,,,,,,,,,descriptive,,,,,,,,,,,,,,,,,,,,,,,,,
+Fig3_future_full_kao(final),sensitivity_full_n30,"Sensitivity: full protocol only (P1–P60, n=30)",0.160000,Periungual: On-touch (this study),"Periungual: On-touch
+(this study, ● n=30, $\triangle$ n=15)",360.000000,30.000000,False,0.000000,37.500000,60.000000,60.000000,0.000000,100.000000,35.692130,31.506021,descriptive,,,,,,,,,,,,,,,,,,,,,,,,,
+Fig3_future_full_kao(final),sensitivity_full_n30,"Sensitivity: full protocol only (P1–P60, n=30)",0.400000,Fingerpad (Kao et al. 2022),"Fingerpad 
+(Kao et al. 2022, n=5)",5.000000,5.000000,False,91.000000,93.000000,100.000000,9.000000,90.000000,100.000000,94.800000,4.868265,descriptive,,,,,,,,,,,,,,,,,,,,,,,,,
+Fig3_future_full_kao(final),sensitivity_full_n30,"Sensitivity: full protocol only (P1–P60, n=30)",0.400000,Periungual: On-touch (this study),"Periungual: On-touch
+(this study, ● n=30, $\triangle$ n=15)",0.000000,0.000000,False,,,,,,,,,descriptive,,,,,,,,,,,,,,,,,,,,,,,,,
+Fig3_future_full_kao(final),sensitivity_full_n30,"Sensitivity: full protocol only (P1–P60, n=30)",0.600000,Fingerpad (Kao et al. 2022),"Fingerpad 
+(Kao et al. 2022, n=5)",0.000000,0.000000,False,,,,,,,,,descriptive,,,,,,,,,,,,,,,,,,,,,,,,,
+Fig3_future_full_kao(final),sensitivity_full_n30,"Sensitivity: full protocol only (P1–P60, n=30)",0.600000,Periungual: On-touch (this study),"Periungual: On-touch
+(this study, ● n=30, $\triangle$ n=15)",360.000000,30.000000,False,60.000000,83.333333,100.000000,40.000000,0.000000,100.000000,77.625331,23.085859,descriptive,,,,,,,,,,,,,,,,,,,,,,,,,
+Fig3_future_full_kao(final),sensitivity_full_n30,"Sensitivity: full protocol only (P1–P60, n=30)",1.000000,Fingerpad (Kao et al. 2022),"Fingerpad 
+(Kao et al. 2022, n=5)",5.000000,5.000000,True,100.000000,100.000000,100.000000,0.000000,100.000000,100.000000,100.000000,0.000000,descriptive,,,,,,,,,,,,,,,,,,,,,,,,,
+Fig3_future_full_kao(final),sensitivity_full_n30,"Sensitivity: full protocol only (P1–P60, n=30)",1.000000,Periungual: On-touch (this study),"Periungual: On-touch
+(this study, ● n=30, $\triangle$ n=15)",360.000000,30.000000,True,75.000000,87.500000,100.000000,25.000000,40.000000,100.000000,85.200397,18.299691,descriptive,,,,,,,,,,,,,,,,,,,,,,,,,
+Fig3_future_full_kao(final),sensitivity_full_n30,"Sensitivity: full protocol only (P1–P60, n=30)",1.400000,Fingerpad (Kao et al. 2022),"Fingerpad 
+(Kao et al. 2022, n=5)",5.000000,5.000000,True,100.000000,100.000000,100.000000,0.000000,100.000000,100.000000,96.400000,8.049845,descriptive,,,,,,,,,,,,,,,,,,,,,,,,,
+Fig3_future_full_kao(final),sensitivity_full_n30,"Sensitivity: full protocol only (P1–P60, n=30)",1.400000,Periungual: On-touch (this study),"Periungual: On-touch
+(this study, ● n=30, $\triangle$ n=15)",360.000000,30.000000,True,100.000000,100.000000,100.000000,0.000000,100.000000,100.000000,96.442791,8.943744,descriptive,,,,,,,,,,,,,,,,,,,,,,,,,
+Fig3_future_full_kao(final),sensitivity_partial_n15,"Sensitivity: partial protocol only (P61–P75, n=15)",0.020000,Fingerpad (Kao et al. 2022),"Fingerpad 
+(Kao et al. 2022, n=5)",5.000000,5.000000,False,8.000000,20.000000,58.000000,50.000000,0.000000,58.000000,28.800000,27.589853,descriptive,,,,,,,,,,,,,,,,,,,,,,,,,
+Fig3_future_full_kao(final),sensitivity_partial_n15,"Sensitivity: partial protocol only (P61–P75, n=15)",0.020000,Periungual: On-touch (this study),"Periungual: On-touch
+(this study, ● n=30, $\triangle$ n=15)",0.000000,0.000000,False,,,,,,,,,descriptive,,,,,,,,,,,,,,,,,,,,,,,,,
+Fig3_future_full_kao(final),sensitivity_partial_n15,"Sensitivity: partial protocol only (P61–P75, n=15)",0.040000,Fingerpad (Kao et al. 2022),"Fingerpad 
+(Kao et al. 2022, n=5)",5.000000,5.000000,False,75.000000,85.000000,95.000000,20.000000,45.000000,100.000000,80.000000,21.794495,descriptive,,,,,,,,,,,,,,,,,,,,,,,,,
+Fig3_future_full_kao(final),sensitivity_partial_n15,"Sensitivity: partial protocol only (P61–P75, n=15)",0.040000,Periungual: On-touch (this study),"Periungual: On-touch
+(this study, ● n=30, $\triangle$ n=15)",0.000000,0.000000,False,,,,,,,,,descriptive,,,,,,,,,,,,,,,,,,,,,,,,,
+Fig3_future_full_kao(final),sensitivity_partial_n15,"Sensitivity: partial protocol only (P61–P75, n=15)",0.070000,Fingerpad (Kao et al. 2022),"Fingerpad 
+(Kao et al. 2022, n=5)",5.000000,5.000000,False,78.000000,80.000000,83.000000,5.000000,78.000000,83.000000,74.200000,22.884493,descriptive,,,,,,,,,,,,,,,,,,,,,,,,,
+Fig3_future_full_kao(final),sensitivity_partial_n15,"Sensitivity: partial protocol only (P61–P75, n=15)",0.070000,Periungual: On-touch (this study),"Periungual: On-touch
+(this study, ● n=30, $\triangle$ n=15)",0.000000,0.000000,False,,,,,,,,,descriptive,,,,,,,,,,,,,,,,,,,,,,,,,
+Fig3_future_full_kao(final),sensitivity_partial_n15,"Sensitivity: partial protocol only (P61–P75, n=15)",0.160000,Fingerpad (Kao et al. 2022),"Fingerpad 
+(Kao et al. 2022, n=5)",0.000000,0.000000,False,,,,,,,,,descriptive,,,,,,,,,,,,,,,,,,,,,,,,,
+Fig3_future_full_kao(final),sensitivity_partial_n15,"Sensitivity: partial protocol only (P61–P75, n=15)",0.160000,Periungual: On-touch (this study),"Periungual: On-touch
+(this study, ● n=30, $\triangle$ n=15)",180.000000,15.000000,False,0.000000,25.000000,42.857143,42.857143,0.000000,100.000000,27.595238,24.508096,descriptive,,,,,,,,,,,,,,,,,,,,,,,,,
+Fig3_future_full_kao(final),sensitivity_partial_n15,"Sensitivity: partial protocol only (P61–P75, n=15)",0.400000,Fingerpad (Kao et al. 2022),"Fingerpad 
+(Kao et al. 2022, n=5)",5.000000,5.000000,True,91.000000,93.000000,100.000000,9.000000,90.000000,100.000000,94.800000,4.868265,descriptive,,,,,,,,,,,,,,,,,,,,,,,,,
+Fig3_future_full_kao(final),sensitivity_partial_n15,"Sensitivity: partial protocol only (P61–P75, n=15)",0.400000,Periungual: On-touch (this study),"Periungual: On-touch
+(this study, ● n=30, $\triangle$ n=15)",180.000000,15.000000,True,50.000000,62.500000,75.000000,25.000000,12.500000,100.000000,63.396825,22.421854,descriptive,,,,,,,,,,,,,,,,,,,,,,,,,
+Fig3_future_full_kao(final),sensitivity_partial_n15,"Sensitivity: partial protocol only (P61–P75, n=15)",0.600000,Fingerpad (Kao et al. 2022),"Fingerpad 
+(Kao et al. 2022, n=5)",0.000000,0.000000,False,,,,,,,,,descriptive,,,,,,,,,,,,,,,,,,,,,,,,,
+Fig3_future_full_kao(final),sensitivity_partial_n15,"Sensitivity: partial protocol only (P61–P75, n=15)",0.600000,Periungual: On-touch (this study),"Periungual: On-touch
+(this study, ● n=30, $\triangle$ n=15)",180.000000,15.000000,False,60.000000,75.000000,87.500000,27.500000,28.571429,100.000000,72.093254,23.754215,descriptive,,,,,,,,,,,,,,,,,,,,,,,,,
+Fig3_future_full_kao(final),sensitivity_partial_n15,"Sensitivity: partial protocol only (P61–P75, n=15)",1.000000,Fingerpad (Kao et al. 2022),"Fingerpad 
+(Kao et al. 2022, n=5)",5.000000,5.000000,False,100.000000,100.000000,100.000000,0.000000,100.000000,100.000000,100.000000,0.000000,descriptive,,,,,,,,,,,,,,,,,,,,,,,,,
+Fig3_future_full_kao(final),sensitivity_partial_n15,"Sensitivity: partial protocol only (P61–P75, n=15)",1.000000,Periungual: On-touch (this study),"Periungual: On-touch
+(this study, ● n=30, $\triangle$ n=15)",0.000000,0.000000,False,,,,,,,,,descriptive,,,,,,,,,,,,,,,,,,,,,,,,,
+Fig3_future_full_kao(final),sensitivity_partial_n15,"Sensitivity: partial protocol only (P61–P75, n=15)",1.400000,Fingerpad (Kao et al. 2022),"Fingerpad 
+(Kao et al. 2022, n=5)",5.000000,5.000000,False,100.000000,100.000000,100.000000,0.000000,100.000000,100.000000,96.400000,8.049845,descriptive,,,,,,,,,,,,,,,,,,,,,,,,,
+Fig3_future_full_kao(final),sensitivity_partial_n15,"Sensitivity: partial protocol only (P61–P75, n=15)",1.400000,Periungual: On-touch (this study),"Periungual: On-touch
+(this study, ● n=30, $\triangle$ n=15)",0.000000,0.000000,False,,,,,,,,,descriptive,,,,,,,,,,,,,,,,,,,,,,,,,
+Fig3_future_full_kao(final),primary_all,Primary: all included subjects (matches final figures),0.070000,,,,,,,,,,,,,,comparison,Periungual: On-touch vs Fingerpad (Kao),"LME (trial-level): Score ~ Group, random intercept ~ participant",Fingerpad (Kao et al. 2022),Periungual: On-touch,False,trial-level (Kao participant / peri subject trials),0.000000,***,-66.641799,-82.269694,-51.013904,5.000000,360.000000,5.000000,30.000000,,74.200000,7.558201,-66.641799,-6.220536,-6.078081,-14.039931,-3.932225,independent Cohen's d on participant/subject means (Periungual − Fingerpad; bootstrap CI),Kao n=5 unchanged across cohorts
+Fig3_future_full_kao(final),primary_all,Primary: all included subjects (matches final figures),0.400000,,,,,,,,,,,,,,comparison,Periungual: On-touch vs Fingerpad (Kao),"LME (trial-level): Score ~ Group, random intercept ~ participant",Fingerpad (Kao et al. 2022),Periungual: On-touch,False,trial-level (Kao participant / peri subject trials),0.003476,**,-31.403175,-52.465971,-10.340378,5.000000,180.000000,5.000000,15.000000,,94.800000,63.396825,-31.403175,-3.954273,-3.787191,-8.847198,-2.880619,independent Cohen's d on participant/subject means (Periungual − Fingerpad; bootstrap CI),Kao n=5 unchanged across cohorts
+Fig3_future_full_kao(final),primary_all,Primary: all included subjects (matches final figures),1.000000,,,,,,,,,,,,,,comparison,Periungual: On-touch vs Fingerpad (Kao),"LME (trial-level): Score ~ Group, random intercept ~ participant",Fingerpad (Kao et al. 2022),Periungual: On-touch,False,trial-level (Kao participant / peri subject trials),0.071671,n.s.,-14.799603,-30.903669,1.304463,5.000000,360.000000,5.000000,30.000000,,100.000000,85.200397,-14.799603,-1.974501,-1.929284,-2.637514,-1.575403,independent Cohen's d on participant/subject means (Periungual − Fingerpad; bootstrap CI),Kao n=5 unchanged across cohorts
+Fig3_future_full_kao(final),primary_all,Primary: all included subjects (matches final figures),1.400000,,,,,,,,,,,,,,comparison,Periungual: On-touch vs Fingerpad (Kao),"LME (trial-level): Score ~ Group, random intercept ~ participant",Fingerpad (Kao et al. 2022),Periungual: On-touch,False,trial-level (Kao participant / peri subject trials),0.991535,n.s.,0.042791,-7.862377,7.947959,5.000000,360.000000,5.000000,30.000000,,96.400000,96.442791,0.042791,0.011568,0.011303,-1.833640,1.788432,independent Cohen's d on participant/subject means (Periungual − Fingerpad; bootstrap CI),Kao n=5 unchanged across cohorts
+Fig3_future_full_kao(final),sensitivity_full_n30,"Sensitivity: full protocol only (P1–P60, n=30)",0.070000,,,,,,,,,,,,,,comparison,Periungual: On-touch vs Fingerpad (Kao),"LME (trial-level): Score ~ Group, random intercept ~ participant",Fingerpad (Kao et al. 2022),Periungual: On-touch,False,trial-level (Kao participant / peri subject trials),0.000000,***,-66.641799,-82.269694,-51.013904,5.000000,360.000000,5.000000,30.000000,,74.200000,7.558201,-66.641799,-6.220536,-6.078081,-14.039931,-3.932225,independent Cohen's d on participant/subject means (Periungual − Fingerpad; bootstrap CI),Kao n=5 unchanged across cohorts
+Fig3_future_full_kao(final),sensitivity_full_n30,"Sensitivity: full protocol only (P1–P60, n=30)",1.000000,,,,,,,,,,,,,,comparison,Periungual: On-touch vs Fingerpad (Kao),"LME (trial-level): Score ~ Group, random intercept ~ participant",Fingerpad (Kao et al. 2022),Periungual: On-touch,False,trial-level (Kao participant / peri subject trials),0.071671,n.s.,-14.799603,-30.903669,1.304463,5.000000,360.000000,5.000000,30.000000,,100.000000,85.200397,-14.799603,-1.974501,-1.929284,-2.637514,-1.575403,independent Cohen's d on participant/subject means (Periungual − Fingerpad; bootstrap CI),Kao n=5 unchanged across cohorts
+Fig3_future_full_kao(final),sensitivity_full_n30,"Sensitivity: full protocol only (P1–P60, n=30)",1.400000,,,,,,,,,,,,,,comparison,Periungual: On-touch vs Fingerpad (Kao),"LME (trial-level): Score ~ Group, random intercept ~ participant",Fingerpad (Kao et al. 2022),Periungual: On-touch,False,trial-level (Kao participant / peri subject trials),0.991535,n.s.,0.042791,-7.862377,7.947959,5.000000,360.000000,5.000000,30.000000,,96.400000,96.442791,0.042791,0.011568,0.011303,-1.833640,1.788432,independent Cohen's d on participant/subject means (Periungual − Fingerpad; bootstrap CI),Kao n=5 unchanged across cohorts
+Fig3_future_full_kao(final),sensitivity_partial_n15,"Sensitivity: partial protocol only (P61–P75, n=15)",0.400000,,,,,,,,,,,,,,comparison,Periungual: On-touch vs Fingerpad (Kao),"LME (trial-level): Score ~ Group, random intercept ~ participant",Fingerpad (Kao et al. 2022),Periungual: On-touch,False,trial-level (Kao participant / peri subject trials),0.003476,**,-31.403175,-52.465971,-10.340378,5.000000,180.000000,5.000000,15.000000,,94.800000,63.396825,-31.403175,-3.954273,-3.787191,-8.847198,-2.880619,independent Cohen's d on participant/subject means (Periungual − Fingerpad; bootstrap CI),Kao n=5 unchanged across cohorts

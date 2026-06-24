@@ -315,12 +315,12 @@ def _assign_bracket_tiers(contrast_specs, region_order):
 
 
 def _add_sig_bracket(ax, x_l, x_r, y_base, tick_h=0.45, text=""):
-    """Bracket from each box center (x_l, x_r) up to a shared bar."""
+    """Horizontal significance line (no vertical ticks)."""
     x_center = (x_l + x_r) / 2.0
     y_top = y_base + tick_h
     ax.plot(
-        [x_l, x_l, x_r, x_r],
-        [y_base, y_top, y_top, y_base],
+        [x_l, x_r],
+        [y_top, y_top],
         color=ACCENT_RED,
         linewidth=1.5,
         clip_on=False,

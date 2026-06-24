@@ -41,7 +41,7 @@ warnings.filterwarnings("ignore")
 # 0. ATD style loader
 # ================================================================
 _SCRIPT_DIR = Path(__file__).resolve().parent
-_ATD_PATH   = _SCRIPT_DIR.parent / "ATDAnalysis" / "ATD_C1_Fig(Anika).py"
+_ATD_PATH   = _SCRIPT_DIR.parent / "ATDAnalysis" / "(Final)ATD_C1_Fig(Anika).py"
 
 def _load_atd():
     spec = importlib.util.spec_from_file_location("atd_c1_fig", _ATD_PATH)
@@ -277,9 +277,50 @@ def save_fig(fig, stem):
     ).save(legacy)
     print(f"  → {legacy}")
 
+
+def save_fig_2col(fig, stem):
+    """2-col export matching render_final_figures / Fig2 (2102 px wide)."""
+    import io
+    from PIL import Image
+    w_in, _ = fig.get_size_inches()
+    w_px = 2102
+    dpi  = w_px / w_in
+    buf  = io.BytesIO()
+    fig.savefig(buf, format="png", dpi=dpi, bbox_inches="tight",
+                pad_inches=0.04, facecolor="white")
+    buf.seek(0)
+    master = Image.open(buf).convert("RGB")
+    h = round(w_px * master.height / master.width)
+    master = master.resize((w_px, h), Image.Resampling.LANCZOS)
+    out_2col = os.path.join(OUTPUT_DIR, f"{stem}_2col.png")
+    legacy   = os.path.join(OUTPUT_DIR, f"{stem}.png")
+    master.save(out_2col)
+    master.save(legacy)
+    print(f"  → {legacy}  ({w_px}×{h} px)")
+
 # ================================================================
 # 6. Layout helpers
 # ================================================================
+def _draw_inward_ticks(ax, frac=None, color="#333333", lw=1.2):
+    """Draw inward tick marks (same length on x and y, matching ATD Fig2)."""
+    from matplotlib.transforms import blended_transform_factory
+    if frac is None:
+        frac = ATD.TICK_LEN_AXES
+    x_trans = blended_transform_factory(ax.transData, ax.transAxes)
+    y_trans = blended_transform_factory(ax.transAxes, ax.transData)
+    xlo, xhi = ax.get_xlim()
+    ylo, yhi = ax.get_ylim()
+    kw = dict(color=color, lw=lw, clip_on=False, zorder=10, solid_capstyle="butt")
+
+    for yt in ax.get_yticks():
+        if ylo <= yt <= yhi:
+            ax.plot([0, frac], [yt, yt], transform=y_trans, **kw)
+
+    for xt in ax.get_xticks():
+        if xlo <= xt <= xhi:
+            ax.plot([xt, xt], [0, frac], transform=x_trans, **kw)
+
+
 def _despine(ax):
     sns.despine(ax=ax)
     ax.tick_params(length=0, labelsize=FONT_TICK)
@@ -529,6 +570,26 @@ DIST_PALETTE = {
      6.0: "#4393C3",   # blue
 }
 
+# Blue ramp for mm boxplot: larger |offset| → darker blue (force-specific)
+ABS_OFFSET_BLUE_1G = {
+    1.5: "#C8DAEF",
+    3.0: "#85B1D9",
+    4.5: "#4A90C2",
+    6.0: "#10559A",   # darkest (matches ATD On-touch)
+}
+ABS_OFFSET_BLUE_26G = {
+    1.5: "#B8C9E8",
+    3.0: "#6B8FC7",
+    4.5: "#3D5F9A",
+    6.0: "#1A2F5C",
+}
+ABS_OFFSET_BLUE_BY_FORCE = {1: ABS_OFFSET_BLUE_1G, 26: ABS_OFFSET_BLUE_26G}
+
+
+def _color_by_abs_offset(signed_mm, force):
+    palette = ABS_OFFSET_BLUE_BY_FORCE.get(force, ABS_OFFSET_BLUE_1G)
+    return palette.get(abs(signed_mm), "#888888")
+
 def _boxplot_panel(ax, force, signed_vals, show_ylabel=True):
     """Draw one force-condition panel onto the given axes."""
     import matplotlib.patches as mpatches
@@ -690,6 +751,104 @@ def make_signed_boxplot_single(force):
     return fig
 
 
+def make_signed_boxplot_mm(force):
+    """Single-panel figure: x-axis shows signed distance in mm (one tick per distance)."""
+    sns.set_theme(style="white")
+    ATD.apply_plot_style()
+    import matplotlib.patches as mpatches
+
+    signed_vals = sorted(subj_sym["signed_offset_mm"].unique())
+    bw      = 0.14
+    gap_in  = 0.28   # wider spacing so tick labels don't crowd
+    rng     = np.random.default_rng(42)
+
+    x_positions = {dist: di * gap_in for di, dist in enumerate(signed_vals)}
+
+    fw = FIG_SIZE[0]   # 8.0 in — same canvas as Fig2 (2-col export width)
+    fh = FIG_SIZE[1]   # 4.5 in
+    fig, ax = plt.subplots(figsize=(fw, fh), facecolor="#FFFFFF")
+
+    for dist in signed_vals:
+        xp    = x_positions[dist]
+        color = _color_by_abs_offset(dist, force)
+        sub   = (subj_sym[
+                     (subj_sym["force_g"] == force) &
+                     (subj_sym["signed_offset_mm"] == dist)
+                 ]["accuracy"].dropna().values * 100)
+        if len(sub) == 0:
+            continue
+
+        ax.boxplot(
+            sub, positions=[xp], widths=bw * 0.82,
+            patch_artist=True, showfliers=False,
+            medianprops=dict(color="#CC0000", lw=2.0),
+            whiskerprops=dict(color="#111111", lw=1.4),
+            capprops=dict(color="#111111", lw=1.4),
+            boxprops=dict(facecolor=color, alpha=0.65,
+                          edgecolor="#111111", lw=1.8),
+        )
+        jitter = rng.uniform(-bw * 0.30, bw * 0.30, len(sub))
+        ax.scatter(xp + jitter, sub, color=color, s=28, alpha=0.80,
+                   edgecolors="#111111", linewidths=0.4, zorder=5)
+
+    # x-axis: one tick per mm value
+    ax.set_xticks(list(x_positions.values()))
+    ax.set_xticklabels(
+        [f"{d:+.1f}" for d in signed_vals],
+        fontsize=FONT_TICK, rotation=0,
+    )
+    ax.set_xlim(min(x_positions.values()) - bw, max(x_positions.values()) + bw)
+    ax.set_ylim(ATD.ACCURACY_YMIN, ATD.ACCURACY_YLIM_TOP)
+    ax.set_yticks(ATD.ACCURACY_YTICKS)
+    ax.set_yticklabels(["0", "20", "40", "60", "80", "100"], fontsize=FONT_TICK)
+    y0, y1 = ATD.ACCURACY_YSPINE
+    ax.spines["left"].set_bounds(y0, y1)
+    ax.set_xlabel("Offset Distance (mm)", fontsize=FONT_LABEL, labelpad=ATD.FIG_AXIS_LABELPAD)
+    ax.set_ylabel("Spatial Accuracy (%)", fontsize=FONT_LABEL, labelpad=ATD.FIG_AXIS_LABELPAD)
+
+    palette = ABS_OFFSET_BLUE_BY_FORCE.get(force, ABS_OFFSET_BLUE_1G)
+    abs_offsets = sorted(palette.keys())
+    dist_handles = [
+        mpatches.Patch(facecolor=palette[d], edgecolor="#111111",
+                       linewidth=0.8, alpha=0.65, label=f"{d:g} mm")
+        for d in abs_offsets
+    ]
+
+    _despine(ax)
+    # top stack (figure coords): title → legend → plot
+    #   MM_PLOT_TOP ↑  = plot closer to legend
+    #   MM_LEGEND_Y  ↓  = legend closer to plot (keep below MM_TITLE_Y)
+    #MM_TITLE_Y  = 0.985
+    MM_TITLE_Y  = 0.93
+    MM_LEGEND_Y = 0.96
+    MM_PLOT_TOP = 0.83
+    fig.subplots_adjust(
+        left=0.11, right=0.98,
+        top=MM_PLOT_TOP, bottom=ATD.FIG_LEGEND_BOTTOM,
+    )
+    fig.text(
+        0.5, MM_TITLE_Y, f"Reference = {force:g}g",
+        ha="center", va="bottom",
+        fontsize=FONT_LABEL, fontweight="bold",
+    )
+    ax.legend(
+        handles=dist_handles,
+        loc="upper center",
+        bbox_to_anchor=(0.5, MM_LEGEND_Y),
+        bbox_transform=fig.transFigure,
+        ncol=4,
+        frameon=False,
+        fontsize=FONT_LABEL,
+        labelspacing=0.2,
+        columnspacing=2.0,
+        handlelength=1.6,
+        handleheight=1.0,
+        borderaxespad=ATD.FIG_LEGEND_PAD_PT,
+    )
+    _draw_inward_ticks(ax)
+    return fig
+
+
 print("[Figure 4] Signed-offset boxplot ...")
 fig = make_signed_boxplot()
 save_fig(fig, "sd_signed_boxplot")
@@ -703,6 +862,16 @@ plt.close(fig)
 print("[Figure 4c] Signed-offset boxplot – 26 g ...")
 fig = make_signed_boxplot_single(26.0)
 save_fig(fig, "sd_signed_boxplot_26g")
+plt.close(fig)
+
+print("[Figure 4d] Signed-offset boxplot – 1 g (mm x-axis) ...")
+fig = make_signed_boxplot_mm(1.0)
+save_fig_2col(fig, "sd_signed_boxplot_1g_mm")
+plt.close(fig)
+
+print("[Figure 4e] Signed-offset boxplot – 26 g (mm x-axis) ...")
+fig = make_signed_boxplot_mm(26.0)
+save_fig_2col(fig, "sd_signed_boxplot_26g_mm")
 plt.close(fig)
 
 # ================================================================

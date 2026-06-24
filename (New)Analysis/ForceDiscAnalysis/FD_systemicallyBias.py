@@ -101,10 +101,12 @@ df = pd.concat(
 )
 
 # Standard columns
+# correct = 1 if the user chose the heavier stimulus
+# UserChoice=1 → picked FirstStim, UserChoice=2 → picked SecondStim
 df["correct"] = np.where(
-    df["Comparison"] > df["Reference"],
-    df["ChoseComparison"] == 1,
-    df["ChoseComparison"] == 0,
+    df["FirstStim"] > df["SecondStim"],
+    df["UserChoice"] == 1,
+    df["UserChoice"] == 2,
 ).astype(int)
 
 df["pair_label"] = df.apply(
