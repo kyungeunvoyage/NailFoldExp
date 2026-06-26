@@ -1,0 +1,7 @@
+pair_label,region_group,acc_diff_rc,acc_diff_cr,delta_rc_minus_cr
+10–26,On-nail,87.5,75.0,12.5
+10–26,Off-nail,50.0,37.5,12.5
+15–26,On-nail,12.5,50.0,-37.5
+15–26,Off-nail,50.0,62.5,-12.5
+26–60,On-nail,62.5,75.0,-12.5
+26–60,Off-nail,87.5,87.5,0.0

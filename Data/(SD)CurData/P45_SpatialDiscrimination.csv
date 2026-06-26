@@ -22,7 +22,7 @@ P45,26.0g,20,0,g-2,g0,g-2,Right,Right,1
 P45,26.0g,21,0,g-3,g0,g-3,Right,Right,1
 P45,26.0g,22,0,g4,g0,g4,Left,Left,1
 P45,26.0g,23,0,g2,g0,g2,Left,Left,1
-P45,26.0g,24,0,g0,g-1,g-1,Right,Left,0
+P45,26.0g,24,0,g0,g-1,g-1,Right,Right,1
 P45,26.0g,25,0,g0,g2,g2,Left,Right,0
 P45,26.0g,26,0,g0,g-3,g-3,Left,Left,1
 P45,26.0g,27,0,g4,g0,g4,Left,Left,1
@@ -46,7 +46,7 @@ P45,1.0g,44,0,g-2,g0,g-2,Right,Right,1
 P45,1.0g,45,0,g0,g3,g3,Right,Right,1
 P45,1.0g,46,0,g0,g3,g3,Right,Right,1
 P45,1.0g,47,0,g-3,g0,g-3,Right,Right,1
-P45,1.0g,48,0,g0,g-1,g-1,Right,Left,0
+P45,1.0g,48,0,g0,g-1,g-1,Right,Right,1
 P45,1.0g,49,0,g0,g1,g1,Right,Right,1
 P45,1.0g,50,0,g1,g0,g1,Right,Left,0
 P45,1.0g,51,0,g-4,g0,g-4,Right,Right,1

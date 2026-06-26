@@ -8,7 +8,7 @@ P49,26.0g,6,0,g-1,g0,g-1,Left,Right,0
 P49,26.0g,7,0,g4,g0,g4,Left,Left,1
 P49,26.0g,8,0,g0,g1,g1,Left,Right,0
 P49,26.0g,9,0,g-4,g0,g-4,Right,Right,1
-P49,26.0g,10,0,g0,g1,g1,Left,Right,0
+P49,26.0g,10,0,g0,g1,g1,Left,Left,1
 P49,26.0g,11,0,g0,g-3,g-3,Left,Left,1
 P49,26.0g,12,0,g0,g2,g2,Left,Right,0
 P49,26.0g,13,0,g-3,g0,g-3,Right,Right,1
@@ -30,7 +30,7 @@ P49,26.0g,28,0,g-2,g0,g-2,Right,Right,1
 P49,26.0g,29,0,g0,g4,g4,Right,Right,1
 P49,26.0g,30,0,g0,g-3,g-3,Left,Left,1
 P49,26.0g,31,0,g2,g0,g2,Left,Left,1
-P49,26.0g,32,0,g-1,g0,g-1,Left,Right,0
+P49,26.0g,32,0,g-1,g0,g-1,Left,Left,1
 P49,1.0g,33,0,g-2,g0,g-2,Right,Right,1
 P49,1.0g,34,0,g-3,g0,g-3,Right,Right,1
 P49,1.0g,35,0,g0,g-1,g-1,Right,Left,0
@@ -42,7 +42,7 @@ P49,1.0g,40,0,g0,g1,g1,Left,Right,0
 P49,1.0g,41,0,g2,g0,g2,Left,Left,1
 P49,1.0g,42,0,g0,g-3,g-3,Left,Left,1
 P49,1.0g,43,0,g1,g0,g1,Left,Left,1
-P49,1.0g,44,0,g0,g-1,g-1,Right,Left,0
+P49,1.0g,44,0,g0,g-1,g-1,Right,Right,1
 P49,1.0g,45,0,g4,g0,g4,Left,Left,1
 P49,1.0g,46,0,g-3,g0,g-3,Right,Right,1
 P49,1.0g,47,0,g0,g4,g4,Right,Right,1
@@ -57,7 +57,7 @@ P49,1.0g,55,0,g0,g4,g4,Right,Right,1
 P49,1.0g,56,0,g2,g0,g2,Left,Left,1
 P49,1.0g,57,0,g0,g1,g1,Left,Right,0
 P49,1.0g,58,0,g2,g0,g2,Left,Left,1
-P49,1.0g,59,0,g0,g1,g1,Left,Right,0
+P49,1.0g,59,0,g0,g1,g1,Left,Left,1
 P49,1.0g,60,0,g-4,g0,g-4,Right,Right,1
 P49,1.0g,61,0,g0,g-2,g-2,Left,Left,1
 P49,1.0g,62,0,g0,g-3,g-3,Left,Left,1

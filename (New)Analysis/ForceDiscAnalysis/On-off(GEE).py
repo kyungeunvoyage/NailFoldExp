@@ -7,6 +7,7 @@ Produces five figures:
   3. gee_region_onnail_vs_offnail  — On-nail vs Off-nail boxplots per force pair
   4. fd_region_slope               — Paired slope plot (On-nail ↔ Off-nail)
   5. fd_region_diff                — Difference strip plot (On-nail − Off-nail)
+  6. gee_pairwise_all_trials       — Low | High boxplots with every trial as a dot
 """
 
 import os
@@ -568,6 +569,94 @@ def plot_band_overall(ax, band_label, order, pvals_dict,
         draw_bracket(ax, i1, i2, y_base + level*tier_step, sig_text)
 
 
+def plot_band_all_trials(ax, band_label, order, *,
+                         show_xlabel=True, show_ylabel=True):
+    """Boxplot + scatter for every trial (0/100%), not per-subject means."""
+    sub = df[(df["band"] == band_label) & (df["pair_label"].isin(order))].copy()
+    bw  = boxplot_width(len(order))
+    jw  = STRIP_JITTER_AT_REF * bw / BOX_WIDTH_AT_REF * 1.4
+    band_max_pct = 0.0
+    color = BAND_BOX_COLOR[band_label]
+
+    for xi, pair in enumerate(order):
+        pdata = sub.loc[sub["pair_label"] == pair, "correct"].values * 100
+        if not len(pdata):
+            continue
+        band_max_pct = max(band_max_pct, float(np.max(pdata)))
+        bp = ax.boxplot(
+            [pdata], positions=[xi], widths=bw, patch_artist=True,
+            showfliers=False, capwidths=ATD.CAP_WIDTH,
+            whiskerprops={"linewidth": BOX_LINEWIDTH, "color": BOX_STROKE},
+            capprops={"linewidth": BOX_LINEWIDTH, "color": BOX_STROKE},
+            medianprops={"color": ACCENT_RED, "linewidth": MEDIAN_LINEWIDTH},
+            boxprops={"linewidth": BOX_LINEWIDTH, "edgecolor": BOX_STROKE},
+        )
+        for patch in bp["boxes"]:
+            patch.set_facecolor(ATD.pale_box_face(color))
+            patch.set_edgecolor(BOX_STROKE)
+            patch.set_zorder(BOX_PATCH_ZORDER)
+        for line in bp["medians"]:
+            line.set_color(ACCENT_RED)
+            line.set_linewidth(MEDIAN_LINEWIDTH)
+            line.set_zorder(MEDIAN_ZORDER)
+
+        x_strip = np.full(len(pdata), xi) + jitter(len(pdata), width=jw)
+        rgba = ATD._hsb_scatter_rgba(color, SCATTER_HSB_BRIGHTNESS, STRIP_ALPHA)
+        ax.scatter(
+            x_strip, pdata, c=[rgba] * len(pdata),
+            s=(STRIP_SIZE * 0.55) ** 2,
+            linewidths=0, edgecolors="none", alpha=0.35,
+            zorder=SCATTER_ZORDER, clip_on=False,
+        )
+
+    ax.axhline(JND_PCT, color=CRITERION_COLOR, linestyle="--",
+               linewidth=1.0, alpha=0.85, zorder=REF_LINE_ZORDER)
+    ax.axhline(CHANCE_PCT, color="gray", linestyle=":", linewidth=0.9,
+               alpha=0.55, zorder=REF_LINE_ZORDER - 1)
+
+    ax.set_xticks(range(len(order)))
+    ax.set_xticklabels(order, fontsize=FONT_TICK)
+    ax.set_xlim(-0.55, len(order) - 0.45)
+    finalize_axes(
+        ax, len(order), max(ATD.ACCURACY_YLIM_TOP, band_max_pct + 6),
+        show_ylabel=show_ylabel, show_xlabel=show_xlabel,
+    )
+    ax.set_title(
+        f"{'Low' if band_label == 'Low' else 'High'} band  "
+        f"(ref = {'1' if band_label == 'Low' else '26'} g)  ·  "
+        f"n = {len(sub)} trials",
+        fontsize=FONT_LABEL, fontweight="bold", pad=6,
+    )
+
+
+def make_all_trials_figure(band_only=None):
+    """Two-panel (Low | High) or single-band trial-level accuracy figure."""
+    sns.set_theme(style="white")
+    ATD.apply_plot_style()
+
+    if band_only == "Low":
+        fig, ax = plt.subplots(figsize=(FIG_SIZE[0] * 0.55, FIG_SIZE[1]), facecolor="#FFFFFF")
+        plot_band_all_trials(ax, "Low", low_order)
+        fig.subplots_adjust(left=0.12, right=0.97, top=0.88, bottom=MARGIN_BOTTOM)
+        return fig
+
+    if band_only == "High":
+        fig, ax = plt.subplots(figsize=(FIG_SIZE[0] * 0.55, FIG_SIZE[1]), facecolor="#FFFFFF")
+        plot_band_all_trials(ax, "High", high_order, show_ylabel=True)
+        fig.subplots_adjust(left=0.12, right=0.97, top=0.88, bottom=MARGIN_BOTTOM)
+        return fig
+
+    fig, ax_l, ax_h = _make_two_panel_fig()
+    plot_band_all_trials(ax_l, "Low",  low_order,  show_ylabel=True)
+    plot_band_all_trials(ax_h, "High", high_order, show_ylabel=False)
+    _add_legend(fig, OVERALL_LEGEND)
+    fig.suptitle(
+        "All trial-level accuracy (each dot = one trial, 0% or 100%)",
+        fontsize=FONT_LABEL, fontweight="bold", y=0.98,
+    )
+    return fig
+
+
 def make_pairwise_figure(orientation):
     sns.set_theme(style="white"); ATD.apply_plot_style()
     px, py, pw, ph = _panel_size_inches()
@@ -602,6 +691,30 @@ if not os.getenv("PAPER_RENDER"):
         fig = make_pairwise_figure(ori)
         save_figure(fig, stem)
         plt.close(fig)
+
+    fig = make_all_trials_figure()
+    save_figure(fig, "gee_pairwise_all_trials")
+    plt.close(fig)
+
+    fig = make_all_trials_figure(band_only="Low")
+    save_figure(fig, "gee_pairwise_all_trials_low")
+    plt.close(fig)
+
+    fig = make_all_trials_figure(band_only="High")
+    save_figure(fig, "gee_pairwise_all_trials_high")
+    plt.close(fig)
+
+    _paper_dir = _SCRIPT_DIR / "final_paper_output"
+    _paper_dir.mkdir(exist_ok=True)
+    for src_name, dst_name in [
+        ("gee_pairwise_all_trials_low.png",  "paper_gee_pairwise_all_trials_low.png"),
+        ("gee_pairwise_all_trials_high.png", "paper_gee_pairwise_all_trials_high.png"),
+    ]:
+        src = os.path.join(OUTPUT_DIR, src_name)
+        dst = _paper_dir / dst_name
+        if os.path.exists(src):
+            shutil.copy2(src, dst)
+            print(f"Copied → {dst}")
 
 # =============================================================================
 # 11. Figure 3: On-nail vs Off-nail boxplot

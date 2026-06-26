@@ -1,21 +1,21 @@
                                GEE Regression Results                              
 ===================================================================================
 Dep. Variable:                   IsCorrect   No. Observations:                 1632
-Model:                                 GEE   No. clusters:                       24
+Model:                                 GEE   No. clusters:                       25
 Method:                        Generalized   Min. cluster size:                  64
-                      Estimating Equations   Max. cluster size:                 160
-Family:                           Binomial   Mean cluster size:                68.0
-Dependence structure:         Exchangeable   Num. iterations:                     6
-Date:                     Tue, 23 Jun 2026   Scale:                           1.000
-Covariance type:                    robust   Time:                         18:19:36
+                      Estimating Equations   Max. cluster size:                  80
+Family:                           Binomial   Mean cluster size:                65.3
+Dependence structure:         Exchangeable   Num. iterations:                     7
+Date:                     Wed, 24 Jun 2026   Scale:                           1.000
+Covariance type:                    robust   Time:                         17:49:35
 =========================================================================================
                             coef    std err          z      P>|z|      [0.025      0.975]
 -----------------------------------------------------------------------------------------
-Intercept                -1.9813      0.271     -7.303      0.000      -2.513      -1.450
-abs_offset_mm             1.0413      0.127      8.174      0.000       0.792       1.291
-force_g                   0.0196      0.013      1.459      0.145      -0.007       0.046
-abs_offset_mm:force_g    -0.0030      0.006     -0.514      0.607      -0.014       0.008
+Intercept                -1.8666      0.277     -6.731      0.000      -2.410      -1.323
+abs_offset_mm             1.0165      0.123      8.272      0.000       0.776       1.257
+force_g                   0.0206      0.013      1.536      0.124      -0.006       0.047
+abs_offset_mm:force_g    -0.0032      0.006     -0.552      0.581      -0.015       0.008
 ==============================================================================
-Skew:                         -0.8361   Kurtosis:                       0.6846
-Centered skew:                -0.7679   Centered kurtosis:              0.5679
+Skew:                         -0.8947   Kurtosis:                       0.6707
+Centered skew:                -0.8162   Centered kurtosis:              0.5375
 ==============================================================================

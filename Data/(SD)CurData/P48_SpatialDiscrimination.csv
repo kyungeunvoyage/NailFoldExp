@@ -22,7 +22,7 @@ P48,26.0g,20,0,g-2,g0,g-2,Left,Right,0
 P48,26.0g,21,0,g0,g3,g3,Right,Right,1
 P48,26.0g,22,0,g0,g-1,g-1,Left,Left,1
 P48,26.0g,23,0,g0,g1,g1,Left,Right,0
-P48,26.0g,24,0,g-1,g0,g-1,Left,Right,0
+P48,26.0g,24,0,g-1,g0,g-1,Left,Left,1
 P48,26.0g,25,0,g0,g-2,g-2,Left,Left,1
 P48,26.0g,26,0,g0,g3,g3,Right,Right,1
 P48,26.0g,27,0,g0,g1,g1,Right,Right,1
@@ -40,7 +40,7 @@ P48,1.0g,38,0,g-4,g0,g-4,Right,Right,1
 P48,1.0g,39,0,g-1,g0,g-1,Left,Right,0
 P48,1.0g,40,0,g0,g3,g3,Right,Right,1
 P48,1.0g,41,0,g0,g1,g1,Right,Right,1
-P48,1.0g,42,0,g0,g1,g1,Left,Right,0
+P48,1.0g,42,0,g0,g1,g1,Left,Left,1
 P48,1.0g,43,0,g0,g-3,g-3,Left,Left,1
 P48,1.0g,44,0,g2,g0,g2,Left,Left,1
 P48,1.0g,45,0,g0,g-1,g-1,Right,Left,0

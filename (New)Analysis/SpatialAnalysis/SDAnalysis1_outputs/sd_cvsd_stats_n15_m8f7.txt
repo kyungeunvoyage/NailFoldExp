@@ -1,0 +1,15 @@
+Spatial Discrimination — Region C vs D
+Classification: directional proxy (signed offset → C/D at C–D zone)
+Metric: per-subject mean accuracy (all offset magnitudes pooled)
+
+=== Group summary (subject means, %) ===
+ Force  Region     Mean       SD      SEM   Median     N
+--------------------------------------------------------
+  1.0g       C    77.14    11.37     2.94    80.00    15
+  1.0g       D    77.69     9.26     2.39    77.78    15
+  Wilcoxon 1g (C vs D): W=52.0, p=0.9750, n=15  (n.s.)
+  LME 1g (D − C): Δ=0.005 [-0.069, 0.079], p=0.8916  (n.s.)
+ 26.0g       C    84.87    10.44     2.69    86.67    15
+ 26.0g       D    79.75    10.52     2.72    77.27    15
+  Wilcoxon 26g (C vs D): W=40.0, p=0.2769, n=15  (n.s.)
+  LME 26g (D − C): Δ=-0.044 [-0.113, 0.025], p=0.2153  (n.s.)

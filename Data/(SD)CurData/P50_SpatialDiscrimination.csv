@@ -1,5 +1,5 @@
 ﻿Subject,Force,Trial_Total,CD_Distance,Stim_1st,Stim_2nd,Comparison_Target,User_Response,Target_Response,IsCorrect
-P50,1.0g,1,0,g0,g-1,g-1,Left,Left,1
+P50,1.0g,1,0,g0,g-1,g-1,Left,Right,0
 P50,1.0g,2,0,g0,g-4,g-4,Left,Left,1
 P50,1.0g,3,0,g4,g0,g4,Left,Left,1
 P50,1.0g,4,0,g3,g0,g3,Left,Left,1
@@ -12,7 +12,7 @@ P50,1.0g,10,0,g4,g0,g4,Left,Left,1
 P50,1.0g,11,0,g0,g-3,g-3,Right,Left,0
 P50,1.0g,12,0,g-2,g0,g-2,Left,Right,0
 P50,1.0g,13,0,g0,g2,g2,Right,Right,1
-P50,1.0g,14,0,g-1,g0,g-1,Left,Right,0
+P50,1.0g,14,0,g-1,g0,g-1,Left,Left,1
 P50,1.0g,15,0,g4,g0,g4,Left,Left,1
 P50,1.0g,16,0,g0,g1,g1,Left,Right,0
 P50,1.0g,17,0,g0,g-3,g-3,Right,Left,0
