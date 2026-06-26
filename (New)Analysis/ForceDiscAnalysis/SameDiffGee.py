@@ -90,6 +90,11 @@ BAND_CONFIG = {
     },
 }
 
+
+def band_title_text(band_label, title_ref, n_subjects):
+    return f"{band_label} band (ref = {title_ref}, n = {n_subjects})"
+
+
 # ── Load data ─────────────────────────────────────────────────────────────────
 import re
 
@@ -516,7 +521,7 @@ def run_subject_analysis(df_band, band_label, pair_order, out_suffix, title_ref)
     subj_root = os.path.join(OUTPUT_DIR, "per_subject")
     os.makedirs(subj_root, exist_ok=True)
 
-    band_title = f"{band_label} band (ref = {title_ref})"
+    band_title = band_title_text(band_label, title_ref, 1)
     summary_rows = []
 
     for subject in sorted(df_band["Subject"].unique()):
@@ -654,7 +659,8 @@ def run_band_analysis(df_band, band_label, pair_order, out_suffix, title_ref):
         .rename(columns={"correct": "accuracy"})
     )
 
-    band_title = f"{band_label} band (ref = {title_ref})"
+    n_subj = df_band["Subject"].nunique()
+    band_title = band_title_text(band_label, title_ref, n_subj)
 
     fig, ax = plt.subplots(figsize=(8, 6))
     _draw_accuracy_panel(
@@ -833,7 +839,7 @@ for band_label, cfg in BAND_CONFIG.items():
 run_response_bias_overview(
     df,
     os.path.join(OUTPUT_DIR, "sd_response_bias_overview_all.png"),
-    "Response Bias Overview — Same/Different 2AFC (All Bands, All Participants)",
+    f"Response Bias Overview — Same/Different 2AFC (All Bands, n = {df['Subject'].nunique()})",
     print_header="Response bias (all bands pooled)",
 )
 
