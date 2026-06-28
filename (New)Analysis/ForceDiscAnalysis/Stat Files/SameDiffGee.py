@@ -73,7 +73,44 @@ os.makedirs(OUTPUT_DIR, exist_ok=True)
 CHANCE_PCT = 50.0
 JND_PCT    = 75.0
 EXPORT_WIDTH_2COL = 2102
-ACC_BY_PAIR_FIGSIZE = (14.0, 6.0)
+EXPORT_HEIGHT_2COL = 1298  # match Fig2_ontouch_vs_inair_2col.png
+ACC_BY_PAIR_FIGSIZE = (14.0, round(14.0 * EXPORT_HEIGHT_2COL / EXPORT_WIDTH_2COL, 3))
+ATD_FIG2_REF_N = 5
+ATD_FIG2_DODGED_BOX_WIDTH = 0.275  # one dodged box at 5 forces (ATD Fig2)
+COMBINED_PANEL_COUNT = 2
+STRIP_JITTER_REF = 0.12
+CAP_WIDTH = 0.10
+BOX_LINEWIDTH = 1.0
+COLOR_LOW_BAND = "#BAD6EB"
+COLOR_HIGH_BAND = "#D0E4FF"
+FIG_PANEL_TOP_FRAC = 0.80
+FIG_LEGEND_ANCHOR_Y = 0.975
+BRACKET_BASE_PAD = 3.0
+BRACKET_TIER_STEP = 8.0
+BRACKET_YLIM_CAP = 122.0
+BLACK = "#1A1A1A"
+TICK_LEN_AXES = 0.016
+ACCURACY_YSPINE_TOP = 100.0
+FONT_TICK = 16
+FONT_LABEL = 14
+FONT_LEGEND = 12
+FIG_AXIS_LABELPAD = 6
+AXIS_SPINE_LW = 2.0
+# paper_fd_onnail_vs_offnail_meanCI: FONT_TICK=16, fig (8×4.5 in), export 2102×1137 px
+PAPER_FD_FIG_H_IN = 4.5
+PAPER_FD_OUT_H_PX = 1137
+SAVE_DPI_COMBINED = 600
+
+
+def _combined_axis_font_size(base_pt):
+    """Match paper FD tick label pixel size on the taller 2-col export canvas."""
+    fig_h = ACC_BY_PAIR_FIGSIZE[1]
+    return round(base_pt * PAPER_FD_OUT_H_PX / EXPORT_HEIGHT_2COL * fig_h / PAPER_FD_FIG_H_IN)
+
+
+COMBINED_FONT_TICK = _combined_axis_font_size(FONT_TICK)
+COMBINED_FONT_LABEL = _combined_axis_font_size(FONT_LABEL)
+COMBINED_FONT_LEGEND = _combined_axis_font_size(FONT_LEGEND)
 
 ON_NAIL  = ["C", "D"]
 OFF_NAIL = ["A", "F"]
@@ -98,18 +135,27 @@ def band_title_text(band_label, title_ref, n_subjects):
     return f"{band_label} band (ref = {title_ref}, n = {n_subjects})"
 
 
-def save_png_at_width(fig, out_path, width_px=EXPORT_WIDTH_2COL, *, pad_inches=0.04):
+def combined_panel_box_width(n_pairs):
+    """Match Fig2 dodged-box pixel width inside each half-width 2-col panel."""
+    return (
+        ATD_FIG2_DODGED_BOX_WIDTH * n_pairs / ATD_FIG2_REF_N * COMBINED_PANEL_COUNT
+    )
+
+
+def save_png_at_width(fig, out_path, width_px=EXPORT_WIDTH_2COL, *,
+                      height_px=None, pad_inches=0.04, dpi=150):
     import io
     from PIL import Image
 
     buf = io.BytesIO()
     fig.savefig(
-        buf, format="png", dpi=150, bbox_inches="tight",
+        buf, format="png", dpi=dpi, bbox_inches="tight",
         pad_inches=pad_inches, facecolor="white",
     )
     buf.seek(0)
     master = Image.open(buf).convert("RGB")
-    height_px = round(width_px * master.height / master.width)
+    if height_px is None:
+        height_px = round(width_px * master.height / master.width)
     master.resize((width_px, height_px), Image.Resampling.LANCZOS).save(out_path)
 
 
@@ -318,8 +364,60 @@ def draw_bracket_above_axes(ax, x1, x2, tier, label, tier_step=0.065):
                 ha="center", va="bottom", fontsize=9, color=RED, fontweight="bold", clip_on=False)
 
 
+def draw_bracket_horizontal_data(ax, x1, x2, y, label, *, linewidth=AXIS_SPINE_LW):
+    """Horizontal significance line in data coords (no vertical end ticks)."""
+    ax.plot([x1, x2], [y, y], color=RED, lw=linewidth, clip_on=False, zorder=30)
+    if label:
+        ax.text((x1 + x2) / 2, y + 1.5, label,
+                ha="center", va="bottom", fontsize=9, color=RED, fontweight="bold",
+                clip_on=False, zorder=31)
+
+
 def jitter_x(n, width=0.12, seed=42):
     return (np.random.default_rng(seed).random(n) - 0.5) * width
+
+
+def apply_accuracy_y_spine_bounds(ax, y_top=ACCURACY_YSPINE_TOP):
+    """Left spine ends at the top data tick (100%) even when ylim extends for brackets."""
+    ax.spines["left"].set_bounds(0, y_top)
+
+
+def apply_combined_axis_spines(ax):
+    """Thicker bottom/left axis outlines for 2-col export."""
+    for spine in ("left", "bottom"):
+        ax.spines[spine].set_visible(True)
+        ax.spines[spine].set_color(BLACK)
+        ax.spines[spine].set_linewidth(AXIS_SPINE_LW)
+
+
+def add_inward_tick_guides(ax, n_x=None, y_ticks=None, *, labelsize=None,
+                           linewidth=AXIS_SPINE_LW):
+    """Short inward tick marks at each x/y label (ATD C1 style)."""
+    ax.grid(False)
+    tick_kw = {"axis": "both", "which": "both", "length": 0}
+    if labelsize is not None:
+        tick_kw["labelsize"] = labelsize
+    ax.tick_params(**tick_kw)
+    x_trans = blended_transform_factory(ax.transData, ax.transAxes)
+    y_trans = blended_transform_factory(ax.transAxes, ax.transData)
+    y_lo, y_hi = ax.get_ylim()
+    if y_ticks is None:
+        y_vals = [t for t in ax.get_yticks() if y_lo - 1e-9 <= t <= y_hi + 1e-9]
+    else:
+        y_vals = [t for t in y_ticks if y_lo - 1e-9 <= t <= y_hi + 1e-9]
+    x_positions = range(n_x) if n_x is not None else ax.get_xticks()
+    for xi in x_positions:
+        ax.plot(
+            [xi, xi], [0, TICK_LEN_AXES],
+            color=BLACK, linewidth=linewidth, solid_capstyle="butt",
+            transform=x_trans, clip_on=False, zorder=6,
+        )
+    for y in y_vals:
+        ax.plot(
+            [0, TICK_LEN_AXES], [y, y],
+            color=BLACK, linewidth=linewidth, solid_capstyle="butt",
+            transform=y_trans, clip_on=False, zorder=6,
+        )
 
 
 # ── Response bias overview (Same/Different analogue of response_bias_overview.py) ─
@@ -580,25 +678,34 @@ def save_same_trial_response_by_pair(df_sub, pair_order, title, out_path, *, csv
 
 def _draw_pair_accuracy_boxplot(ax, pair_order, values_by_pair, *,
                                 pairwise_pvals_dict=None, dot_label=None,
-                                data_ylim_top=100, show_ylabel=True):
-    """Boxplot + scatter; y-axis fixed 0–100. Brackets drawn above axes in margin."""
+                                data_ylim_top=100, show_ylabel=True,
+                                bracket_in_data_space=False, box_color="#dde6f0",
+                                box_width=0.42, jitter_width=0.12):
+    """Boxplot + scatter; y-axis 0–100 (brackets may extend ylim when in data space)."""
     band_max = 0.0
     for xi, pair in enumerate(pair_order):
         vals = np.asarray(values_by_pair.get(pair, []), dtype=float) * 100
         if len(vals) == 0:
             continue
         band_max = max(band_max, float(np.nanmax(vals)))
-        bp = ax.boxplot([vals], positions=[xi], widths=0.42,
-                         patch_artist=True, showfliers=False)
-        bp["boxes"][0].set_facecolor("#dde6f0"); bp["boxes"][0].set_edgecolor("black")
+        bp = ax.boxplot(
+            [vals], positions=[xi], widths=box_width,
+            patch_artist=True, showfliers=False, capwidths=CAP_WIDTH,
+            whiskerprops={"linewidth": BOX_LINEWIDTH, "color": "black"},
+            capprops={"linewidth": BOX_LINEWIDTH, "color": "black"},
+            medianprops={"color": RED, "linewidth": 2},
+            boxprops={"linewidth": BOX_LINEWIDTH, "edgecolor": "black"},
+        )
+        bp["boxes"][0].set_facecolor(box_color); bp["boxes"][0].set_edgecolor("black")
         bp["medians"][0].set_color(RED); bp["medians"][0].set_linewidth(2)
-        jx = xi + jitter_x(len(vals))
+        jx = xi + jitter_x(len(vals), width=jitter_width)
         ax.scatter(jx, vals, color=C1, alpha=0.6, s=20, zorder=3)
 
     ax.axhline(JND_PCT,    color="black", ls="--", lw=1.2, alpha=0.8)
     ax.axhline(CHANCE_PCT, color="gray",  ls=":",  lw=0.9, alpha=0.7)
 
     max_bracket_tier = -1
+    ylim_top = data_ylim_top
     if pairwise_pvals_dict:
         pair_combos = sorted(itertools.combinations(range(len(pair_order)), 2),
                              key=lambda t: t[1]-t[0])
@@ -612,21 +719,52 @@ def _draw_pair_accuracy_boxplot(ax, pair_order, values_by_pair, *,
             while any(l == level and not (i2 < a or b < i1) for a, b, l in tier_used):
                 level += 1
             tier_used.append((i1, i2, level))
-            draw_bracket_above_axes(ax, i1, i2, level, pval_label(pval))
+            label = pval_label(pval)
+            if bracket_in_data_space:
+                y = max(102.0, band_max + BRACKET_BASE_PAD) + level * BRACKET_TIER_STEP
+                draw_bracket_horizontal_data(ax, i1, i2, y, label)
+            else:
+                draw_bracket_above_axes(ax, i1, i2, level, label)
         if tier_used:
             max_bracket_tier = max(l for _, _, l in tier_used)
+            if bracket_in_data_space:
+                ylim_top = min(
+                    BRACKET_YLIM_CAP,
+                    max(102.0, band_max + BRACKET_BASE_PAD)
+                    + max_bracket_tier * BRACKET_TIER_STEP + 6.0,
+                )
 
     ax.set_xticks(range(len(pair_order)))
-    ax.set_xticklabels(pair_order, fontsize=11)
-    ax.set_ylim(0, data_ylim_top)
-    ax.set_yticks(list(range(0, data_ylim_top + 1, 20)))
+    tick_fs = COMBINED_FONT_TICK if bracket_in_data_space else 11
+    label_fs = COMBINED_FONT_LABEL if bracket_in_data_space else 11
+    ax.set_xticklabels(pair_order, fontsize=tick_fs)
+    ax.set_xlim(-0.55, len(pair_order) - 0.45)
+    ax.set_ylim(0, ylim_top)
+    y_tick_vals = list(range(0, data_ylim_top + 1, 20))
+    ax.set_yticks(y_tick_vals)
+    ax.tick_params(axis="both", labelsize=tick_fs, length=0)
     if show_ylabel:
-        ax.set_ylabel("Accuracy (%)", fontsize=11)
-    ax.set_xlabel("Force pair (g)", fontsize=11)
+        ax.set_ylabel(
+            "Discrimination Accuracy (%)" if bracket_in_data_space else "Accuracy (%)",
+            fontsize=label_fs,
+            labelpad=FIG_AXIS_LABELPAD if bracket_in_data_space else None,
+        )
+    ax.set_xlabel(
+        "Force pair (g)", fontsize=label_fs,
+        labelpad=FIG_AXIS_LABELPAD if bracket_in_data_space else None,
+    )
     ax.spines[["top", "right"]].set_visible(False)
+    if bracket_in_data_space:
+        apply_combined_axis_spines(ax)
+        apply_accuracy_y_spine_bounds(ax)
+        add_inward_tick_guides(ax, n_x=len(pair_order), y_ticks=y_tick_vals, labelsize=tick_fs)
+        apply_accuracy_y_spine_bounds(ax)
+        apply_combined_axis_spines(ax)
     if dot_label:
         ax.text(0.02, 0.98, dot_label, transform=ax.transAxes,
                 ha="left", va="top", fontsize=9, color="#555")
+    if bracket_in_data_space:
+        return max_bracket_tier, ylim_top
     return max_bracket_tier
 
 
@@ -644,7 +782,9 @@ def _apply_accuracy_figure_layout(fig, max_bracket_tier, title, *, panel_titles=
             ax.set_title(panel_title, fontsize=11, fontweight="bold", pad=10)
 
 
-def _draw_accuracy_panel(ax, subj_acc_df, pair_order, pairwise_pvals_dict, *, show_ylabel=True):
+def _draw_accuracy_panel(ax, subj_acc_df, pair_order, pairwise_pvals_dict, *, show_ylabel=True,
+                         bracket_in_data_space=False, box_color="#dde6f0",
+                         box_width=0.42, jitter_width=0.12):
     subj_acc_sorted = subj_acc_df[subj_acc_df["pair_label"].isin(pair_order)].copy()
     values_by_pair = {
         pair: subj_acc_sorted.loc[subj_acc_sorted["pair_label"] == pair, "accuracy"].values
@@ -654,7 +794,23 @@ def _draw_accuracy_panel(ax, subj_acc_df, pair_order, pairwise_pvals_dict, *, sh
         ax, pair_order, values_by_pair,
         pairwise_pvals_dict=pairwise_pvals_dict,
         show_ylabel=show_ylabel,
+        bracket_in_data_space=bracket_in_data_space,
+        box_color=box_color,
+        box_width=box_width,
+        jitter_width=jitter_width,
     )
+
+
+def _combined_accuracy_legend_handles(band_specs):
+    band_colors = {"Low": COLOR_LOW_BAND, "High": COLOR_HIGH_BAND}
+    return [
+        mpatches.Patch(
+            facecolor=band_colors.get(spec["band_label"], "#dde6f0"),
+            edgecolor="black",
+            label=band_title_text(spec["band_label"], spec["title_ref"], spec["n_subj"]),
+        )
+        for spec in band_specs
+    ]
 
 
 def save_combined_accuracy_by_pair(band_specs):
@@ -667,27 +823,52 @@ def save_combined_accuracy_by_pair(band_specs):
     if len(band_specs) == 1:
         axes = [axes]
 
-    max_tier = -1
-    panel_titles = []
+    band_colors = {"Low": COLOR_LOW_BAND, "High": COLOR_HIGH_BAND}
+    shared_ylim = 100.0
     for ax, spec in zip(axes, band_specs):
-        tier = _draw_accuracy_panel(
+        box_w = combined_panel_box_width(len(spec["pair_order"]))
+        jitter_w = STRIP_JITTER_REF * box_w / ATD_FIG2_DODGED_BOX_WIDTH
+        _, ylim_top = _draw_accuracy_panel(
             ax, spec["subj_acc"], spec["pair_order"], spec["pairwise_pvals"],
             show_ylabel=(ax is axes[0]),
+            bracket_in_data_space=True,
+            box_color=band_colors.get(spec["band_label"], "#dde6f0"),
+            box_width=box_w,
+            jitter_width=jitter_w,
         )
-        max_tier = max(max_tier, tier)
-        panel_titles.append(
-            band_title_text(spec["band_label"], spec["title_ref"], spec["n_subj"])
-        )
+        shared_ylim = max(shared_ylim, ylim_top)
 
-    _apply_accuracy_figure_layout(
-        fig, max_tier,
-        title="Overall Accuracy — Same/Different 2AFC",
-        panel_titles=panel_titles,
+    for ax in axes:
+        ax.set_ylim(0, shared_ylim)
+
+    fig.legend(
+        handles=_combined_accuracy_legend_handles(band_specs),
+        loc="upper center",
+        bbox_to_anchor=(0.5, FIG_LEGEND_ANCHOR_Y),
+        bbox_transform=fig.transFigure,
+        ncol=len(band_specs),
+        frameon=False,
+        fontsize=COMBINED_FONT_LEGEND,
+        columnspacing=2.0,
+        handletextpad=0.5,
+        handlelength=1.6,
+    )
+    fig.subplots_adjust(
+        left=0.07, right=0.98, top=FIG_PANEL_TOP_FRAC, bottom=0.12, wspace=0.10,
     )
     out_path = os.path.join(OUTPUT_DIR, "sd_accuracy_by_pair_2col.png")
-    save_png_at_width(fig, out_path, width_px=EXPORT_WIDTH_2COL)
+    save_png_at_width(
+        fig, out_path,
+        width_px=EXPORT_WIDTH_2COL,
+        height_px=EXPORT_HEIGHT_2COL,
+        dpi=SAVE_DPI_COMBINED,
+        pad_inches=0.05,
+    )
     plt.close(fig)
-    print(f"Saved → sd_accuracy_by_pair_2col.png  ({EXPORT_WIDTH_2COL} px wide)")
+    print(
+        f"Saved → sd_accuracy_by_pair_2col.png  "
+        f"({EXPORT_WIDTH_2COL}×{EXPORT_HEIGHT_2COL} px)"
+    )
 
 
 def _save_subject_accuracy_by_pair(df_sub, subject, pair_order, band_title, out_path):

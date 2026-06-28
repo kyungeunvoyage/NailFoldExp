@@ -38,7 +38,7 @@ import statsmodels.formula.api as smf
 SCRIPT_DIR  = os.path.dirname(os.path.abspath(__file__))
 ATD_C1_PATH = os.path.join(SCRIPT_DIR, "(Final)ATD_C1_Fig(Anika).py")
 OUT_C1      = os.path.join(SCRIPT_DIR, "atd_c1_outputs")
-OUT_AGG     = os.path.join(SCRIPT_DIR, "figures")
+OUT_AGG     = os.path.join(SCRIPT_DIR, "..", "figures")
 os.makedirs(OUT_C1, exist_ok=True)
 os.makedirs(OUT_AGG, exist_ok=True)
 
@@ -49,6 +49,8 @@ UNIFIED_STYLE = dict(
     # ── Colors ───────────────────────────────────────────────────────────────
     IN_AIR                    = "#6A4A3C",   # In-air (brown)
     ON_TOUCH                  = "#10559A",   # On-touch (blue)
+    POOL_ON_NAIL              = "#1565C0",   # pooled On-nail — saturated royal blue
+    POOL_OFF_NAIL             = "#81D4FA",   # pooled Off-nail — light cyan-blue (high contrast)
     ACCENT_RED                = "#BF2C23",   # median line
     BLACK                     = "#1A1A1A",
     KAO_COLOR                 = "#5A5A5A",   # Fingerpad (gray)
@@ -65,6 +67,7 @@ UNIFIED_STYLE = dict(
     # ── Line widths ──────────────────────────────────────────────────────────
     BOX_LINEWIDTH             = 0.8,
     CAP_LINEWIDTH             = 0.5,
+    BRACKET_LINEWIDTH         = 1.5,
 
     # ── Font sizes ───────────────────────────────────────────────────────────
     FONT_TICK                 = 16,
@@ -72,7 +75,7 @@ UNIFIED_STYLE = dict(
     FONT_LEGEND               = 12,
     FONT_ANNOT                = 10,
     FONT_BRACKET_STAR         = 15,  # significance asterisk size (*** / *)
-    FONT_PANEL_TITLE          = 16,  # force panel titles (0.16 g, 0.4 g, …)
+    FONT_PANEL_TITLE          = 14,  # force panel titles (0.16 g, 0.4 g, …)
 
     # ── Y-axis  (세 피규어 모두 동일한 tick 간격) ─────────────────────────────
     ACCURACY_YTICKS           = (0, 20, 40, 60, 80, 100),
@@ -86,7 +89,9 @@ UNIFIED_STYLE = dict(
 
 # 2-col export
 EXPORT_WIDTH = 2102
+EXPORT_HEIGHT_POOLED = 1293  # fixed canvas; plot expands when legend removed
 EXPORT_TAG   = "2col"
+POOLED_FIGSIZE = (8.0, round(8.0 * EXPORT_HEIGHT_POOLED / EXPORT_WIDTH, 3))
 
 # =============================================================================
 # 3. Load & patch atd_c1 module
@@ -128,12 +133,21 @@ POOLED_Y_AXIS_TOP = 100
 # =============================================================================
 # 4. Helper: save at 2-col width
 # =============================================================================
-def save_final(fig, out_path):
-    w_in, _ = fig.get_size_inches()
-    dpi = EXPORT_WIDTH / w_in
-    fig.savefig(out_path, dpi=dpi, bbox_inches="tight",
-                pad_inches=0.04, facecolor="white")
-    print(f"  Saved → {out_path}")
+def save_final(fig, out_path, width_px=EXPORT_WIDTH, height_px=None):
+    import io
+    from PIL import Image
+
+    buf = io.BytesIO()
+    fig.savefig(
+        buf, format="png", dpi=600, bbox_inches="tight",
+        pad_inches=0.04, facecolor="white",
+    )
+    buf.seek(0)
+    master = Image.open(buf).convert("RGB")
+    if height_px is None:
+        height_px = round(width_px * master.height / master.width)
+    master.resize((width_px, height_px), Image.Resampling.LANCZOS).save(out_path)
+    print(f"  Saved → {out_path}  ({width_px}×{height_px} px)")
 
 
 # =============================================================================
@@ -290,7 +304,7 @@ def _sig_bracket(ax, x_l, x_r, y_base, text="", tick_h=0.5, text_pad=0.0):
     mid   = (x_l + x_r) / 2
     y_top = y_base + tick_h
     ax.plot([x_l, x_r], [y_top, y_top],
-            color=ACCENT_RED, linewidth=2.0, clip_on=False, zorder=25)
+            color=ACCENT_RED, linewidth=S["BRACKET_LINEWIDTH"], clip_on=False, zorder=25)
     ax.text(mid, y_top + text_pad, text,
             ha="center", va="bottom", fontsize=S["FONT_BRACKET_STAR"],
             color=ACCENT_RED, fontweight="bold", clip_on=False, zorder=26)
@@ -302,7 +316,7 @@ def _force_title(ax, force_val, y=0.95):
         txt += ".0"
     ax.text(0.5, y, f"{txt} g", transform=ax.transAxes,
             ha="center", va="bottom", fontsize=S["FONT_PANEL_TITLE"],
-            fontweight="black", clip_on=False)
+            fontweight="normal", clip_on=False)
 
 
 def _scatter_strip(ax, x_pos, vals, subjects, partial_set, color, jitter_arr):
@@ -351,12 +365,12 @@ def generate_pooled():
     POOL_GROUP_MAP   = {"C": "On-nail", "D": "On-nail",
                         "A": "Off-nail", "F": "Off-nail"}
     POOL_GROUP_ORDER = ["On-nail", "Off-nail"]
-    POOL_PALETTE     = {"On-nail": ON_TOUCH, "Off-nail": "#7C94B8"}
+    POOL_PALETTE     = {"On-nail": S["POOL_ON_NAIL"], "Off-nail": S["POOL_OFF_NAIL"]}
     POOL_X_LABELS    = ["On-nail\n(C+D)", "Off-nail\n(A+F)"]
     FONT_XTICK       = 12
 
     fig, axes = plt.subplots(1, len(plot_forces),
-                             figsize=(8.0, 4.5), facecolor="white")
+                             figsize=POOLED_FIGSIZE, facecolor="white")
     if len(plot_forces) == 1:
         axes = [axes]
 
@@ -414,23 +428,10 @@ def generate_pooled():
             ax.set_ylabel("")
             ax.tick_params(axis="y", labelleft=False)
 
-    leg_handles = [
-        mpatches.Patch(facecolor=pale_box_face(POOL_PALETTE[grp]),
-                       edgecolor=BLACK, linewidth=BOX_LINEWIDTH,
-                       label=lbl.replace("\n", " "))
-        for lbl, grp in zip(POOL_X_LABELS, POOL_GROUP_ORDER)
-    ]
-    fig.legend(
-        handles=leg_handles, loc="lower center",
-        bbox_to_anchor=(0.5, 0.99), bbox_transform=fig.transFigure,
-        ncol=2, frameon=False, fontsize=FONT_LABEL,
-        labelspacing=0.2, columnspacing=2.0,
-        handlelength=1.6, handleheight=1.0,
-    )
-    fig.subplots_adjust(left=0.08, right=0.97, top=1.0, bottom=0.12, wspace=0.18)
+    fig.subplots_adjust(left=0.08, right=0.97, top=0.96, bottom=0.12, wspace=0.18)
 
     out = os.path.join(OUT_AGG, "onnail_vs_offnail_pooled(final).png")
-    save_final(fig, out)
+    save_final(fig, out, height_px=EXPORT_HEIGHT_POOLED)
     plt.close(fig)
 
 

@@ -380,7 +380,7 @@ def mpl_boxplot_width(n_x_categories, reference_n=None):
 # Paths
 # =============================================================================
 SCRIPT_DIR   = os.path.dirname(os.path.abspath(__file__))
-REPO_ROOT    = os.path.normpath(os.path.join(SCRIPT_DIR, "../../"))
+REPO_ROOT    = os.path.normpath(os.path.join(SCRIPT_DIR, "../../../"))
 FILE_PATTERN = os.path.join(
     REPO_ROOT, "Data", "(ATD)CurData", "P*_AbsoluteThresholdDetection.csv"
 )
