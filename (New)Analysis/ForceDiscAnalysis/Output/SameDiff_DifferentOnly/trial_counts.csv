@@ -1,0 +1,4 @@
+scope,band,n_total_trials,n_same_excluded,n_different_kept,pct_different
+all,All,1092,396,696,63.7
+band,Low,768,288,480,62.5
+band,High,324,108,216,66.7

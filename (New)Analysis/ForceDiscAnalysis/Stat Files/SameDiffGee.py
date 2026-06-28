@@ -40,6 +40,7 @@ import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import matplotlib.patches as mpatches
+from matplotlib.transforms import blended_transform_factory
 import warnings
 warnings.filterwarnings("ignore")
 
@@ -71,6 +72,8 @@ os.makedirs(OUTPUT_DIR, exist_ok=True)
 
 CHANCE_PCT = 50.0
 JND_PCT    = 75.0
+EXPORT_WIDTH_2COL = 2102
+ACC_BY_PAIR_FIGSIZE = (14.0, 6.0)
 
 ON_NAIL  = ["C", "D"]
 OFF_NAIL = ["A", "F"]
@@ -93,6 +96,21 @@ BAND_CONFIG = {
 
 def band_title_text(band_label, title_ref, n_subjects):
     return f"{band_label} band (ref = {title_ref}, n = {n_subjects})"
+
+
+def save_png_at_width(fig, out_path, width_px=EXPORT_WIDTH_2COL, *, pad_inches=0.04):
+    import io
+    from PIL import Image
+
+    buf = io.BytesIO()
+    fig.savefig(
+        buf, format="png", dpi=150, bbox_inches="tight",
+        pad_inches=pad_inches, facecolor="white",
+    )
+    buf.seek(0)
+    master = Image.open(buf).convert("RGB")
+    height_px = round(width_px * master.height / master.width)
+    master.resize((width_px, height_px), Image.Resampling.LANCZOS).save(out_path)
 
 
 # ── Load data ─────────────────────────────────────────────────────────────────
@@ -288,6 +306,18 @@ def draw_bracket(ax, x1, x2, y, label, tick_h=3.5):
                 ha="center", va="bottom", fontsize=9, color=RED, fontweight="bold")
 
 
+def draw_bracket_above_axes(ax, x1, x2, tier, label, tier_step=0.065):
+    """Significance bracket in margin above plot — y-axis stays 0–100."""
+    trans = blended_transform_factory(ax.transData, ax.transAxes)
+    y = 1.02 + tier * tier_step
+    tick_h = 0.022
+    ax.plot([x1, x1, x2, x2], [y, y + tick_h, y + tick_h, y],
+            color=RED, lw=1.2, clip_on=False, transform=trans)
+    if label:
+        ax.text((x1 + x2) / 2, y + tick_h + 0.012, label, transform=trans,
+                ha="center", va="bottom", fontsize=9, color=RED, fontweight="bold", clip_on=False)
+
+
 def jitter_x(n, width=0.12, seed=42):
     return (np.random.default_rng(seed).random(n) - 0.5) * width
 
@@ -408,9 +438,150 @@ def run_response_bias_overview(df_sub, out_path, suptitle, *, print_header=None)
     print(f"Saved → {os.path.relpath(out_path, OUTPUT_DIR)}")
 
 
-def _draw_pair_accuracy_boxplot(ax, pair_order, values_by_pair, title, *,
-                                pairwise_pvals_dict=None, dot_label=None):
-    """Boxplot + jittered scatter per force pair (shared by group & single-subject plots)."""
+def _pair_response_distribution_rows(df_sub, pair_order):
+    rows = []
+    for pair in pair_order:
+        for gt in ["SAME", "DIFFERENT"]:
+            sub = df_sub[(df_sub["pair_label"] == pair) & (df_sub["GroundTruth"] == gt)]
+            n = len(sub)
+            if n == 0:
+                continue
+            n_same = int((sub["UserChoice"] == "SAME").sum())
+            n_diff = n - n_same
+            rows.append({
+                "pair_label": pair,
+                "ground_truth": gt,
+                "n_trials": n,
+                "n_resp_same": n_same,
+                "n_resp_diff": n_diff,
+                "pct_resp_same": n_same / n * 100,
+                "pct_resp_diff": n_diff / n * 100,
+            })
+    return rows
+
+
+def _label_stacked_bar(ax, x_left, width, y, text, min_width=8):
+    if width < min_width:
+        return
+    ax.text(x_left + width / 2, y, text, ha="center", va="center",
+            fontsize=8, fontweight="bold", color="white")
+
+
+def save_response_distribution_by_pair(df_sub, pair_order, title, out_path, *, csv_path=None):
+    """
+    Per force pair: response distribution on SAME trials vs DIFFERENT trials.
+    Each row = one pair × ground-truth type; stacked bar = responded SAME | DIFFERENT.
+    """
+    rows = _pair_response_distribution_rows(df_sub, pair_order)
+    if not rows:
+        return
+    if csv_path:
+        pd.DataFrame(rows).to_csv(csv_path, index=False)
+
+    fig, ax = plt.subplots(figsize=(11, 1.55 * len(pair_order) * 2 + 1.2))
+    y = 0
+    yticks, ylabels = [], []
+    bar_h = 0.38
+    group_gap = 0.55
+
+    for pair in pair_order:
+        pair_rows = [r for r in rows if r["pair_label"] == pair]
+        for r in pair_rows:
+            ps, pct_diff = r["pct_resp_same"], r["pct_resp_diff"]
+            ax.barh(y, ps, height=bar_h, color=C_SAME, edgecolor="black", linewidth=0.6)
+            ax.barh(y, pct_diff, height=bar_h, left=ps, color=C_DIFF, edgecolor="black", linewidth=0.6)
+            _label_stacked_bar(ax, 0, ps, y, f"{ps:.1f}%\n(n={r['n_resp_same']})")
+            _label_stacked_bar(ax, ps, pct_diff, y, f"{pct_diff:.1f}%\n(n={r['n_resp_diff']})")
+            yticks.append(y)
+            gt = r["ground_truth"]
+            ylabels.append(f"{pair}  ·  {gt} trials  (n={r['n_trials']})")
+            y -= 1
+        y -= group_gap
+
+    ax.axvline(50, color="gray", ls="--", lw=1.0, alpha=0.7)
+    ax.text(50, y + group_gap + 0.5, "50%", ha="center", fontsize=8, color="gray")
+    ax.set_xlim(0, 100)
+    ax.set_yticks(yticks)
+    ax.set_yticklabels(ylabels, fontsize=10)
+    ax.set_xlabel("Response distribution (%)", fontsize=11)
+    ax.set_title(title, fontsize=12, fontweight="bold", pad=12)
+    ax.invert_yaxis()
+    ax.spines[["top", "right", "left"]].set_visible(False)
+    ax.legend(handles=[
+        mpatches.Patch(facecolor=C_SAME, edgecolor="black", label="Responded: SAME"),
+        mpatches.Patch(facecolor=C_DIFF, edgecolor="black", label="Responded: DIFFERENT"),
+    ], loc="lower right", frameon=False, fontsize=10)
+    plt.tight_layout()
+    fig.savefig(out_path, dpi=150, bbox_inches="tight")
+    plt.close(fig)
+    print(f"Saved → {os.path.relpath(out_path, OUTPUT_DIR)}")
+
+
+def _same_trial_response_rows(df_sub, pair_order):
+    """Response distribution within SAME trials only, per force pair."""
+    rows = []
+    for pair in pair_order:
+        sub = df_sub[(df_sub["pair_label"] == pair) & (df_sub["GroundTruth"] == "SAME")]
+        n = len(sub)
+        if n == 0:
+            continue
+        n_same = int((sub["UserChoice"] == "SAME").sum())
+        n_diff = n - n_same
+        rows.append({
+            "pair_label": pair,
+            "n_trials": n,
+            "n_resp_same": n_same,
+            "n_resp_diff": n_diff,
+            "pct_resp_same": n_same / n * 100,
+            "pct_resp_diff": n_diff / n * 100,
+        })
+    return rows
+
+
+def save_same_trial_response_by_pair(df_sub, pair_order, title, out_path, *, csv_path=None):
+    """SAME trials only: how participants responded (SAME vs DIFFERENT), by force pair."""
+    rows = _same_trial_response_rows(df_sub, pair_order)
+    if not rows:
+        return
+    if csv_path:
+        pd.DataFrame(rows).to_csv(csv_path, index=False)
+
+    fig, ax = plt.subplots(figsize=(11, 1.1 * len(pair_order) + 1.8))
+    yticks, ylabels = [], []
+    bar_h = 0.55
+
+    for yi, r in enumerate(rows):
+        ps, pct_diff = r["pct_resp_same"], r["pct_resp_diff"]
+        ax.barh(yi, ps, height=bar_h, color=C_SAME, edgecolor="black", linewidth=0.6)
+        ax.barh(yi, pct_diff, height=bar_h, left=ps, color=C_DIFF, edgecolor="black", linewidth=0.6)
+        _label_stacked_bar(ax, 0, ps, yi, f"{ps:.1f}%\n(n={r['n_resp_same']})")
+        _label_stacked_bar(ax, ps, pct_diff, yi, f"{pct_diff:.1f}%\n(n={r['n_resp_diff']})")
+        yticks.append(yi)
+        ylabels.append(f"{r['pair_label']}  (SAME trials, n={r['n_trials']})")
+
+    ax.axvline(50, color="gray", ls="--", lw=1.0, alpha=0.7)
+    ax.text(50, len(rows) - 0.15, "50%", ha="center", fontsize=8, color="gray")
+    ax.set_xlim(0, 100)
+    ax.set_yticks(yticks)
+    ax.set_yticklabels(ylabels, fontsize=10)
+    ax.set_xlabel("Response distribution (%)  — ground truth always SAME", fontsize=11)
+    ax.set_title(title, fontsize=12, fontweight="bold", pad=12)
+    ax.invert_yaxis()
+    ax.spines[["top", "right", "left"]].set_visible(False)
+    ax.legend(handles=[
+        mpatches.Patch(facecolor=C_SAME, edgecolor="black", label="Responded: SAME (correct)"),
+        mpatches.Patch(facecolor=C_DIFF, edgecolor="black", label="Responded: DIFFERENT (incorrect)"),
+    ], loc="lower right", frameon=False, fontsize=10)
+    plt.tight_layout()
+    fig.savefig(out_path, dpi=150, bbox_inches="tight")
+    plt.close(fig)
+    print(f"Saved → {os.path.relpath(out_path, OUTPUT_DIR)}")
+
+
+def _draw_pair_accuracy_boxplot(ax, pair_order, values_by_pair, *,
+                                pairwise_pvals_dict=None, dot_label=None,
+                                data_ylim_top=100, show_ylabel=True):
+    """Boxplot + scatter; y-axis fixed 0–100. Brackets drawn above axes in margin."""
     band_max = 0.0
     for xi, pair in enumerate(pair_order):
         vals = np.asarray(values_by_pair.get(pair, []), dtype=float) * 100
@@ -426,18 +597,12 @@ def _draw_pair_accuracy_boxplot(ax, pair_order, values_by_pair, title, *,
 
     ax.axhline(JND_PCT,    color="black", ls="--", lw=1.2, alpha=0.8)
     ax.axhline(CHANCE_PCT, color="gray",  ls=":",  lw=0.9, alpha=0.7)
-    ax.text(len(pair_order)-0.5, JND_PCT+1.5,    f"threshold ({JND_PCT:.0f}%)",
-            ha="right", fontsize=9, color="#333")
-    ax.text(len(pair_order)-0.5, CHANCE_PCT+1.5, f"chance ({CHANCE_PCT:.0f}%)",
-            ha="right", fontsize=9, color="#888")
 
-    y_top = max(105.0, band_max + 8)
+    max_bracket_tier = -1
     if pairwise_pvals_dict:
         pair_combos = sorted(itertools.combinations(range(len(pair_order)), 2),
                              key=lambda t: t[1]-t[0])
-        tier_step = 11
         tier_used = []
-        y_bracket = y_top
         for i1, i2 in pair_combos:
             p1, p2 = pair_order[i1], pair_order[i2]
             pval = pairwise_pvals_dict.get((p1, p2), pairwise_pvals_dict.get((p2, p1), np.nan))
@@ -447,31 +612,82 @@ def _draw_pair_accuracy_boxplot(ax, pair_order, values_by_pair, title, *,
             while any(l == level and not (i2 < a or b < i1) for a, b, l in tier_used):
                 level += 1
             tier_used.append((i1, i2, level))
-            draw_bracket(ax, i1, i2, y_bracket + level * tier_step, pval_label(pval))
-        y_top = y_bracket + max((l for _, _, l in tier_used), default=-1) * tier_step + 18
+            draw_bracket_above_axes(ax, i1, i2, level, pval_label(pval))
+        if tier_used:
+            max_bracket_tier = max(l for _, _, l in tier_used)
 
     ax.set_xticks(range(len(pair_order)))
     ax.set_xticklabels(pair_order, fontsize=11)
-    ax.set_ylim(0, y_top)
-    ax.set_ylabel("Accuracy (%)", fontsize=11)
+    ax.set_ylim(0, data_ylim_top)
+    ax.set_yticks(list(range(0, data_ylim_top + 1, 20)))
+    if show_ylabel:
+        ax.set_ylabel("Accuracy (%)", fontsize=11)
     ax.set_xlabel("Force pair (g)", fontsize=11)
-    ax.set_title(title, fontsize=12, fontweight="bold")
     ax.spines[["top", "right"]].set_visible(False)
     if dot_label:
         ax.text(0.02, 0.98, dot_label, transform=ax.transAxes,
                 ha="left", va="top", fontsize=9, color="#555")
+    return max_bracket_tier
 
 
-def _draw_accuracy_panel(ax, subj_acc_df, pair_order, title, pairwise_pvals_dict):
+def _apply_accuracy_figure_layout(fig, max_bracket_tier, title, *, panel_titles=None):
+    """Title at figure top; brackets in margin below title; axes y-axis 0–100."""
+    title_pad = 0.055 if title else 0.02
+    panel_pad = 0.045 if panel_titles else 0.0
+    bracket_pad = 0.06 + max(0, max_bracket_tier) * 0.052
+    axes_top = 1.0 - title_pad - panel_pad - bracket_pad
+    fig.subplots_adjust(top=max(axes_top, 0.55), wspace=0.12)
+    if title:
+        fig.suptitle(title, fontsize=12, fontweight="bold", y=1.0, va="top")
+    if panel_titles:
+        for ax, panel_title in zip(fig.axes, panel_titles):
+            ax.set_title(panel_title, fontsize=11, fontweight="bold", pad=10)
+
+
+def _draw_accuracy_panel(ax, subj_acc_df, pair_order, pairwise_pvals_dict, *, show_ylabel=True):
     subj_acc_sorted = subj_acc_df[subj_acc_df["pair_label"].isin(pair_order)].copy()
     values_by_pair = {
         pair: subj_acc_sorted.loc[subj_acc_sorted["pair_label"] == pair, "accuracy"].values
         for pair in pair_order
     }
-    _draw_pair_accuracy_boxplot(
-        ax, pair_order, values_by_pair, title,
+    return _draw_pair_accuracy_boxplot(
+        ax, pair_order, values_by_pair,
         pairwise_pvals_dict=pairwise_pvals_dict,
+        show_ylabel=show_ylabel,
     )
+
+
+def save_combined_accuracy_by_pair(band_specs):
+    """Low | High accuracy-by-pair in one 2-column figure (2102 px wide)."""
+    fig, axes = plt.subplots(
+        1, len(band_specs),
+        figsize=ACC_BY_PAIR_FIGSIZE,
+        sharey=True,
+    )
+    if len(band_specs) == 1:
+        axes = [axes]
+
+    max_tier = -1
+    panel_titles = []
+    for ax, spec in zip(axes, band_specs):
+        tier = _draw_accuracy_panel(
+            ax, spec["subj_acc"], spec["pair_order"], spec["pairwise_pvals"],
+            show_ylabel=(ax is axes[0]),
+        )
+        max_tier = max(max_tier, tier)
+        panel_titles.append(
+            band_title_text(spec["band_label"], spec["title_ref"], spec["n_subj"])
+        )
+
+    _apply_accuracy_figure_layout(
+        fig, max_tier,
+        title="Overall Accuracy — Same/Different 2AFC",
+        panel_titles=panel_titles,
+    )
+    out_path = os.path.join(OUTPUT_DIR, "sd_accuracy_by_pair_2col.png")
+    save_png_at_width(fig, out_path, width_px=EXPORT_WIDTH_2COL)
+    plt.close(fig)
+    print(f"Saved → sd_accuracy_by_pair_2col.png  ({EXPORT_WIDTH_2COL} px wide)")
 
 
 def _save_subject_accuracy_by_pair(df_sub, subject, pair_order, band_title, out_path):
@@ -486,12 +702,12 @@ def _save_subject_accuracy_by_pair(df_sub, subject, pair_order, band_title, out_
         for pair in pair_order
     }
     fig, ax = plt.subplots(figsize=(8, 6))
-    _draw_pair_accuracy_boxplot(
+    plot_title = f"{subject} — Overall Accuracy — Same/Different 2AFC ({band_title})"
+    max_tier = _draw_pair_accuracy_boxplot(
         ax, pair_order, values_by_pair,
-        f"{subject} — Overall Accuracy — Same/Different 2AFC ({band_title})",
         dot_label="each dot = one region (A–F)",
     )
-    plt.tight_layout()
+    _apply_accuracy_figure_layout(fig, max_tier, plot_title)
     fig.savefig(out_path, dpi=150, bbox_inches="tight")
     plt.close(fig)
     print(f"  Saved → {os.path.relpath(out_path, OUTPUT_DIR)}")
@@ -606,6 +822,18 @@ def run_subject_analysis(df_band, band_label, pair_order, out_suffix, title_ref)
             print_header=f"Response bias | {subject} | {band_title}",
         )
 
+        dist_out = os.path.join(subj_dir, f"sd_response_by_pair{out_suffix}.png")
+        save_response_distribution_by_pair(
+            df_sub, pair_order,
+            f"{subject} — Response by Pair × Ground Truth ({band_title})",
+            dist_out,
+        )
+        save_same_trial_response_by_pair(
+            df_sub, pair_order,
+            f"{subject} — Responses on SAME Trials Only ({band_title})",
+            os.path.join(subj_dir, f"sd_same_trial_response{out_suffix}.png"),
+        )
+
     if summary_rows:
         summary_path = os.path.join(subj_root, f"accuracy_by_subject{out_suffix}.csv")
         pd.DataFrame(summary_rows).to_csv(summary_path, index=False)
@@ -661,18 +889,6 @@ def run_band_analysis(df_band, band_label, pair_order, out_suffix, title_ref):
 
     n_subj = df_band["Subject"].nunique()
     band_title = band_title_text(band_label, title_ref, n_subj)
-
-    fig, ax = plt.subplots(figsize=(8, 6))
-    _draw_accuracy_panel(
-        ax, subj_acc, pair_order,
-        f"Overall Accuracy — Same/Different 2AFC ({band_title})",
-        pairwise_pvals,
-    )
-    plt.tight_layout()
-    out_a1 = f"sd_accuracy_by_pair{out_suffix}.png"
-    fig.savefig(os.path.join(OUTPUT_DIR, out_a1), dpi=150, bbox_inches="tight")
-    plt.close(fig)
-    print(f"Saved → {out_a1}")
 
     OFFSET = 0.22
     BW_SD  = 0.20
@@ -825,16 +1041,56 @@ def run_band_analysis(df_band, band_label, pair_order, out_suffix, title_ref):
         f"Response Bias Overview — Same/Different 2AFC ({band_title})",
         print_header=f"Response bias (pooled) | {band_title}",
     )
+    save_response_distribution_by_pair(
+        df_band, pair_order,
+        f"Response Distribution by Force Pair — SAME vs DIFFERENT trials ({band_title})",
+        os.path.join(OUTPUT_DIR, f"sd_response_by_pair{out_suffix}.png"),
+        csv_path=os.path.join(OUTPUT_DIR, f"response_distribution_by_pair{out_suffix}.csv"),
+    )
+    rows = _pair_response_distribution_rows(df_band, pair_order)
+    print("\nResponse distribution by pair (pooled):")
+    for r in rows:
+        print(f"  {r['pair_label']:8s}  GT={r['ground_truth']:9s}  "
+              f"resp SAME {r['pct_resp_same']:5.1f}% (n={r['n_resp_same']:3d})  "
+              f"resp DIFF {r['pct_resp_diff']:5.1f}% (n={r['n_resp_diff']:3d})  "
+              f"[trials={r['n_trials']}]")
+    save_same_trial_response_by_pair(
+        df_band, pair_order,
+        f"Responses on SAME Trials Only — by Force Pair ({band_title})",
+        os.path.join(OUTPUT_DIR, f"sd_same_trial_response{out_suffix}.png"),
+        csv_path=os.path.join(OUTPUT_DIR, f"same_trial_response_by_pair{out_suffix}.csv"),
+    )
+    same_rows = _same_trial_response_rows(df_band, pair_order)
+    print("\nSAME-trial response distribution by pair (pooled):")
+    for r in same_rows:
+        print(f"  {r['pair_label']:8s}  resp SAME {r['pct_resp_same']:5.1f}% (n={r['n_resp_same']:3d})  "
+              f"resp DIFF {r['pct_resp_diff']:5.1f}% (n={r['n_resp_diff']:3d})  "
+              f"[SAME trials={r['n_trials']}]")
     run_subject_analysis(df_band, band_label, pair_order, out_suffix, title_ref)
 
+    return {
+        "band_label": band_label,
+        "title_ref": title_ref,
+        "pair_order": pair_order,
+        "subj_acc": subj_acc,
+        "pairwise_pvals": pairwise_pvals,
+        "n_subj": n_subj,
+    }
 
+
+accuracy_band_specs = []
 for band_label, cfg in BAND_CONFIG.items():
     df_band = df[df["band"] == band_label].copy()
     if df_band.empty:
         print(f"\nNo data for {band_label} band — skipping")
         continue
     pair_order = fix_order(cfg["pair_order"], df_band["pair_label"].unique().tolist())
-    run_band_analysis(df_band, band_label, pair_order, cfg["suffix"], cfg["title_ref"])
+    spec = run_band_analysis(df_band, band_label, pair_order, cfg["suffix"], cfg["title_ref"])
+    if spec:
+        accuracy_band_specs.append(spec)
+
+if accuracy_band_specs:
+    save_combined_accuracy_by_pair(accuracy_band_specs)
 
 run_response_bias_overview(
     df,
