@@ -25,7 +25,7 @@ P84,S01,On-touch,E,1,1.4,1,same_ref,1,1,SAME,SAME,1
 P84,S01,On-touch,B,1,0.6,1,diff_cr,0.6,1,DIFFERENT,SAME,0
 P84,S01,On-touch,D,1,0.6,1,diff_cr,0.6,1,DIFFERENT,DIFFERENT,1
 P84,S01,On-touch,A,1,0.6,1,diff_rc,1,0.6,DIFFERENT,DIFFERENT,1
-P84,S01,On-touch,C,1,2,1,diff_cr,2,1,DIFFERENT,SAME,0
+P84,S01,On-touch,C,1,2,1,diff_cr,2,1,DIFFERENT,DIFFERENT,1
 P84,S01,On-touch,C,1,0.4,1,diff_cr,0.4,1,DIFFERENT,SAME,0
 P84,S01,On-touch,D,1,0.6,1,same_ref,1,1,SAME,SAME,1
 P84,S01,On-touch,B,1,2,1,same_ref,1,1,SAME,DIFFERENT,0
@@ -52,7 +52,7 @@ P84,S01,On-touch,B,1,0.4,1,diff_rc,1,0.4,DIFFERENT,DIFFERENT,1
 P84,S01,On-touch,C,1,0.6,1,same_ref,1,1,SAME,SAME,1
 P84,S01,On-touch,A,1,0.4,1,same_ref,1,1,SAME,SAME,1
 P84,S01,On-touch,F,1,0.4,1,diff_cr,0.4,1,DIFFERENT,SAME,0
-P84,S01,On-touch,E,1,0.4,1,diff_cr,0.4,1,DIFFERENT,SAME,0
+P84,S01,On-touch,E,1,0.4,1,diff_cr,0.4,1,DIFFERENT,DIFFERENT,1
 P84,S01,On-touch,A,1,1.4,1,diff_rc,1,1.4,DIFFERENT,DIFFERENT,1
 P84,S01,On-touch,A,1,2,1,same_ref,1,1,SAME,SAME,1
 P84,S01,On-touch,E,1,2,1,diff_rc,1,2,DIFFERENT,SAME,0
@@ -62,7 +62,7 @@ P84,S01,On-touch,F,1,2,1,diff_cr,2,1,DIFFERENT,SAME,0
 P84,S01,On-touch,D,1,1.4,1,diff_cr,1.4,1,DIFFERENT,SAME,0
 P84,S01,On-touch,F,1,2,1,same_ref,1,1,SAME,DIFFERENT,0
 P84,S01,On-touch,D,1,0.4,1,diff_rc,1,0.4,DIFFERENT,DIFFERENT,1
-P84,S01,On-touch,E,1,0.4,1,diff_rc,1,0.4,DIFFERENT,SAME,0
+P84,S01,On-touch,E,1,0.4,1,diff_rc,1,0.4,DIFFERENT,DIFFERENT,1
 P84,S01,On-touch,E,1,2,1,diff_cr,2,1,DIFFERENT,DIFFERENT,1
 P84,S01,On-touch,D,1,1.4,1,same_ref,1,1,SAME,DIFFERENT,0
 P84,S01,On-touch,D,1,2,1,diff_rc,1,2,DIFFERENT,DIFFERENT,1

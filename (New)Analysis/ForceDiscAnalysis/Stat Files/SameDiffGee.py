@@ -52,14 +52,12 @@ try:
     from statsmodels.genmod.generalized_estimating_equations import GEE
     from statsmodels.genmod.families import Binomial
     USE_GEE = True
-    print("Using: statsmodels GEE (binomial)")
 except ImportError:
     try:
         from scipy.stats import wilcoxon
         USE_WILCOXON = True
-        print("statsmodels not found — using scipy Wilcoxon (fallback)")
     except ImportError:
-        print("Neither statsmodels nor scipy — using permutation test (fallback)")
+        pass
 
 # ── Paths ─────────────────────────────────────────────────────────────────────
 DATA_DIR = "/Users/kyungeunjung/NailFoldExp/Data/(FD)CurData"
@@ -180,10 +178,6 @@ if not files:
         f"No files with subject number > 73 found.\n"
         f"Files present: {sorted(os.path.basename(f) for f in all_files)}"
     )
-print(f"Total files found  : {len(all_files)}")
-print(f"Files with ID > 73 : {len(files)}")
-print(f"  → {[os.path.basename(f) for f in files]}")
-
 df = pd.concat(
     [pd.read_csv(f, encoding="utf-8-sig") for f in files],
     ignore_index=True,
@@ -264,8 +258,8 @@ def run_gee_pairwise(df_band, subj_acc, pair_order):
                                         data=chunk, family=Binomial()).fit(maxiter=60)
                 results[(p1, p2)] = fit.pvalues["pair_dummy"]
                 continue
-            except Exception as e:
-                print(f"  GEE failed ({p1} vs {p2}): {e}")
+            except Exception:
+                pass
 
         paired = subj_means[subj_means["pair_label"].isin([p1, p2])]\
                  .pivot(index="Subject", columns="pair_label", values="accuracy").dropna()
@@ -303,8 +297,8 @@ def run_gee_region(df_band, pair_order):
                                         data=chunk, family=Binomial()).fit(maxiter=60)
                 results[pair] = fit.pvalues["region_dummy"]
                 continue
-            except Exception as e:
-                print(f"  GEE region failed ({pair}): {e}")
+            except Exception:
+                pass
 
         subj_reg = (
             df_reg[df_reg["pair_label"] == pair]
@@ -491,19 +485,11 @@ def _draw_bias_bar(ax, pct_same, pct_diff, label_same, label_diff, title, n, sub
             ha="right", va="bottom", fontsize=9, color="#555")
 
 
-def run_response_bias_overview(df_sub, out_path, suptitle, *, print_header=None):
+def run_response_bias_overview(df_sub, out_path, suptitle):
     """Three-panel response bias figure (pooled, band, or single-subject)."""
     stats = _bias_proportions(df_sub)
     if stats is None:
         return
-
-    if print_header:
-        print(f"\n{print_header}")
-        print(f"  Delivered   SAME {stats['del_same']:.1f}%  |  DIFFERENT {stats['del_diff']:.1f}%")
-        print(f"  Responses   SAME {stats['resp_same']:.1f}%  |  DIFFERENT {stats['resp_diff']:.1f}%")
-        if stats["n_incorrect"]:
-            print(f"  Incorrect   SAME {stats['inc_same']:.1f}%  |  DIFFERENT {stats['inc_diff']:.1f}%  "
-                  f"(n={stats['n_incorrect']})")
 
     fig, axes = plt.subplots(3, 1, figsize=(9, 7.5))
     fig.suptitle(suptitle, fontsize=13, fontweight="bold", y=0.99)
@@ -533,7 +519,6 @@ def run_response_bias_overview(df_sub, out_path, suptitle, *, print_header=None)
     plt.tight_layout(rect=[0, 0, 1, 0.97], h_pad=2.5)
     fig.savefig(out_path, dpi=150, bbox_inches="tight")
     plt.close(fig)
-    print(f"Saved → {os.path.relpath(out_path, OUTPUT_DIR)}")
 
 
 def _pair_response_distribution_rows(df_sub, pair_order):
@@ -612,7 +597,6 @@ def save_response_distribution_by_pair(df_sub, pair_order, title, out_path, *, c
     plt.tight_layout()
     fig.savefig(out_path, dpi=150, bbox_inches="tight")
     plt.close(fig)
-    print(f"Saved → {os.path.relpath(out_path, OUTPUT_DIR)}")
 
 
 def _same_trial_response_rows(df_sub, pair_order):
@@ -673,7 +657,6 @@ def save_same_trial_response_by_pair(df_sub, pair_order, title, out_path, *, csv
     plt.tight_layout()
     fig.savefig(out_path, dpi=150, bbox_inches="tight")
     plt.close(fig)
-    print(f"Saved → {os.path.relpath(out_path, OUTPUT_DIR)}")
 
 
 def _draw_pair_accuracy_boxplot(ax, pair_order, values_by_pair, *,
@@ -865,10 +848,6 @@ def save_combined_accuracy_by_pair(band_specs):
         pad_inches=0.05,
     )
     plt.close(fig)
-    print(
-        f"Saved → sd_accuracy_by_pair_2col.png  "
-        f"({EXPORT_WIDTH_2COL}×{EXPORT_HEIGHT_2COL} px)"
-    )
 
 
 def _save_subject_accuracy_by_pair(df_sub, subject, pair_order, band_title, out_path):
@@ -891,7 +870,6 @@ def _save_subject_accuracy_by_pair(df_sub, subject, pair_order, band_title, out_
     _apply_accuracy_figure_layout(fig, max_tier, plot_title)
     fig.savefig(out_path, dpi=150, bbox_inches="tight")
     plt.close(fig)
-    print(f"  Saved → {os.path.relpath(out_path, OUTPUT_DIR)}")
 
 
 def _draw_subject_bars(ax, pair_order, values_pct, title, bar_color=C1):
@@ -934,7 +912,6 @@ def run_subject_analysis(df_band, band_label, pair_order, out_suffix, title_ref)
         same_acc = df_sub[df_sub["GroundTruth"] == "SAME"].groupby("pair_label")["correct"].mean()
         diff_acc = df_sub[df_sub["GroundTruth"] == "DIFFERENT"].groupby("pair_label")["correct"].mean()
 
-        print(f"\n--- {subject} | {band_title} ---")
         for pair in pair_order:
             row = overall.loc[pair] if pair in overall.index else None
             if row is None or pd.isna(row["n_trials"]):
@@ -942,11 +919,6 @@ def run_subject_analysis(df_band, band_label, pair_order, out_suffix, title_ref)
             acc_pct = row["accuracy"] * 100
             same_pct = same_acc.get(pair, np.nan) * 100 if pair in same_acc.index else np.nan
             diff_pct = diff_acc.get(pair, np.nan) * 100 if pair in diff_acc.index else np.nan
-            same_str = f"{same_pct:5.1f}%" if not np.isnan(same_pct) else "  n/a "
-            diff_str = f"{diff_pct:5.1f}%" if not np.isnan(diff_pct) else "  n/a "
-            print(f"  {pair:8s}  overall {acc_pct:5.1f}%  "
-                  f"SAME {same_str}  DIFF {diff_str}  "
-                  f"(n={int(row['n_trials'])})")
             summary_rows.append({
                 "Subject": subject,
                 "band": band_label,
@@ -989,7 +961,6 @@ def run_subject_analysis(df_band, band_label, pair_order, out_suffix, title_ref)
         out_name = f"sd_overview{out_suffix}.png"
         fig.savefig(os.path.join(subj_dir, out_name), dpi=150, bbox_inches="tight")
         plt.close(fig)
-        print(f"  Saved → per_subject/{subject}/{out_name}")
 
         pair_out = os.path.join(subj_dir, f"sd_accuracy_by_pair{out_suffix}.png")
         _save_subject_accuracy_by_pair(
@@ -1000,7 +971,6 @@ def run_subject_analysis(df_band, band_label, pair_order, out_suffix, title_ref)
         run_response_bias_overview(
             df_sub, bias_out,
             f"Response Bias — {subject}  ({band_title})",
-            print_header=f"Response bias | {subject} | {band_title}",
         )
 
         dist_out = os.path.join(subj_dir, f"sd_response_by_pair{out_suffix}.png")
@@ -1018,15 +988,10 @@ def run_subject_analysis(df_band, band_label, pair_order, out_suffix, title_ref)
     if summary_rows:
         summary_path = os.path.join(subj_root, f"accuracy_by_subject{out_suffix}.csv")
         pd.DataFrame(summary_rows).to_csv(summary_path, index=False)
-        print(f"Saved summary → per_subject/accuracy_by_subject{out_suffix}.csv")
 
 
 def run_band_analysis(df_band, band_label, pair_order, out_suffix, title_ref):
     """Run SDT, GEE, and figures for one force band (Low ref=1g or High ref=26g)."""
-    print(f"\n{'='*60}")
-    print(f"Band: {band_label} (ref = {title_ref})  |  trials = {len(df_band)}  |  subjects = {df_band['Subject'].nunique()}")
-    print(f"Pair order: {pair_order}")
-
     subj_acc = (
         df_band.groupby(["Subject", "pair_label"])["correct"]
         .mean().reset_index()
@@ -1038,8 +1003,6 @@ def run_band_analysis(df_band, band_label, pair_order, out_suffix, title_ref):
         sdt = compute_sdt(sub)
         sdt_rows.append({"pair_label": pair, "region_group": grp, **sdt})
     df_sdt = pd.DataFrame(sdt_rows)
-    print("\nSDT summary (pooled across subjects):")
-    print(df_sdt.to_string(index=False))
     df_sdt.to_csv(os.path.join(OUTPUT_DIR, f"sdt_summary{out_suffix}.csv"), index=False)
 
     order_rows = []
@@ -1055,8 +1018,6 @@ def run_band_analysis(df_band, band_label, pair_order, out_suffix, title_ref):
                 "delta_rc_minus_cr": (acc_rc - acc_cr) * 100 if not (np.isnan(acc_rc) or np.isnan(acc_cr)) else np.nan,
             })
     df_order = pd.DataFrame(order_rows)
-    print("\nOrder effect (diff_rc vs diff_cr accuracy %):")
-    print(df_order.to_string(index=False))
     df_order.to_csv(os.path.join(OUTPUT_DIR, f"order_effect{out_suffix}.csv"), index=False)
 
     pairwise_pvals = run_gee_pairwise(df_band, subj_acc, pair_order)
@@ -1111,7 +1072,6 @@ def run_band_analysis(df_band, band_label, pair_order, out_suffix, title_ref):
     out_a2 = f"sd_accuracy_split{out_suffix}.png"
     fig.savefig(os.path.join(OUTPUT_DIR, out_a2), dpi=150, bbox_inches="tight")
     plt.close(fig)
-    print(f"Saved → {out_a2}")
 
     df_reg = df_band[df_band["region_group"].notna()]
     subj_acc_reg = (
@@ -1162,7 +1122,6 @@ def run_band_analysis(df_band, band_label, pair_order, out_suffix, title_ref):
     out_b = f"sd_onnail_vs_offnail{out_suffix}.png"
     fig.savefig(os.path.join(OUTPUT_DIR, out_b), dpi=150, bbox_inches="tight")
     plt.close(fig)
-    print(f"Saved → {out_b}")
 
     df_sdt_plot = df_sdt[df_sdt["pair_label"].isin(pair_order)].copy()
     fig, ax = plt.subplots(figsize=(9, 5))
@@ -1188,7 +1147,6 @@ def run_band_analysis(df_band, band_label, pair_order, out_suffix, title_ref):
     out_c = f"sd_dprime_by_pair_region{out_suffix}.png"
     fig.savefig(os.path.join(OUTPUT_DIR, out_c), dpi=150, bbox_inches="tight")
     plt.close(fig)
-    print(f"Saved → {out_c}")
 
     fig, ax = plt.subplots(figsize=(9, 5))
     df_order_plot = df_order[df_order["pair_label"].isin(pair_order)]
@@ -1214,13 +1172,11 @@ def run_band_analysis(df_band, band_label, pair_order, out_suffix, title_ref):
     out_d = f"sd_order_effect{out_suffix}.png"
     fig.savefig(os.path.join(OUTPUT_DIR, out_d), dpi=150, bbox_inches="tight")
     plt.close(fig)
-    print(f"Saved → {out_d}")
 
     run_response_bias_overview(
         df_band,
         os.path.join(OUTPUT_DIR, f"sd_response_bias_overview{out_suffix}.png"),
         f"Response Bias Overview — Same/Different 2AFC ({band_title})",
-        print_header=f"Response bias (pooled) | {band_title}",
     )
     save_response_distribution_by_pair(
         df_band, pair_order,
@@ -1228,25 +1184,12 @@ def run_band_analysis(df_band, band_label, pair_order, out_suffix, title_ref):
         os.path.join(OUTPUT_DIR, f"sd_response_by_pair{out_suffix}.png"),
         csv_path=os.path.join(OUTPUT_DIR, f"response_distribution_by_pair{out_suffix}.csv"),
     )
-    rows = _pair_response_distribution_rows(df_band, pair_order)
-    print("\nResponse distribution by pair (pooled):")
-    for r in rows:
-        print(f"  {r['pair_label']:8s}  GT={r['ground_truth']:9s}  "
-              f"resp SAME {r['pct_resp_same']:5.1f}% (n={r['n_resp_same']:3d})  "
-              f"resp DIFF {r['pct_resp_diff']:5.1f}% (n={r['n_resp_diff']:3d})  "
-              f"[trials={r['n_trials']}]")
     save_same_trial_response_by_pair(
         df_band, pair_order,
         f"Responses on SAME Trials Only — by Force Pair ({band_title})",
         os.path.join(OUTPUT_DIR, f"sd_same_trial_response{out_suffix}.png"),
         csv_path=os.path.join(OUTPUT_DIR, f"same_trial_response_by_pair{out_suffix}.csv"),
     )
-    same_rows = _same_trial_response_rows(df_band, pair_order)
-    print("\nSAME-trial response distribution by pair (pooled):")
-    for r in same_rows:
-        print(f"  {r['pair_label']:8s}  resp SAME {r['pct_resp_same']:5.1f}% (n={r['n_resp_same']:3d})  "
-              f"resp DIFF {r['pct_resp_diff']:5.1f}% (n={r['n_resp_diff']:3d})  "
-              f"[SAME trials={r['n_trials']}]")
     run_subject_analysis(df_band, band_label, pair_order, out_suffix, title_ref)
 
     return {
@@ -1259,25 +1202,24 @@ def run_band_analysis(df_band, band_label, pair_order, out_suffix, title_ref):
     }
 
 
-accuracy_band_specs = []
-for band_label, cfg in BAND_CONFIG.items():
-    df_band = df[df["band"] == band_label].copy()
-    if df_band.empty:
-        print(f"\nNo data for {band_label} band — skipping")
-        continue
-    pair_order = fix_order(cfg["pair_order"], df_band["pair_label"].unique().tolist())
-    spec = run_band_analysis(df_band, band_label, pair_order, cfg["suffix"], cfg["title_ref"])
-    if spec:
-        accuracy_band_specs.append(spec)
+if __name__ == "__main__":
+    accuracy_band_specs = []
+    for band_label, cfg in BAND_CONFIG.items():
+        df_band = df[df["band"] == band_label].copy()
+        if df_band.empty:
+            continue
+        pair_order = fix_order(cfg["pair_order"], df_band["pair_label"].unique().tolist())
+        spec = run_band_analysis(df_band, band_label, pair_order, cfg["suffix"], cfg["title_ref"])
+        if spec:
+            accuracy_band_specs.append(spec)
 
-if accuracy_band_specs:
-    save_combined_accuracy_by_pair(accuracy_band_specs)
+    if accuracy_band_specs:
+        save_combined_accuracy_by_pair(accuracy_band_specs)
 
-run_response_bias_overview(
-    df,
-    os.path.join(OUTPUT_DIR, "sd_response_bias_overview_all.png"),
-    f"Response Bias Overview — Same/Different 2AFC (All Bands, n = {df['Subject'].nunique()})",
-    print_header="Response bias (all bands pooled)",
-)
+    run_response_bias_overview(
+        df,
+        os.path.join(OUTPUT_DIR, "sd_response_bias_overview_all.png"),
+        f"Response Bias Overview — Same/Different 2AFC (All Bands, n = {df['Subject'].nunique()})",
+    )
 
-print(f"\nAll outputs saved to:\n  {OUTPUT_DIR}")
+    print(f"\nAll outputs saved to:\n  {OUTPUT_DIR}")
