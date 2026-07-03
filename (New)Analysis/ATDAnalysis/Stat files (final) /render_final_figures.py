@@ -38,7 +38,7 @@ import statsmodels.formula.api as smf
 SCRIPT_DIR  = os.path.dirname(os.path.abspath(__file__))
 ATD_C1_PATH = os.path.join(SCRIPT_DIR, "(Final)ATD_C1_Fig(Anika).py")
 OUT_C1      = os.path.join(SCRIPT_DIR, "atd_c1_outputs")
-OUT_AGG     = os.path.join(SCRIPT_DIR, "..", "figures")
+OUT_AGG     = os.path.join(SCRIPT_DIR, "figures")
 os.makedirs(OUT_C1, exist_ok=True)
 os.makedirs(OUT_AGG, exist_ok=True)
 
@@ -80,18 +80,15 @@ UNIFIED_STYLE = dict(
     # ── Y-axis  (세 피규어 모두 동일한 tick 간격) ─────────────────────────────
     ACCURACY_YTICKS           = (0, 20, 40, 60, 80, 100),
 
-    # ── Tick lengths for pooled figure (fraction of axis size) ───────────────
-    # Pooled figure has 4 narrow panels → y-ticks need larger fraction
-    # to visually match Fig3's single wide panel (atd_c1 TICK_LEN_AXES=0.016)
-    TICK_LEN_X                = 0.016,  # x-tick height (fraction of axes height)
-    TICK_LEN_Y                = 0.060,  # y-tick width  (fraction of axes width)
+    # ── Tick lengths (x/y equal — fraction of respective axis dimension) ─────
+    TICK_LEN_AXES             = 0.016,
 )
 
-# 2-col export
+# 2-col export (unified canvas: 2102×1298 px)
 EXPORT_WIDTH = 2102
-EXPORT_HEIGHT_POOLED = 1293  # fixed canvas; plot expands when legend removed
+EXPORT_HEIGHT = 1298
 EXPORT_TAG   = "2col"
-POOLED_FIGSIZE = (8.0, round(8.0 * EXPORT_HEIGHT_POOLED / EXPORT_WIDTH, 3))
+POOLED_FIGSIZE = (8.0, round(8.0 * EXPORT_HEIGHT / EXPORT_WIDTH, 3))
 
 # =============================================================================
 # 3. Load & patch atd_c1 module
@@ -133,7 +130,7 @@ POOLED_Y_AXIS_TOP = 100
 # =============================================================================
 # 4. Helper: save at 2-col width
 # =============================================================================
-def save_final(fig, out_path, width_px=EXPORT_WIDTH, height_px=None):
+def save_final(fig, out_path, width_px=EXPORT_WIDTH, height_px=EXPORT_HEIGHT):
     import io
     from PIL import Image
 
@@ -144,8 +141,6 @@ def save_final(fig, out_path, width_px=EXPORT_WIDTH, height_px=None):
     )
     buf.seek(0)
     master = Image.open(buf).convert("RGB")
-    if height_px is None:
-        height_px = round(width_px * master.height / master.width)
     master.resize((width_px, height_px), Image.Resampling.LANCZOS).save(out_path)
     print(f"  Saved → {out_path}  ({width_px}×{height_px} px)")
 
@@ -246,6 +241,11 @@ def generate_fig3_full_kao():
         region_background=False,
         region_labels=False,
         highlight_forces=[0.07, 0.4, 1.0, 1.4],
+        highlight_force_edge_pad={
+            1.0: (0.06, 0.01),
+            1.4: (0.01, 0.04),
+        },
+        highlight_force_min_gap=0.05,
         scatter_brightness=S["SCATTER_HSB_BRIGHTNESS"],
         kao_df_override=df_kao_all,
         partial_subjects=atd_c1._PARTIAL_SUBJ,
@@ -336,8 +336,8 @@ def _scatter_strip(ax, x_pos, vals, subjects, partial_set, color, jitter_arr):
 
 
 def _inward_ticks(ax, x_positions, y_ticks):
-    frac_x = S["TICK_LEN_X"]
-    frac_y = S["TICK_LEN_Y"]
+    frac_x = S["TICK_LEN_AXES"]
+    frac_y = atd_c1.y_tick_frac_match_x(ax, frac_x)
     ax.tick_params(axis="both", which="both", length=0)
     x_tr = blended_transform_factory(ax.transData, ax.transAxes)
     y_tr = blended_transform_factory(ax.transAxes, ax.transData)
@@ -421,7 +421,6 @@ def generate_pooled():
         ax.set_ylim(-5, POOLED_YLIM_TOP)
         ax.spines["left"].set_bounds(-5, POOLED_Y_AXIS_TOP)
         sns.despine(ax=ax)
-        _inward_ticks(ax, x_positions=[0, 1], y_ticks=POOLED_Y_TICKS)
         if fval == plot_forces[0]:
             ax.set_ylabel("Detection Accuracy (%)", fontsize=FONT_LABEL)
         else:
@@ -429,9 +428,12 @@ def generate_pooled():
             ax.tick_params(axis="y", labelleft=False)
 
     fig.subplots_adjust(left=0.08, right=0.97, top=0.96, bottom=0.12, wspace=0.18)
+    fig.canvas.draw()
+    for ax in axes:
+        _inward_ticks(ax, x_positions=[0, 1], y_ticks=POOLED_Y_TICKS)
 
     out = os.path.join(OUT_AGG, "onnail_vs_offnail_pooled(final).png")
-    save_final(fig, out, height_px=EXPORT_HEIGHT_POOLED)
+    save_final(fig, out)
     plt.close(fig)
 
 

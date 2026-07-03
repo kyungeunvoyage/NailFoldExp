@@ -21,7 +21,7 @@ FIG_DIR = os.path.join(SCRIPT_DIR, "figures")
 os.makedirs(FIG_DIR, exist_ok=True)
 
 # Shared styling with ATD_C1_Fig(Anika).py
-_ANIKA_PATH = os.path.join(SCRIPT_DIR, "ATD_C1_Fig(Anika).py")
+_ANIKA_PATH = os.path.join(SCRIPT_DIR, "(Final)ATD_C1_Fig(Anika).py")
 _spec = importlib.util.spec_from_file_location("atd_c1", _ANIKA_PATH)
 atd_c1 = importlib.util.module_from_spec(_spec)
 _spec.loader.exec_module(atd_c1)
@@ -60,6 +60,7 @@ FIG2_SIZE   = (14.0, 6.0)   # pairwise LME heatmaps (width scales with # forces)
 FIG3_SIZE   = (14.5, 5.2)   # lateral / proximal contrasts
 FIG5_SIZE = (8.0, 4.5)       # onnail_vs_offnail_by_force (2-col aspect)
 EXPORT_WIDTH_2COL = 2102
+EXPORT_HEIGHT_2COL = 1298
 Y_LABEL = "Detection Accuracy (%)"
 FONT_XTICK = 11              # smaller x-axis tick labels on contrast plots
 FONT_FIG5_XTICK = 12         # Fig5 region labels (On-nail\n(C+D), …)
@@ -101,15 +102,17 @@ def add_inward_tick_guides(ax, x_positions=None, y_ticks=None):
         y_vals = [t for t in y_ticks if y_lo - 1e-9 <= t <= y_hi + 1e-9]
     if x_positions is None:
         x_positions = ax.get_xticks()
+    frac_x = TICK_LEN_AXES
+    frac_y = atd_c1.y_tick_frac_match_x(ax, frac_x)
     for xi in x_positions:
         ax.plot(
-            [xi, xi], [0, TICK_LEN_AXES],
+            [xi, xi], [0, frac_x],
             color=BLACK, linewidth=1.0, solid_capstyle="butt",
             transform=x_trans, clip_on=False, zorder=6,
         )
     for y in y_vals:
         ax.plot(
-            [0, TICK_LEN_AXES], [y, y],
+            [0, frac_y], [y, y],
             color=BLACK, linewidth=1.0, solid_capstyle="butt",
             transform=y_trans, clip_on=False, zorder=6,
         )
@@ -143,13 +146,22 @@ def _scatter_partial(ax, x_pos, vals, subject_ids, partial_subjects, color, *,
                    s=(size * 1.3) ** 2, marker="^", **kw)
 
 
-def save_png_at_width(fig, out_path, width_px=EXPORT_WIDTH_2COL, *, pad_inches=0.04):
-    w_in, _ = fig.get_size_inches()
-    dpi = width_px / w_in
+def save_png_at_width(
+    fig, out_path, width_px=EXPORT_WIDTH_2COL,
+    height_px=EXPORT_HEIGHT_2COL, *, pad_inches=0.04,
+):
+    import io
+    from PIL import Image
+
+    buf = io.BytesIO()
     fig.savefig(
-        out_path, dpi=dpi, bbox_inches="tight",
+        buf, format="png", dpi=SAVE_DPI, bbox_inches="tight",
         pad_inches=pad_inches, facecolor="white",
     )
+    buf.seek(0)
+    master = Image.open(buf).convert("RGB")
+    master.resize((width_px, height_px), Image.Resampling.LANCZOS).save(out_path)
+    print(f"Saved → {out_path}  ({width_px}×{height_px} px)")
 
 
 def _force_panel_title(force_val):
@@ -1274,11 +1286,6 @@ else:
         ax5.yaxis.set_major_locator(FixedLocator(FIG5_Y_TICKS))
         # Spine/ticks end at 100; ylim may extend to ~120 for brackets only
         ax5.spines["left"].set_bounds(-5, FIG5_Y_AXIS_TOP)
-        add_inward_tick_guides(
-            ax5,
-            x_positions=range(len(REGION_ORDER)),
-            y_ticks=FIG5_Y_TICKS,
-        )
         if fval == plot_forces[0]:
             ax5.set_ylabel(Y_LABEL, fontsize=FONT_LABEL)
         else:
@@ -1296,6 +1303,12 @@ else:
     add_fig5_legend(fig5, leg_handles_f5, ncol=len(REGION_ORDER))
     # Larger ``top`` → subplots move up → less white gap under the legend
     fig5.subplots_adjust(left=0.08, right=0.97, top=0.88, bottom=0.12, wspace=0.18)
+    for ax5 in axes5:
+        add_inward_tick_guides(
+            ax5,
+            x_positions=range(len(REGION_ORDER)),
+            y_ticks=FIG5_Y_TICKS,
+        )
     out_f5 = os.path.join(FIG_DIR, "onnail_vs_offnail_by_force.png")
     save_png_at_width(fig5, out_f5, width_px=EXPORT_WIDTH_2COL)
     print(f"Saved: {out_f5}")
@@ -1392,7 +1405,6 @@ else:
         ax6.set_ylim(-5, FIG5_YLIM_TOP_CAP)
         ax6.spines["left"].set_bounds(-5, FIG5_Y_AXIS_TOP)
         sns.despine(ax=ax6)
-        add_inward_tick_guides(ax6, x_positions=[0, 1], y_ticks=FIG5_Y_TICKS)
         if fval == plot_forces[0]:
             ax6.set_ylabel(Y_LABEL, fontsize=FONT_LABEL)
         else:
@@ -1410,6 +1422,8 @@ else:
     ]
     add_fig5_legend(fig6, leg_handles_f6, ncol=len(POOL_GROUP_ORDER))
     fig6.subplots_adjust(left=0.08, right=0.97, top=1.0, bottom=0.12, wspace=0.18)
+    for ax6 in axes6:
+        add_inward_tick_guides(ax6, x_positions=[0, 1], y_ticks=FIG5_Y_TICKS)
     out_f6 = os.path.join(FIG_DIR, "onnail_vs_offnail_pooled.png")
     save_png_at_width(fig6, out_f6, width_px=EXPORT_WIDTH_2COL)
     print(f"Saved: {out_f6}")
@@ -1514,7 +1528,6 @@ else:
         ax7.set_ylim(-5, y_top7)
         ax7.spines["left"].set_bounds(-5, FIG5_Y_AXIS_TOP)
         sns.despine(ax=ax7)
-        add_inward_tick_guides(ax7, x_positions=[0, 1], y_ticks=FIG5_Y_TICKS)
         if fval == plot_forces[0]:
             ax7.set_ylabel(Y_LABEL, fontsize=FONT_LABEL)
         else:
@@ -1531,6 +1544,8 @@ else:
     ]
     add_fig5_legend(fig7, leg_handles_f7, ncol=len(MOA_GROUP_ORDER))
     fig7.subplots_adjust(left=0.08, right=0.97, top=0.88, bottom=0.12, wspace=0.18)
+    for ax7 in axes7:
+        add_inward_tick_guides(ax7, x_positions=[0, 1], y_ticks=FIG5_Y_TICKS)
     out_f7 = os.path.join(FIG_DIR, "onnail_vs_offnail_pooled_n30.png")
     save_png_at_width(fig7, out_f7, width_px=EXPORT_WIDTH_2COL)
     print(f"Saved: {out_f7}")
@@ -1621,7 +1636,6 @@ else:
         ax8a.set_ylim(-5, min(FIG5_YLIM_TOP_CAP, max(tops_8a.values()) + 20))
         ax8a.spines["left"].set_bounds(-5, FIG5_Y_AXIS_TOP)
         sns.despine(ax=ax8a)
-        add_inward_tick_guides(ax8a, x_positions=[0, 1], y_ticks=FIG5_Y_TICKS)
         if fval == plot_forces[0]:
             ax8a.set_ylabel(Y_LABEL, fontsize=FONT_LABEL)
 
@@ -1632,6 +1646,8 @@ else:
     ]
     add_fig5_legend(fig8a, leg_f8a, ncol=len(F8A_GROUP_ORDER))
     fig8a.subplots_adjust(left=0.08, right=0.97, top=0.88, bottom=0.12, wspace=0.18)
+    for ax8a in axes8a:
+        add_inward_tick_guides(ax8a, x_positions=[0, 1], y_ticks=FIG5_Y_TICKS)
     out_f8a = os.path.join(FIG_DIR, "onnail_bcde_vs_offnail_af_n30.png")
     save_png_at_width(fig8a, out_f8a, width_px=EXPORT_WIDTH_2COL)
     print(f"Saved: {out_f8a}")
@@ -1717,7 +1733,6 @@ else:
         ax8b.set_ylim(-5, min(FIG5_YLIM_TOP_CAP, max(tops_8b.values()) + 20))
         ax8b.spines["left"].set_bounds(-5, FIG5_Y_AXIS_TOP)
         sns.despine(ax=ax8b)
-        add_inward_tick_guides(ax8b, x_positions=[0, 1], y_ticks=FIG5_Y_TICKS)
         if fval == plot_forces[0]:
             ax8b.set_ylabel(Y_LABEL, fontsize=FONT_LABEL)
 
@@ -1728,6 +1743,8 @@ else:
     ]
     add_fig5_legend(fig8b, leg_f8b, ncol=len(F8B_GROUP_ORDER))
     fig8b.subplots_adjust(left=0.08, right=0.97, top=0.88, bottom=0.12, wspace=0.18)
+    for ax8b in axes8b:
+        add_inward_tick_guides(ax8b, x_positions=[0, 1], y_ticks=FIG5_Y_TICKS)
     out_f8b = os.path.join(FIG_DIR, "onnail_bcde_vs_offnail_af_pooled.png")
     save_png_at_width(fig8b, out_f8b, width_px=EXPORT_WIDTH_2COL)
     print(f"Saved: {out_f8b}")

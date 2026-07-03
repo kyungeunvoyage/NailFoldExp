@@ -60,12 +60,19 @@ FIG_SIZE  = (8.0, 4.5)   # design aspect ratio (w×h inches)
 SAVE_DPI  = 600            # master raster before column-width resize
 SAVE_SVG  = False          # set True to also export .svg
 
-# Publication column widths (px); height scales with figure aspect ratio
+# Publication column widths (px); height fixed to 2-col canvas aspect (2102×1298)
+EXPORT_WIDTH_2COL = 2102
+EXPORT_HEIGHT_2COL = 1298
 EXPORT_WIDTHS_PX = (
     ("1col",   1028),
     ("1p5col", 1346),
-    ("2col",   2102),
+    ("2col",   EXPORT_WIDTH_2COL),
 )
+
+
+def export_height_px(width_px):
+    """Target export height (px) for a given column width."""
+    return round(width_px * EXPORT_HEIGHT_2COL / EXPORT_WIDTH_2COL)
 
 # Font sizes — change here (applied after sns.set_theme so they are not reset)
 FONT_TICK   = 16   # axis tick numbers (0.02, 0.04, …)
@@ -459,7 +466,7 @@ def save_figure(fig, stem, export_widths=None):
     master = Image.open(buf).convert("RGB")
 
     for tag, width_px in export_widths:
-        height_px = round(width_px * master.height / master.width)
+        height_px = export_height_px(width_px)
         out = master.resize((width_px, height_px), Image.Resampling.LANCZOS)
         png_path = os.path.join(OUT_DIR, f"{stem}_{tag}.png")
         out.save(png_path)
@@ -678,6 +685,21 @@ def annotate_fig2_condition_brackets(
     return y_ceiling
 
 
+def y_tick_frac_match_x(ax, x_tick_frac=None):
+    """transAxes fraction for y ticks so display length matches x ticks."""
+    if x_tick_frac is None:
+        x_tick_frac = TICK_LEN_AXES
+    fig = ax.figure
+    if fig.canvas is None:
+        from matplotlib.backends.backend_agg import FigureCanvasAgg
+        FigureCanvasAgg(fig)
+    fig.canvas.draw()
+    bbox = ax.get_window_extent(fig.canvas.get_renderer())
+    if bbox.width <= 1e-6:
+        return x_tick_frac
+    return x_tick_frac * bbox.height / bbox.width
+
+
 def add_inward_tick_guides(ax, n_x):
     """Short inward guides at each x/y label (matplotlib ticks fail on sns categorical axes)."""
     ax.set_xticks(range(n_x))
@@ -688,16 +710,18 @@ def add_inward_tick_guides(ax, n_x):
     y_trans = blended_transform_factory(ax.transAxes, ax.transData)
     y_lo, y_hi = ax.get_ylim()
     y_vals = [t for t in ax.get_yticks() if y_lo - 1e-9 <= t <= y_hi + 1e-9]
+    frac_x = TICK_LEN_AXES
+    frac_y = y_tick_frac_match_x(ax, frac_x)
 
     for xi in range(n_x):
         ax.plot(
-            [xi, xi], [0, TICK_LEN_AXES],
+            [xi, xi], [0, frac_x],
             color=BLACK, linewidth=1.0, solid_capstyle="butt",
             transform=x_trans, clip_on=False, zorder=6,
         )
     for y in y_vals:
         ax.plot(
-            [0, TICK_LEN_AXES], [y, y],
+            [0, frac_y], [y, y],
             color=BLACK, linewidth=1.0, solid_capstyle="butt",
             transform=y_trans, clip_on=False, zorder=6,
         )
@@ -1202,31 +1226,66 @@ def xspan(forces_sub, all_forces, pad=0.48):
     return (min(idxs) - pad, max(idxs) + pad) if idxs else None
 
 
-def force_highlight_xspan(force_val, combined_forces, n_forces, box_w, edge_pad=0.06):
+def force_highlight_xspan(force_val, combined_forces, n_forces, box_w,
+                          edge_pad_left=0.06, edge_pad_right=0.06):
     """x span covering all dodged boxes at one force tick (e.g. 0.07 g Kao + Peri)."""
     forces = list(combined_forces)
     if force_val not in forces:
         return None
     cat = forces.index(force_val)
     half = fig3_hue_dodge_half(n_forces)
-    xlo = cat - half - box_w / 2 - edge_pad
-    xhi = cat + half + box_w / 2 + edge_pad
+    xlo = cat - half - box_w / 2 - edge_pad_left
+    xhi = cat + half + box_w / 2 + edge_pad_right
     return (xlo, xhi)
 
 
+def _resolve_highlight_span_overlaps(spans, *, min_gap=0.04):
+    """Trim adjacent highlight bands so they do not overlap."""
+    if len(spans) < 2:
+        return spans
+    ordered = sorted(spans, key=lambda t: t[1][0])
+    out = [list(ordered[0])]
+    for f, (xlo, xhi) in ordered[1:]:
+        prev_f, (prev_lo, prev_hi) = out[-1]
+        if prev_hi > xlo - min_gap:
+            split = (prev_hi + xlo) / 2.0
+            out[-1][1] = (prev_lo, split - min_gap / 2.0)
+            xlo = split + min_gap / 2.0
+        out.append([f, (xlo, xhi)])
+    return [(f, (xlo, xhi)) for f, (xlo, xhi) in out]
+
+
 def draw_force_highlight_background(ax, highlight_forces, combined_forces, n_forces, box_w,
-                                    color="#B0B0B0", alpha=0.10):
+                                    color="#B0B0B0", alpha=0.10,
+                                    force_edge_pad=None, min_band_gap=0.04):
     """Light vertical band behind the plot — fill only, no border."""
     if not highlight_forces:
         return
     fill = mcolors.to_rgba(color, alpha)
     band_trans = blended_transform_factory(ax.transData, ax.transAxes)
+    pad_default = 0.06
+    pad_map = force_edge_pad or {}
+    spans = []
+    for f in highlight_forces:
+        pad_spec = pad_map.get(f, pad_default)
+        if isinstance(pad_spec, (tuple, list)):
+            pad_left, pad_right = pad_spec
+        elif isinstance(pad_spec, dict):
+            pad_left = pad_spec.get("left", pad_default)
+            pad_right = pad_spec.get("right", pad_default)
+        else:
+            pad_left = pad_right = float(pad_spec)
+        span = force_highlight_xspan(
+            f, combined_forces, n_forces, box_w,
+            edge_pad_left=pad_left, edge_pad_right=pad_right,
+        )
+        if span:
+            spans.append((f, span))
+    spans = _resolve_highlight_span_overlaps(spans, min_gap=min_band_gap)
     with matplotlib.rc_context({"patch.force_edgecolor": False, "patch.linewidth": 0.0}):
-        for f in highlight_forces:
-            span = force_highlight_xspan(f, combined_forces, n_forces, box_w)
-            if not span:
+        for f, (xlo, xhi) in spans:
+            if xhi <= xlo:
                 continue
-            xlo, xhi = span
             band = mpatches.Polygon(
                 [(xlo, 0.0), (xhi, 0.0), (xhi, 1.0), (xlo, 1.0)],
                 closed=True,
@@ -1254,6 +1313,8 @@ def plot_kao_vs_periungual(df_periungual, peri_label, peri_color, save_stem,
                            highlight_forces=None,
                            highlight_force_color="#B0B0B0",
                            highlight_force_alpha=0.10,
+                           highlight_force_edge_pad=None,
+                           highlight_force_min_gap=0.04,
                            participant_median=False,
                            kao_df_override=None,
                            triangle_keys=None,
@@ -1329,6 +1390,8 @@ def plot_kao_vs_periungual(df_periungual, peri_label, peri_color, save_stem,
     draw_force_highlight_background(
         ax, highlight_forces, combined_forces, n_forces, box_w,
         color=highlight_force_color, alpha=highlight_force_alpha,
+        force_edge_pad=highlight_force_edge_pad,
+        min_band_gap=highlight_force_min_gap,
     )
 
     ax.axhline(80, color=CRITERION_COLOR, linestyle="--", linewidth=1.0, alpha=0.85,

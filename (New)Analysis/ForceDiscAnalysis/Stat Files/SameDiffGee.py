@@ -796,7 +796,7 @@ def _combined_accuracy_legend_handles(band_specs):
     ]
 
 
-def save_combined_accuracy_by_pair(band_specs):
+def save_combined_accuracy_by_pair(band_specs, *, show_brackets=True):
     """Low | High accuracy-by-pair in one 2-column figure (2102 px wide)."""
     fig, axes = plt.subplots(
         1, len(band_specs),
@@ -811,8 +811,9 @@ def save_combined_accuracy_by_pair(band_specs):
     for ax, spec in zip(axes, band_specs):
         box_w = combined_panel_box_width(len(spec["pair_order"]))
         jitter_w = STRIP_JITTER_REF * box_w / ATD_FIG2_DODGED_BOX_WIDTH
+        pvals = spec["pairwise_pvals"] if show_brackets else None
         _, ylim_top = _draw_accuracy_panel(
-            ax, spec["subj_acc"], spec["pair_order"], spec["pairwise_pvals"],
+            ax, spec["subj_acc"], spec["pair_order"], pvals,
             show_ylabel=(ax is axes[0]),
             bracket_in_data_space=True,
             box_color=band_colors.get(spec["band_label"], "#dde6f0"),
@@ -839,7 +840,8 @@ def save_combined_accuracy_by_pair(band_specs):
     fig.subplots_adjust(
         left=0.07, right=0.98, top=FIG_PANEL_TOP_FRAC, bottom=0.12, wspace=0.10,
     )
-    out_path = os.path.join(OUTPUT_DIR, "sd_accuracy_by_pair_2col.png")
+    suffix = "" if show_brackets else "_nobracket"
+    out_path = os.path.join(OUTPUT_DIR, f"sd_accuracy_by_pair_2col{suffix}.png")
     save_png_at_width(
         fig, out_path,
         width_px=EXPORT_WIDTH_2COL,
@@ -1215,6 +1217,7 @@ if __name__ == "__main__":
 
     if accuracy_band_specs:
         save_combined_accuracy_by_pair(accuracy_band_specs)
+        save_combined_accuracy_by_pair(accuracy_band_specs, show_brackets=False)
 
     run_response_bias_overview(
         df,
