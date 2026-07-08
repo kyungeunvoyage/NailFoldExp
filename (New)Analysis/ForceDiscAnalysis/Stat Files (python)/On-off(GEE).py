@@ -31,7 +31,18 @@ from pathlib import Path
 # ATD C1 figure style
 # =============================================================================
 _SCRIPT_DIR = Path(__file__).resolve().parent
-_ATD_C1_PATH = _SCRIPT_DIR.parent / "ATDAnalysis" / "ATD_C1_Fig(Anika).py"
+def _resolve_atd_c1_path():
+    root = _SCRIPT_DIR.parent.parent / "ATDAnalysis"
+    for sub in ("Stat files", "Stat files (final) "):
+        path = root / sub / "(Final)ATD_C1_Fig(Anika).py"
+        if path.is_file():
+            return path
+    raise FileNotFoundError(
+        f"Could not find (Final)ATD_C1_Fig(Anika).py under {root}"
+    )
+
+
+_ATD_C1_PATH = _resolve_atd_c1_path()
 
 def _load_atd_c1():
     spec = importlib.util.spec_from_file_location("atd_c1_fig", _ATD_C1_PATH)
@@ -41,7 +52,19 @@ def _load_atd_c1():
 
 ATD = _load_atd_c1()
 
-# ── Style constants ───────────────────────────────────────────────────────────
+from gee_export_utils import (
+    EXPORT_CANVAS,
+    EXPORT_WIDTH_2COL,
+    LAYOUT_BOTTOM,
+    LAYOUT_TOP,
+    XLABEL_FORCE_PAIR,
+    add_figure_legend,
+    horizontal_panel_rects,
+    save_export_figure,
+    single_panel_rect,
+    vertical_panel_rects,
+)
+
 SLATE_BLUE         = ATD.SLATE_BLUE
 ACCENT_RED         = ATD.ACCENT_RED
 CRITERION_COLOR    = ATD.CRITERION_COLOR
@@ -91,11 +114,8 @@ BRACKET_TEXT_HEIGHT  = 2.5
 BRACKET_TIER_GAP     = 0.5
 BRACKET_TICK_H       = 2.0   # local override (no vertical ticks drawn)
 BRACKET_YLIM_PAD     = 1.5
-FIG_PANEL_TOP_FRAC   = 0.80
-FIG_LEGEND_ANCHOR_Y  = 0.88
-LEGEND_HEADROOM_IN   = 0.55
-MARGIN_BOTTOM        = ATD.FIG_LEGEND_BOTTOM
-GAP_BAND_IN          = 1.5
+FIG_PANEL_TOP_FRAC   = LAYOUT_TOP
+MARGIN_BOTTOM        = LAYOUT_BOTTOM
 
 # Region viz constants
 ALPHA_LINE   = 0.35
@@ -384,7 +404,7 @@ def assign_bracket_levels(combos):
     return placed
 
 def finalize_axes(ax, n_x, ylim_top, *, show_ylabel=True, show_xlabel=True,
-                  xlabel="Force pair (g)", ylabel="Discrimination Accuracy (%)"):
+                  xlabel=XLABEL_FORCE_PAIR, ylabel="Discrimination Accuracy (%)"):
     ax.set_ylim(ATD.ACCURACY_YMIN, min(ATD.FIG2_BRACKET_YLIM_CAP, ylim_top))
     ax.set_yticks(ATD.ACCURACY_YTICKS)
     ax.grid(False)
@@ -399,61 +419,20 @@ def finalize_axes(ax, n_x, ylim_top, *, show_ylabel=True, show_xlabel=True,
     ATD.apply_accuracy_y_spine_bounds(ax)
 
 def save_figure(fig, stem):
-    from PIL import Image
-    buf = io.BytesIO()
-    fig.savefig(buf, format="png", dpi=SAVE_DPI, bbox_inches="tight",
-                pad_inches=0.02, facecolor="white")
-    buf.seek(0)
-    master = Image.open(buf).convert("RGB")
-    for tag, width_px in EXPORT_WIDTHS_PX:
-        height_px = round(width_px * master.height / master.width)
-        out = master.resize((width_px, height_px), Image.Resampling.LANCZOS)
-        png_path = os.path.join(OUTPUT_DIR, f"{stem}_{tag}.png")
-        out.save(png_path)
-        print(f"Saved → {png_path}  ({width_px}×{height_px} px)")
-    legacy = os.path.join(OUTPUT_DIR, f"{stem}.png")
-    master.resize(
-        (2102, round(2102 * master.height / master.width)),
-        Image.Resampling.LANCZOS,
-    ).save(legacy)
-    print(f"Saved → {legacy}")
+    save_export_figure(fig, OUTPUT_DIR, stem, EXPORT_WIDTHS_PX)
 
-def _panel_size_inches():
-    tmp, axes = plt.subplots(1, 2, figsize=FIG_SIZE, sharey=True, facecolor="#FFFFFF")
-    tmp.subplots_adjust(left=0.07, right=0.98, top=FIG_PANEL_TOP_FRAC,
-                        bottom=MARGIN_BOTTOM, wspace=0.10)
-    pos = axes[0].get_position()
-    px  = pos.x0 * FIG_SIZE[0]
-    py  = pos.y0 * FIG_SIZE[1]
-    pw  = pos.width  * FIG_SIZE[0]
-    ph  = pos.height * FIG_SIZE[1]
-    plt.close(tmp)
-    return px, py, pw, ph
 
-def _make_two_panel_fig(fig_h_override=None):
+def _make_two_panel_fig():
     sns.set_theme(style="white")
     ATD.apply_plot_style()
-    px, py, pw, ph = _panel_size_inches()
-    left_in  = 0.07 * FIG_SIZE[0]
-    right_in = (1 - 0.98) * FIG_SIZE[0]
-    fig_w    = left_in + pw + GAP_BAND_IN + pw + right_in
-    fig_h    = fig_h_override or (FIG_SIZE[1] + LEGEND_HEADROOM_IN)
-    ax_y     = py / fig_h
-    ax_h     = ph / fig_h
-    fig      = plt.figure(figsize=(fig_w, fig_h), facecolor="#FFFFFF")
-    ax_low   = fig.add_axes([left_in / fig_w, ax_y, pw / fig_w, ax_h])
-    ax_high  = fig.add_axes([(left_in + pw + GAP_BAND_IN) / fig_w, ax_y,
-                              pw / fig_w, ax_h])
+    low_r, high_r = horizontal_panel_rects()
+    fig = plt.figure(figsize=EXPORT_CANVAS, facecolor="#FFFFFF")
+    ax_low = fig.add_axes(low_r)
+    ax_high = fig.add_axes(high_r)
     return fig, ax_low, ax_high
 
 def _add_legend(fig, handles):
-    fig.legend(
-        handles=handles,
-        loc="upper center", bbox_to_anchor=(0.5, FIG_LEGEND_ANCHOR_Y),
-        bbox_transform=fig.transFigure,
-        ncol=len(handles), fontsize=FONT_LABEL, frameon=False,
-        columnspacing=2.0, handletextpad=0.5, handlelength=1.6,
-    )
+    add_figure_legend(fig, handles, fontsize=FONT_LABEL)
 
 # =============================================================================
 # 9. Export stats to text / CSV
@@ -536,37 +515,14 @@ def plot_band_overall(ax, band_label, order, pvals_dict,
     ax.axhline(JND_PCT, color=CRITERION_COLOR, linestyle="--",
                linewidth=1.0, alpha=0.85, zorder=REF_LINE_ZORDER)
 
-    sig_combos = []
-    for i1, i2 in sorted(itertools.combinations(range(len(order)), 2),
-                          key=lambda t: t[1]-t[0]):
-        p1, p2 = order[i1], order[i2]
-        pval = pvals_dict.get((p1,p2), pvals_dict.get((p2,p1), np.nan))
-        if not np.isnan(pval) and pval < BRACKET_ALPHA:
-            sig_combos.append((i1, i2))
-
-    placed     = assign_bracket_levels(sig_combos)
-    max_level  = max((lv for _,_,lv in placed), default=-1)
-    tier_step  = bracket_tier_step()
-    y_base     = max(102.0, band_max_pct + ATD.FIG2_BRACKET_BASE_PAD)
-    ylim_top   = ATD.ACCURACY_YLIM_TOP
-    if placed:
-        ylim_top = max(ylim_top,
-                       bracket_stack_top(y_base + max_level*tier_step, "*** p=0.000")
-                       + BRACKET_YLIM_PAD)
-    ylim_top = min(ATD.FIG2_BRACKET_YLIM_CAP, ylim_top)
+    ylim_top = min(ATD.FIG2_BRACKET_YLIM_CAP,
+                   max(ATD.ACCURACY_YLIM_TOP, band_max_pct + 8.0))
 
     ax.set_xticks(range(len(order)))
     ax.set_xticklabels(order, fontsize=FONT_TICK)
     ax.set_xlim(-0.55, len(order) - 0.45)
     finalize_axes(ax, len(order), ylim_top,
                   show_ylabel=show_ylabel, show_xlabel=show_xlabel)
-
-    for i1, i2, level in placed:
-        p1, p2   = order[i1], order[i2]
-        pval     = pvals_dict.get((p1,p2), pvals_dict.get((p2,p1), np.nan))
-        lbl      = pval_label(pval)
-        sig_text = lbl if (lbl and not np.isnan(pval)) else ""
-        draw_bracket(ax, i1, i2, y_base + level*tier_step, sig_text)
 
 
 def plot_band_all_trials(ax, band_label, order, *,
@@ -635,15 +591,15 @@ def make_all_trials_figure(band_only=None):
     ATD.apply_plot_style()
 
     if band_only == "Low":
-        fig, ax = plt.subplots(figsize=(FIG_SIZE[0] * 0.55, FIG_SIZE[1]), facecolor="#FFFFFF")
+        fig = plt.figure(figsize=EXPORT_CANVAS, facecolor="#FFFFFF")
+        ax = fig.add_axes(single_panel_rect(bottom=MARGIN_BOTTOM))
         plot_band_all_trials(ax, "Low", low_order)
-        fig.subplots_adjust(left=0.12, right=0.97, top=0.88, bottom=MARGIN_BOTTOM)
         return fig
 
     if band_only == "High":
-        fig, ax = plt.subplots(figsize=(FIG_SIZE[0] * 0.55, FIG_SIZE[1]), facecolor="#FFFFFF")
+        fig = plt.figure(figsize=EXPORT_CANVAS, facecolor="#FFFFFF")
+        ax = fig.add_axes(single_panel_rect(bottom=MARGIN_BOTTOM))
         plot_band_all_trials(ax, "High", high_order, show_ylabel=True)
-        fig.subplots_adjust(left=0.12, right=0.97, top=0.88, bottom=MARGIN_BOTTOM)
         return fig
 
     fig, ax_l, ax_h = _make_two_panel_fig()
@@ -659,26 +615,19 @@ def make_all_trials_figure(band_only=None):
 
 def make_pairwise_figure(orientation):
     sns.set_theme(style="white"); ATD.apply_plot_style()
-    px, py, pw, ph = _panel_size_inches()
-    left_in   = 0.07 * FIG_SIZE[0]
-    right_in  = (1 - 0.98) * FIG_SIZE[0]
-    bottom_in = MARGIN_BOTTOM * FIG_SIZE[1]
+    fig = plt.figure(figsize=EXPORT_CANVAS, facecolor="#FFFFFF")
+    kw = {}
 
     if orientation == "horizontal":
-        fig_w = left_in + pw + GAP_BAND_IN + pw + right_in
-        fig_h = FIG_SIZE[1] + LEGEND_HEADROOM_IN
-        ax_y  = py / fig_h; ax_h = ph / fig_h
-        fig   = plt.figure(figsize=(fig_w, fig_h), facecolor="#FFFFFF")
-        ax_l  = fig.add_axes([left_in/fig_w, ax_y, pw/fig_w, ax_h])
-        ax_r  = fig.add_axes([(left_in+pw+GAP_BAND_IN)/fig_w, ax_y, pw/fig_w, ax_h])
+        low_r, high_r = horizontal_panel_rects(**kw)
+        ax_l = fig.add_axes(low_r)
+        ax_r = fig.add_axes(high_r)
         plot_band_overall(ax_l, "Low",  low_order,  low_pvals,  show_ylabel=True)
         plot_band_overall(ax_r, "High", high_order, high_pvals, show_ylabel=False)
     else:
-        fig_h = bottom_in + ph + GAP_BAND_IN + ph + LEGEND_HEADROOM_IN
-        ax_h  = ph / fig_h; ax_w = pw / FIG_SIZE[0]; ax_x = px / FIG_SIZE[0]
-        fig   = plt.figure(figsize=(FIG_SIZE[0], fig_h), facecolor="#FFFFFF")
-        ax_r  = fig.add_axes([ax_x, bottom_in/fig_h, ax_w, ax_h])
-        ax_l  = fig.add_axes([ax_x, (bottom_in+ph+GAP_BAND_IN)/fig_h, ax_w, ax_h])
+        low_r, high_r = vertical_panel_rects()
+        ax_l = fig.add_axes(low_r)
+        ax_r = fig.add_axes(high_r)
         plot_band_overall(ax_l, "Low",  low_order,  low_pvals,  show_ylabel=True)
         plot_band_overall(ax_r, "High", high_order, high_pvals, show_ylabel=True)
 
@@ -758,12 +707,6 @@ def plot_region_band_box(ax, band_label, order, region_pvals,
             ax.scatter(x_strip, pdata, c=[rgba]*len(pdata), s=STRIP_SIZE**2,
                        linewidths=0, edgecolors="none", alpha=STRIP_ALPHA,
                        zorder=SCATTER_ZORDER, clip_on=False)
-
-        pval = region_pvals.get(pair, np.nan)
-        txt  = pval_text_full(pval)
-        col  = pval_color(pval)
-        y_br = min(band_max_pct + 8, ATD.FIG2_BRACKET_YLIM_CAP - 15)
-        draw_bracket(ax, xi-SIDE_OFFSET*0.5, xi+SIDE_OFFSET*0.5, y_br, txt)
 
     ax.axhline(JND_PCT, color=CRITERION_COLOR, linestyle="--",
                linewidth=1.0, alpha=0.85, zorder=REF_LINE_ZORDER)
@@ -849,7 +792,7 @@ def plot_slope_panel(ax, band_label, order, region_pvals, show_ylabel):
     if show_ylabel:
         ax.set_ylabel("Discrimination Accuracy (%)", fontsize=FONT_LABEL,
                       labelpad=ATD.FIG_AXIS_LABELPAD)
-    ax.set_xlabel("Force pair (g)", fontsize=FONT_LABEL, labelpad=ATD.FIG_AXIS_LABELPAD)
+    ax.set_xlabel(XLABEL_FORCE_PAIR, fontsize=FONT_LABEL, labelpad=ATD.FIG_AXIS_LABELPAD)
     ax.grid(False); sns.despine(ax=ax)
     ATD.apply_accuracy_y_spine_bounds(ax)
 
@@ -918,7 +861,7 @@ def plot_diff_panel(ax, band_label, order, region_pvals, show_ylabel):
     if show_ylabel:
         ax.set_ylabel("Δ Accuracy: On-nail − Off-nail (%)",
                       fontsize=FONT_LABEL, labelpad=ATD.FIG_AXIS_LABELPAD)
-    ax.set_xlabel("Force pair (g)", fontsize=FONT_LABEL, labelpad=ATD.FIG_AXIS_LABELPAD)
+    ax.set_xlabel(XLABEL_FORCE_PAIR, fontsize=FONT_LABEL, labelpad=ATD.FIG_AXIS_LABELPAD)
     ax.grid(False); sns.despine(ax=ax)
 
 

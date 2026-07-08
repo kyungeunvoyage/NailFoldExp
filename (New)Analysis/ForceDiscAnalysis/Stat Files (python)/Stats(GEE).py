@@ -40,7 +40,18 @@ from pathlib import Path
 # ATD C1 figure style (fonts, axes, export widths — ATD_C1_Fig(Anika).py)
 # =============================================================================
 _SCRIPT_DIR = Path(__file__).resolve().parent
-_ATD_C1_PATH = _SCRIPT_DIR.parent / "ATDAnalysis" / "ATD_C1_Fig(Anika).py"
+def _resolve_atd_c1_path():
+    root = _SCRIPT_DIR.parent.parent / "ATDAnalysis"
+    for sub in ("Stat files", "Stat files (final) "):
+        path = root / sub / "(Final)ATD_C1_Fig(Anika).py"
+        if path.is_file():
+            return path
+    raise FileNotFoundError(
+        f"Could not find (Final)ATD_C1_Fig(Anika).py under {root}"
+    )
+
+
+_ATD_C1_PATH = _resolve_atd_c1_path()
 
 
 def _load_atd_c1():
@@ -51,6 +62,15 @@ def _load_atd_c1():
 
 
 ATD = _load_atd_c1()
+
+from gee_export_utils import (
+    EXPORT_CANVAS,
+    XLABEL_FORCE_PAIR,
+    add_figure_legend,
+    horizontal_panel_rects,
+    save_export_figure,
+    vertical_panel_rects,
+)
 
 # Semantic FD band colors (box fill only; lines/ticks match ATD)
 SLATE_BLUE = ATD.SLATE_BLUE
@@ -400,40 +420,20 @@ print(f"Saved: {export_txt}")
 
 def save_gee_figure(fig, stem, export_widths=None):
     """Save PNG at ATD column widths (1col / 1.5col / 2col) + legacy single name."""
-    from PIL import Image
-
     if export_widths is None:
         export_widths = EXPORT_WIDTHS_PX
-    buf = io.BytesIO()
-    fig.savefig(
-        buf, format="png", dpi=SAVE_DPI, bbox_inches="tight",
-        pad_inches=0.02, facecolor="white",
-    )
-    buf.seek(0)
-    master = Image.open(buf).convert("RGB")
-    for tag, width_px in export_widths:
-        height_px = round(width_px * master.height / master.width)
-        out = master.resize((width_px, height_px), Image.Resampling.LANCZOS)
-        png_path = os.path.join(OUTPUT_DIR, f"{stem}_{tag}.png")
-        out.save(png_path)
-        print(f"Saved PNG → {png_path}  ({width_px}×{height_px} px)")
-    legacy = os.path.join(OUTPUT_DIR, f"{stem}.png")
-    master.resize(
-        (2102, round(2102 * master.height / master.width)),
-        Image.Resampling.LANCZOS,
-    ).save(legacy)
-    print(f"Saved PNG → {legacy}  (2col alias)")
+    save_export_figure(fig, OUTPUT_DIR, stem, export_widths)
 
 
 def finalize_gee_axes(ax, n_x, ylim_top, *, show_ylabel=True, show_xlabel=True,
-                      xlabel="Force pair (g)"):
+                      xlabel=XLABEL_FORCE_PAIR):
     """ATD C1 axes: 0–100% y, inward ticks, floating 0%, no grid."""
     ax.set_ylim(ATD.ACCURACY_YMIN, min(ATD.FIG2_BRACKET_YLIM_CAP, ylim_top))
     ax.set_yticks(ATD.ACCURACY_YTICKS)
     ax.grid(False)
     ax.tick_params(axis="both", which="both", length=0, labelsize=FONT_TICK)
     if show_ylabel:
-        ax.set_ylabel("Detection Accuracy (%)", fontsize=FONT_LABEL,
+        ax.set_ylabel("Discrimination Accuracy (%)", fontsize=FONT_LABEL,
                       labelpad=ATD.FIG_AXIS_LABELPAD)
     if show_xlabel:
         ax.set_xlabel(xlabel, fontsize=FONT_LABEL, labelpad=ATD.FIG_AXIS_LABELPAD)
@@ -572,30 +572,10 @@ def plot_band(ax, band_label, order, pvals_dict, show_xlabel=True, show_ylabel=T
     )
     ax.axhline(CHANCE_PCT, color=BLACK, linestyle=":", linewidth=0.8, alpha=0.5, zorder=1)
 
-    pair_combos = sorted(
-        itertools.combinations(range(len(order)), 2),
-        key=lambda t: t[1] - t[0],
+    ylim_top = min(
+        ATD.FIG2_BRACKET_YLIM_CAP,
+        max(ATD.ACCURACY_YLIM_TOP, band_max_pct + 8.0),
     )
-    sig_combos = []
-    for i1, i2 in pair_combos:
-        p1, p2 = order[i1], order[i2]
-        pval = pvals_dict.get((p1, p2), pvals_dict.get((p2, p1), np.nan))
-        if not np.isnan(pval) and pval < BRACKET_ALPHA:
-            sig_combos.append((i1, i2))
-
-    placed = assign_bracket_levels(sig_combos)
-    max_level = max((lv for _, _, lv in placed), default=-1)
-    tier_step = bracket_tier_step()
-    bracket_base = max(102.0, band_max_pct + ATD.FIG2_BRACKET_BASE_PAD)
-    ylim_top = max(ATD.ACCURACY_YLIM_TOP, band_max_pct + 8.0)
-    if placed:
-        ylim_top = max(
-            ylim_top,
-            bracket_stack_top(
-                bracket_base + max_level * tier_step, "***  p=0.000",
-            ) + BRACKET_YLIM_PAD,
-        )
-    ylim_top = min(ATD.FIG2_BRACKET_YLIM_CAP, ylim_top)
 
     ax.set_xticks(range(len(order)))
     ax.set_xticklabels(order, fontsize=FONT_TICK)
@@ -604,18 +584,6 @@ def plot_band(ax, band_label, order, pvals_dict, show_xlabel=True, show_ylabel=T
         ax, len(order), ylim_top,
         show_ylabel=show_ylabel, show_xlabel=show_xlabel,
     )
-
-    for i1, i2, level in placed:
-        p1 = order[i1]
-        p2 = order[i2]
-        pval = pvals_dict.get((p1, p2), pvals_dict.get((p2, p1), np.nan))
-        label = pval_label(pval)
-        if label:
-            sig_text = f"{label}  p={pval:.3f}" if not np.isnan(pval) else label
-        else:
-            sig_text = ""
-        y = bracket_base + level * tier_step
-        draw_bracket(ax, i1, i2, y, sig_text)
 
 
 LEGEND_ELEMENTS = [
@@ -631,72 +599,23 @@ LEGEND_ELEMENTS = [
 
 
 def _add_legend(fig):
-    """Legend in the dedicated top strip of the figure."""
-    fig.legend(
-        handles=LEGEND_ELEMENTS,
-        loc="upper center",
-        bbox_to_anchor=(0.5, FIG_LEGEND_ANCHOR_Y),
-        bbox_transform=fig.transFigure,
-        ncol=2,
-        fontsize=FONT_LABEL,
-        frameon=False,
-        columnspacing=2.0,
-        handletextpad=0.5,
-        handlelength=1.6,
-    )
-
-
-# Layout: legend strip at top → plot (+ brackets in data space)
-FIG_PANEL_TOP_FRAC = 0.80    # axes ymax — headroom for figure legend only
-FIG_LEGEND_ANCHOR_Y = 0.975  # top-center of full figure canvas
-LEGEND_HEADROOM_IN = 0.55    # extra figure height above panels (inches)
-MARGIN_BOTTOM = ATD.FIG_LEGEND_BOTTOM
-GAP_BAND_IN = 1.5            # inches between Low and High panels
-
-
-def _panel_size_inches():
-    """Panel size (in) from horizontal layout — used as fixed size for both orientations."""
-    tmp, axes = plt.subplots(1, 2, figsize=FIG_SIZE, sharey=True, facecolor="#FFFFFF")
-    tmp.subplots_adjust(
-        left=0.07, right=0.98, top=FIG_PANEL_TOP_FRAC, bottom=MARGIN_BOTTOM, wspace=0.10,
-    )
-    pos = axes[0].get_position()
-    px = pos.x0 * FIG_SIZE[0]
-    py = pos.y0 * FIG_SIZE[1]
-    pw = pos.width * FIG_SIZE[0]
-    ph = pos.height * FIG_SIZE[1]
-    plt.close(tmp)
-    return px, py, pw, ph
+    add_figure_legend(fig, LEGEND_ELEMENTS, ncol=2, fontsize=FONT_LABEL)
 
 
 def make_pairwise_figure(orientation):
     """Build GEE pairwise plot. orientation: 'horizontal' (1×2) or 'vertical' (2×1)."""
     sns.set_theme(style="white")
     ATD.apply_plot_style()
-    px, py, pw, ph = _panel_size_inches()
-    left_in = 0.07 * FIG_SIZE[0]
-    right_in = (1 - 0.98) * FIG_SIZE[0]
-    bottom_in = MARGIN_BOTTOM * FIG_SIZE[1]
+    fig = plt.figure(figsize=EXPORT_CANVAS, facecolor="#FFFFFF")
 
     if orientation == "horizontal":
-        fig_w = left_in + pw + GAP_BAND_IN + pw + right_in
-        fig_h = FIG_SIZE[1] + LEGEND_HEADROOM_IN
-        ax_y = py / fig_h
-        ax_h_frac = ph / fig_h
-        fig = plt.figure(figsize=(fig_w, fig_h), facecolor="#FFFFFF")
-        ax_low = fig.add_axes([left_in / fig_w, ax_y, pw / fig_w, ax_h_frac])
-        x_high = (left_in + pw + GAP_BAND_IN) / fig_w
-        ax_high = fig.add_axes([x_high, ax_y, pw / fig_w, ax_h_frac])
+        low_r, high_r = horizontal_panel_rects()
+        ax_low = fig.add_axes(low_r)
+        ax_high = fig.add_axes(high_r)
     elif orientation == "vertical":
-        fig_h = bottom_in + ph + GAP_BAND_IN + ph + LEGEND_HEADROOM_IN
-        ax_h_frac = ph / fig_h
-        fig = plt.figure(figsize=(FIG_SIZE[0], fig_h), facecolor="#FFFFFF")
-        y_high = bottom_in / fig_h
-        y_low = (bottom_in + ph + GAP_BAND_IN) / fig_h
-        ax_w_frac = pw / FIG_SIZE[0]
-        ax_x = px / FIG_SIZE[0]
-        ax_high = fig.add_axes([ax_x, y_high, ax_w_frac, ax_h_frac])
-        ax_low = fig.add_axes([ax_x, y_low, ax_w_frac, ax_h_frac])
+        low_r, high_r = vertical_panel_rects()
+        ax_low = fig.add_axes(low_r)
+        ax_high = fig.add_axes(high_r)
     else:
         raise ValueError(f"Unknown orientation: {orientation!r}")
 
@@ -856,22 +775,6 @@ def plot_region_band(ax, band_label, order, region_pvals,
                        s=STRIP_SIZE**2, linewidths=0, edgecolors="none",
                        alpha=STRIP_ALPHA, zorder=SCATTER_ZORDER, clip_on=False)
 
-        # n.s. / sig bracket between On-nail and Off-nail for this pair
-        pval = region_pvals.get(pair, np.nan)
-        label = pval_label(pval)
-        if np.isnan(pval):
-            sig_text = ""
-        elif label:
-            sig_text = f"{label}  p={pval:.3f}"
-        else:
-            sig_text = f"n.s.  p={pval:.3f}"
-
-        # Draw bracket just above the boxes
-        y_bracket = band_max_pct + 8.0
-        x1 = xi - SIDE_OFFSET * 0.5
-        x2 = xi + SIDE_OFFSET * 0.5
-        draw_bracket(ax, x1, x2, y_bracket, sig_text)
-
     ax.axhline(JND_PCT, color=CRITERION_COLOR, linestyle="--",
                linewidth=1.0, alpha=0.85, zorder=REF_LINE_ZORDER)
     ax.axhline(CHANCE_PCT, color=BLACK, linestyle=":", linewidth=0.8,
@@ -896,20 +799,10 @@ REGION_LEGEND_ELEMENTS = [
 def make_region_figure():
     sns.set_theme(style="white")
     ATD.apply_plot_style()
-    px, py, pw, ph = _panel_size_inches()
-    left_in  = 0.07 * FIG_SIZE[0]
-    right_in = (1 - 0.98) * FIG_SIZE[0]
-    bottom_in = MARGIN_BOTTOM * FIG_SIZE[1]
-
-    fig_w = left_in + pw + GAP_BAND_IN + pw + right_in
-    fig_h = FIG_SIZE[1] + LEGEND_HEADROOM_IN
-    ax_y  = py / fig_h
-    ax_h  = ph / fig_h
-
-    fig   = plt.figure(figsize=(fig_w, fig_h), facecolor="#FFFFFF")
-    ax_low  = fig.add_axes([left_in / fig_w, ax_y, pw / fig_w, ax_h])
-    x_high  = (left_in + pw + GAP_BAND_IN) / fig_w
-    ax_high = fig.add_axes([x_high, ax_y, pw / fig_w, ax_h])
+    low_r, high_r = horizontal_panel_rects()
+    fig = plt.figure(figsize=EXPORT_CANVAS, facecolor="#FFFFFF")
+    ax_low = fig.add_axes(low_r)
+    ax_high = fig.add_axes(high_r)
 
     # Titles
     ax_low.set_title("Low Band  (ref = 1g)",  fontsize=FONT_LABEL, fontweight="bold", pad=6)
@@ -920,14 +813,7 @@ def make_region_figure():
     plot_region_band(ax_high, "High", high_order, high_region_pvals,
                      show_xlabel=True, show_ylabel=False)
 
-    fig.legend(
-        handles=REGION_LEGEND_ELEMENTS,
-        loc="upper center",
-        bbox_to_anchor=(0.5, FIG_LEGEND_ANCHOR_Y),
-        bbox_transform=fig.transFigure,
-        ncol=2, fontsize=FONT_LABEL, frameon=False,
-        columnspacing=2.0, handletextpad=0.5, handlelength=1.6,
-    )
+    add_figure_legend(fig, REGION_LEGEND_ELEMENTS, ncol=2, fontsize=FONT_LABEL)
     return fig
 
 

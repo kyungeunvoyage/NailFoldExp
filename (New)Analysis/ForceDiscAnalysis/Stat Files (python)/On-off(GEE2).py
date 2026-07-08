@@ -28,7 +28,18 @@ from scipy import stats
 # 0. ATD style loader
 # =============================================================================
 _SCRIPT_DIR = Path(__file__).resolve().parent
-_ATD_PATH   = _SCRIPT_DIR.parent / "ATDAnalysis" / "ATD_C1_Fig(Anika).py"
+def _resolve_atd_path():
+    root = _SCRIPT_DIR.parent.parent / "ATDAnalysis"
+    for sub in ("Stat files", "Stat files (final) "):
+        path = root / sub / "(Final)ATD_C1_Fig(Anika).py"
+        if path.is_file():
+            return path
+    raise FileNotFoundError(
+        f"Could not find (Final)ATD_C1_Fig(Anika).py under {root}"
+    )
+
+
+_ATD_PATH   = _resolve_atd_path()
 
 def _load_atd():
     spec = importlib.util.spec_from_file_location("atd_c1_fig", _ATD_PATH)
@@ -37,6 +48,8 @@ def _load_atd():
     return mod
 
 ATD = _load_atd()
+
+from gee_export_utils import EXPORT_CANVAS, add_figure_legend, horizontal_panel_rects, save_export_figure
 
 # ── Style constants ───────────────────────────────────────────────────────────
 ACCENT_RED      = ATD.ACCENT_RED
@@ -135,26 +148,8 @@ ALL_ORDER  = low_order + high_order
 print("Force pairs (Low):",  low_order)
 print("Force pairs (High):", high_order)
 
-# =============================================================================
-# 3. Figure save helper
-# =============================================================================
 def save_fig(fig, stem):
-    import io
-    from PIL import Image
-    buf = io.BytesIO()
-    fig.savefig(buf, format="png", dpi=SAVE_DPI, bbox_inches="tight",
-                pad_inches=0.05, facecolor="white")
-    buf.seek(0)
-    master = Image.open(buf).convert("RGB")
-    for tag, w in EXPORT_WIDTHS_PX:
-        h = round(w * master.height / master.width)
-        master.resize((w, h), Image.Resampling.LANCZOS).save(
-            os.path.join(OUTPUT_DIR, f"{stem}_{tag}.png"))
-    legacy = os.path.join(OUTPUT_DIR, f"{stem}.png")
-    master.resize(
-        (2102, round(2102 * master.height / master.width)),
-        Image.Resampling.LANCZOS).save(legacy)
-    print(f"Saved → {legacy}")
+    save_export_figure(fig, OUTPUT_DIR, stem, EXPORT_WIDTHS_PX)
 
 # =============================================================================
 # 4. Two-panel layout helper
@@ -162,26 +157,14 @@ def save_fig(fig, stem):
 def make_two_panel(fig_h=None):
     sns.set_theme(style="white")
     ATD.apply_plot_style()
-    left_in  = 0.08 * FIG_SIZE[0]
-    right_in = 0.03 * FIG_SIZE[0]
-    bot_in   = MARGIN_BOT * FIG_SIZE[1]
-    pw       = (FIG_SIZE[0] - left_in - right_in - GAP_BAND_IN) / 2
-    ph       = FIG_SIZE[1] * (1 - MARGIN_BOT - 0.08) - LEGEND_H_IN
-    fig_w    = FIG_SIZE[0]
-    fig_h    = fig_h or (ph + bot_in + LEGEND_H_IN + 0.3)
-    ax_y     = bot_in / fig_h
-    ax_h     = ph / fig_h
-    fig      = plt.figure(figsize=(fig_w, fig_h), facecolor="#FFFFFF")
-    ax_l     = fig.add_axes([left_in/fig_w,                  ax_y, pw/fig_w, ax_h])
-    ax_r     = fig.add_axes([(left_in+pw+GAP_BAND_IN)/fig_w, ax_y, pw/fig_w, ax_h])
+    low_r, high_r = horizontal_panel_rects()
+    fig = plt.figure(figsize=EXPORT_CANVAS, facecolor="#FFFFFF")
+    ax_l = fig.add_axes(low_r)
+    ax_r = fig.add_axes(high_r)
     return fig, ax_l, ax_r
 
 def add_legend(fig, handles, ncol=None):
-    ncol = ncol or len(handles)
-    fig.legend(handles=handles, loc="upper center",
-               bbox_to_anchor=(0.5, 0.99), bbox_transform=fig.transFigure,
-               ncol=ncol, fontsize=FONT_LABEL, frameon=False,
-               columnspacing=1.8, handletextpad=0.5)
+    add_figure_legend(fig, handles, ncol=ncol, fontsize=FONT_LABEL)
 
 # Pair colors within each band
 LOW_PAIR_COLORS  = ["#08519C", "#2171B5", "#6BAED6", "#BDD7E7"]
@@ -298,9 +281,8 @@ def make_forest():
     df_es = df_es.sort_values("yi", ascending=False).reset_index(drop=True)
 
     n = len(df_es)
-    fig_h = max(3.5, n * 0.55 + 1.5)
-    fig   = plt.figure(figsize=(FIG_SIZE[0] * 0.65, fig_h), facecolor="#FFFFFF")
-    ax    = fig.add_axes([0.28, 0.12, 0.65, 0.78])
+    fig = plt.figure(figsize=EXPORT_CANVAS, facecolor="#FFFFFF")
+    ax = fig.add_axes([0.28, 0.12, 0.65, 0.76])
 
     SMALL_D  = 0.2   # conventional small effect threshold
 
@@ -356,7 +338,6 @@ def make_forest():
     ax.legend(handles=leg_handles, fontsize=FONT_ANNOT, frameon=False,
               loc="lower right", borderpad=0.4)
 
-    fig.tight_layout()
     return fig
 
 fig = make_forest()
@@ -487,10 +468,9 @@ def make_tost(delta_pct=15.0):
     df_t["yi"] = df_t["pair"].apply(lambda p: order_all.index(p))
     df_t = df_t.sort_values("yi", ascending=False).reset_index(drop=True)
 
-    n_rows  = len(df_t)
-    fig_h   = max(3.8, n_rows * 0.65 + 1.8)
-    fig     = plt.figure(figsize=(FIG_SIZE[0] * 0.70, fig_h), facecolor="#FFFFFF")
-    ax      = fig.add_axes([0.24, 0.12, 0.60, 0.78])
+    n_rows = len(df_t)
+    fig = plt.figure(figsize=EXPORT_CANVAS, facecolor="#FFFFFF")
+    ax = fig.add_axes([0.24, 0.12, 0.60, 0.76])
 
     for i, row in df_t.iterrows():
         color  = COLOR_LOW if row["band"] == "Low" else COLOR_HIGH
