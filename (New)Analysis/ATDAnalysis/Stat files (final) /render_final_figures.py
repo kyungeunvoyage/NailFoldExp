@@ -36,11 +36,17 @@ import statsmodels.formula.api as smf
 # 1. PATHS
 # =============================================================================
 SCRIPT_DIR  = os.path.dirname(os.path.abspath(__file__))
+ATD_ROOT    = os.path.normpath(os.path.join(SCRIPT_DIR, ".."))
 ATD_C1_PATH = os.path.join(SCRIPT_DIR, "(Final)ATD_C1_Fig(Anika).py")
-OUT_C1      = os.path.join(SCRIPT_DIR, "atd_c1_outputs")
-OUT_AGG     = os.path.join(SCRIPT_DIR, "figures")
+OUT_C1      = os.path.join(ATD_ROOT, "atd_c1_outputs")
+OUT_AGG     = os.path.join(ATD_ROOT, "figures")
+OUT_FINAL   = os.path.join(ATD_ROOT, "Final")
 os.makedirs(OUT_C1, exist_ok=True)
 os.makedirs(OUT_AGG, exist_ok=True)
+os.makedirs(OUT_FINAL, exist_ok=True)
+
+# Shared On-touch blue — all box plots in Final/ use this base color
+ON_TOUCH_BLUE = "#10559A"
 
 # =============================================================================
 # 2. UNIFIED STYLE  ← 이 딕셔너리 하나만 수정하면 세 피규어 모두 반영됩니다
@@ -48,9 +54,9 @@ os.makedirs(OUT_AGG, exist_ok=True)
 UNIFIED_STYLE = dict(
     # ── Colors ───────────────────────────────────────────────────────────────
     IN_AIR                    = "#6A4A3C",   # In-air (brown)
-    ON_TOUCH                  = "#10559A",   # On-touch (blue)
-    POOL_ON_NAIL              = "#1565C0",   # pooled On-nail — saturated royal blue
-    POOL_OFF_NAIL             = "#81D4FA",   # pooled Off-nail — light cyan-blue (high contrast)
+    ON_TOUCH                  = ON_TOUCH_BLUE,   # On-touch (blue)
+    POOL_ON_NAIL              = ON_TOUCH_BLUE,   # pooled On-nail — same as On-touch
+    POOL_OFF_NAIL             = ON_TOUCH_BLUE,   # pooled Off-nail — same as On-touch
     ACCENT_RED                = "#BF2C23",   # median line
     BLACK                     = "#1A1A1A",
     KAO_COLOR                 = "#5A5A5A",   # Fingerpad (gray)
@@ -109,6 +115,7 @@ atd_c1.CRITERION_COLOR             = atd_c1.BLACK
 atd_c1.ON_TOUCH_BOX_BRIGHTNESS     = UNIFIED_STYLE["COND_BOX_BRIGHTNESS"]
 atd_c1.ON_TOUCH_BOX_SATURATION_SCALE = UNIFIED_STYLE["COND_BOX_SATURATION_SCALE"]
 atd_c1.ON_TOUCH_BOX_ALPHA_HEX      = UNIFIED_STYLE["COND_BOX_ALPHA_HEX"]
+atd_c1.OUT_DIR = OUT_C1
 
 # Convenience shortcuts
 S             = UNIFIED_STYLE
@@ -143,6 +150,15 @@ def save_final(fig, out_path, width_px=EXPORT_WIDTH, height_px=EXPORT_HEIGHT):
     master = Image.open(buf).convert("RGB")
     master.resize((width_px, height_px), Image.Resampling.LANCZOS).save(out_path)
     print(f"  Saved → {out_path}  ({width_px}×{height_px} px)")
+
+
+def publish_to_final(src_path, dest_name):
+    """Copy a rendered PNG into ATDAnalysis/Final/."""
+    import shutil
+
+    dest = os.path.join(OUT_FINAL, dest_name)
+    shutil.copy2(src_path, dest)
+    print(f"  Published → {dest}")
 
 
 # =============================================================================
@@ -435,6 +451,24 @@ def generate_pooled():
     out = os.path.join(OUT_AGG, "onnail_vs_offnail_pooled(final).png")
     save_final(fig, out)
     plt.close(fig)
+    return out
+
+
+def publish_final_figures():
+    """Sync the three publication figures into ATDAnalysis/Final/."""
+    print("\n[Publishing] Copy figures to Final/ …")
+    publish_to_final(
+        os.path.join(OUT_C1, "Fig2_ontouch_vs_inair(final)_2col.png"),
+        "Fig2_ontouch_vs_inair_2col.png",
+    )
+    publish_to_final(
+        os.path.join(OUT_C1, "Fig3_future_full_kao(final)_2col.png"),
+        "Fig3_future_full_kao(final)_2col.png",
+    )
+    publish_to_final(
+        os.path.join(OUT_AGG, "onnail_vs_offnail_pooled(final).png"),
+        "onnail_vs_offnail_pooled(final).png",
+    )
 
 
 # =============================================================================
@@ -443,9 +477,14 @@ def generate_pooled():
 if __name__ == "__main__":
     print("=" * 60)
     print("Rendering final figures with unified style …")
+    print(f"On-touch blue: {ON_TOUCH_BLUE}")
+    print(f"OUT_C1   → {OUT_C1}")
+    print(f"OUT_AGG  → {OUT_AGG}")
+    print(f"OUT_FINAL → {OUT_FINAL}")
     print("=" * 60)
     generate_fig2()
     generate_fig3()
     generate_fig3_full_kao()
     generate_pooled()
+    publish_final_figures()
     print("\nDone.")

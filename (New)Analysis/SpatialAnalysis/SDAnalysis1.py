@@ -41,13 +41,16 @@ warnings.filterwarnings("ignore")
 # 0. ATD style loader
 # ================================================================
 _SCRIPT_DIR = Path(__file__).resolve().parent
-_ATD_PATH   = _SCRIPT_DIR.parent / "ATDAnalysis" / "(Final)ATD_C1_Fig(Anika).py"
-
 def _load_atd():
-    spec = importlib.util.spec_from_file_location("atd_c1_fig", _ATD_PATH)
-    mod  = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(mod)
-    return mod
+    root = _SCRIPT_DIR.parent / "ATDAnalysis"
+    for sub in ("Stat files", "Stat files (final) "):
+        path = root / sub / "(Final)ATD_C1_Fig(Anika).py"
+        if path.is_file():
+            spec = importlib.util.spec_from_file_location("atd_c1_fig", path)
+            mod = importlib.util.module_from_spec(spec)
+            spec.loader.exec_module(mod)
+            return mod
+    raise FileNotFoundError(f"Could not find (Final)ATD_C1_Fig(Anika).py under {root}")
 
 ATD = _load_atd()
 
@@ -987,7 +990,6 @@ def make_signed_boxplot_mm(force):
     """Single-panel figure: x-axis shows signed distance in mm (one tick per distance)."""
     sns.set_theme(style="white")
     ATD.apply_plot_style()
-    import matplotlib.patches as mpatches
 
     signed_vals = sorted(subj_sym["signed_offset_mm"].unique())
     bw      = 0.14
@@ -1000,9 +1002,11 @@ def make_signed_boxplot_mm(force):
     fh = FIG_SIZE[1]   # 4.5 in
     fig, ax = plt.subplots(figsize=(fw, fh), facecolor="#FFFFFF")
 
+    box_fill = ATD.pale_box_face(ATD.ON_TOUCH)
+    scatter_rgba = ATD._hsb_scatter_rgba(ATD.ON_TOUCH)
+
     for dist in signed_vals:
         xp    = x_positions[dist]
-        color = _color_by_abs_offset(dist, force)
         sub   = (subj_sym[
                      (subj_sym["force_g"] == force) &
                      (subj_sym["signed_offset_mm"] == dist)
@@ -1010,18 +1014,32 @@ def make_signed_boxplot_mm(force):
         if len(sub) == 0:
             continue
 
-        ax.boxplot(
+        bp = ax.boxplot(
             sub, positions=[xp], widths=bw * 0.82,
             patch_artist=True, showfliers=False,
             medianprops=dict(color="#CC0000", lw=2.0),
-            whiskerprops=dict(color="#111111", lw=1.4),
-            capprops=dict(color="#111111", lw=1.4),
-            boxprops=dict(facecolor=color, alpha=0.65,
-                          edgecolor="#111111", lw=1.8),
+            whiskerprops=dict(color="#000000", lw=1.4),
+            capprops=dict(color="#000000", lw=1.4),
+            boxprops=dict(facecolor=box_fill,
+                          edgecolor="#000000", lw=1.8),
         )
+        bp["boxes"][0].set_edgecolor("#000000")
+        for whisker in bp["whiskers"]:
+            whisker.set_color("#000000")
+        for cap in bp["caps"]:
+            cap.set_color("#000000")
         jitter = rng.uniform(-bw * 0.30, bw * 0.30, len(sub))
-        ax.scatter(xp + jitter, sub, color=color, s=28, alpha=0.40,
+        ax.scatter(xp + jitter, sub, c=[scatter_rgba] * len(sub), s=28,
                    edgecolors="none", linewidths=0, zorder=5)
+
+    ax.axhline(
+        THRESHOLD * 100,
+        color=ATD.CRITERION_COLOR,
+        linestyle="--",
+        linewidth=1.0,
+        alpha=0.85,
+        zorder=2,
+    )
 
     # x-axis: one tick per mm value
     ax.set_xticks(list(x_positions.values()))
@@ -1035,47 +1053,15 @@ def make_signed_boxplot_mm(force):
     ax.set_yticklabels(["0", "20", "40", "60", "80", "100"], fontsize=FONT_TICK)
     y0, y1 = ATD.ACCURACY_YSPINE
     ax.spines["left"].set_bounds(y0, y1)
-    ax.set_xlabel("Offset Distance (mm)", fontsize=FONT_LABEL, labelpad=ATD.FIG_AXIS_LABELPAD)
-    ax.set_ylabel("Spatial Accuracy (%)", fontsize=FONT_LABEL, labelpad=ATD.FIG_AXIS_LABELPAD)
-
-    palette = ABS_OFFSET_BLUE_BY_FORCE.get(force, ABS_OFFSET_BLUE_1G)
-    abs_offsets = sorted(palette.keys())
-    dist_handles = [
-        mpatches.Patch(facecolor=palette[d], edgecolor="#111111",
-                       linewidth=0.8, alpha=0.65, label=f"{d:g} mm")
-        for d in abs_offsets
-    ]
+    ax.set_xlabel("Offset distance (mm)", fontsize=FONT_LABEL + 4,
+                  labelpad=ATD.FIG_AXIS_LABELPAD)
+    ax.set_ylabel("Spatial accuracy (%)", fontsize=FONT_LABEL + 4,
+                  labelpad=ATD.FIG_AXIS_LABELPAD)
 
     _despine(ax)
-    # top stack (figure coords): title → legend → plot
-    #   MM_PLOT_TOP ↑  = plot closer to legend
-    #   MM_LEGEND_Y  ↓  = legend closer to plot (keep below MM_TITLE_Y)
-    #MM_TITLE_Y  = 0.985
-    MM_TITLE_Y  = 0.93
-    MM_LEGEND_Y = 0.96
-    MM_PLOT_TOP = 0.83
     fig.subplots_adjust(
         left=0.11, right=0.98,
-        top=MM_PLOT_TOP, bottom=ATD.FIG_LEGEND_BOTTOM,
-    )
-    fig.text(
-        0.5, MM_TITLE_Y, f"Reference = {force:g}g",
-        ha="center", va="bottom",
-        fontsize=FONT_LABEL, fontweight="bold",
-    )
-    ax.legend(
-        handles=dist_handles,
-        loc="upper center",
-        bbox_to_anchor=(0.5, MM_LEGEND_Y),
-        bbox_transform=fig.transFigure,
-        ncol=4,
-        frameon=False,
-        fontsize=FONT_LABEL,
-        labelspacing=0.2,
-        columnspacing=2.0,
-        handlelength=1.6,
-        handleheight=1.0,
-        borderaxespad=ATD.FIG_LEGEND_PAD_PT,
+        top=0.92, bottom=ATD.FIG_LEGEND_BOTTOM,
     )
     _draw_inward_ticks(ax)
     return fig

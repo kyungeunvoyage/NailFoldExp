@@ -3,6 +3,8 @@
 import os
 import shutil
 
+import matplotlib.colors as mcolors
+
 EXPORT_WIDTH_2COL = 2102
 EXPORT_HEIGHT_2COL = 1298
 EXPORT_CANVAS = (
@@ -18,6 +20,13 @@ LAYOUT_TOP = 0.88           # headroom for legend above panels
 PANEL_GAP_FRAC = 0.06       # ~wspace 0.18 for two equal panels
 LEGEND_ANCHOR_Y = 0.975
 XLABEL_FORCE_PAIR = "Stimulus force pair (g)"
+
+# ATD Fig2 On-touch — unified box/scatter base color across FD Final figures
+ON_TOUCH_BLUE = "#10559A"
+OFF_NAIL_LIGHT_BLUE = "#85B1D9"  # lighter blue for Off-nail in (3,1)
+
+# ATD pooled on-nail mini-panel reference box width (data coords)
+POOLED_BOX_REF = 0.45
 
 
 def export_height_px(width_px):
@@ -65,6 +74,50 @@ def single_panel_rect(
     top=0.90,
 ):
     return [left, bottom, 1.0 - left - right, top - bottom]
+
+
+def on_touch_box_color(atd_module):
+    """Pale box fill matching ATD Fig2 On-touch."""
+    return atd_module.pale_box_face(ON_TOUCH_BLUE)
+
+
+def on_touch_scatter_rgba(atd_module):
+    """Scatter rgba matching ATD Fig2 On-touch strip."""
+    return atd_module._hsb_scatter_rgba(
+        ON_TOUCH_BLUE,
+        atd_module.SCATTER_HSB_BRIGHTNESS,
+        atd_module.STRIP_ALPHA,
+    )
+
+
+# Softer than scatter (V=0.60), darker than pale box fill (V=0.88 @ low sat)
+ON_TOUCH_HATCH_BRIGHTNESS = 0.78
+ON_TOUCH_HATCH_SATURATION_SCALE = 0.58
+
+
+def on_touch_hatch_rgba(atd_module):
+    """Light on-touch hatch lines on pale On-nail boxes."""
+    hex_c = atd_module.hsb_hex(
+        ON_TOUCH_BLUE,
+        ON_TOUCH_HATCH_BRIGHTNESS,
+        ON_TOUCH_HATCH_SATURATION_SCALE,
+    )
+    r, g, b = mcolors.to_rgb(hex_c)
+    return (r, g, b, 1.0)
+
+
+def off_nail_box_color(atd_module):
+    """Lighter pale box fill for Off-nail (Low band col 3)."""
+    return atd_module.pale_box_face(OFF_NAIL_LIGHT_BLUE)
+
+
+def off_nail_scatter_rgba(atd_module):
+    """Lighter scatter for Off-nail (Low band col 3)."""
+    return atd_module._hsb_scatter_rgba(
+        OFF_NAIL_LIGHT_BLUE,
+        atd_module.SCATTER_HSB_BRIGHTNESS,
+        atd_module.STRIP_ALPHA,
+    )
 
 
 def add_figure_legend(fig, handles, *, ncol=None, anchor_y=LEGEND_ANCHOR_Y, fontsize=12):

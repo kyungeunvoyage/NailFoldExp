@@ -65,9 +65,12 @@ ATD = _load_atd_c1()
 
 from gee_export_utils import (
     EXPORT_CANVAS,
+    ON_TOUCH_BLUE,
     XLABEL_FORCE_PAIR,
     add_figure_legend,
     horizontal_panel_rects,
+    on_touch_box_color,
+    on_touch_scatter_rgba,
     save_export_figure,
     vertical_panel_rects,
 )
@@ -98,9 +101,11 @@ EXPORT_WIDTHS_PX = ATD.EXPORT_WIDTHS_PX
 JND_PCT = 75.0
 CHANCE_PCT = 50.0
 
-COLOR_LOW_BAND = "#BAD6EB"   # all Low-band boxes / points
-COLOR_HIGH_BAND = "#D0E4FF"  # all High-band boxes / points
-BAND_BOX_COLOR = {"Low": COLOR_LOW_BAND, "High": COLOR_HIGH_BAND}
+COLOR_LOW_BAND = ON_TOUCH_BLUE
+COLOR_HIGH_BAND = ON_TOUCH_BLUE
+BAND_BOX_COLOR = {"Low": ON_TOUCH_BLUE, "High": ON_TOUCH_BLUE}
+BOX_FILL_COLOR = on_touch_box_color(ATD)
+SCATTER_RGBA = on_touch_scatter_rgba(ATD)
 
 BRACKET_ALPHA = 0.05
 STRIP_ALPHA = ATD.STRIP_ALPHA
@@ -428,15 +433,18 @@ def save_gee_figure(fig, stem, export_widths=None):
 def finalize_gee_axes(ax, n_x, ylim_top, *, show_ylabel=True, show_xlabel=True,
                       xlabel=XLABEL_FORCE_PAIR):
     """ATD C1 axes: 0–100% y, inward ticks, floating 0%, no grid."""
+    fs_tick = FONT_TICK
+    fs_label = FONT_LABEL
+    labelpad = ATD.FIG_AXIS_LABELPAD
     ax.set_ylim(ATD.ACCURACY_YMIN, min(ATD.FIG2_BRACKET_YLIM_CAP, ylim_top))
     ax.set_yticks(ATD.ACCURACY_YTICKS)
     ax.grid(False)
-    ax.tick_params(axis="both", which="both", length=0, labelsize=FONT_TICK)
+    ax.tick_params(axis="both", which="both", length=0, labelsize=fs_tick)
     if show_ylabel:
-        ax.set_ylabel("Discrimination Accuracy (%)", fontsize=FONT_LABEL,
-                      labelpad=ATD.FIG_AXIS_LABELPAD)
+        ax.set_ylabel("Discrimination Accuracy (%)", fontsize=fs_label,
+                      labelpad=labelpad)
     if show_xlabel:
-        ax.set_xlabel(xlabel, fontsize=FONT_LABEL, labelpad=ATD.FIG_AXIS_LABELPAD)
+        ax.set_xlabel(xlabel, fontsize=fs_label, labelpad=labelpad)
     sns.despine(ax=ax)
     ATD.apply_accuracy_y_spine_bounds(ax)
     ATD.add_inward_tick_guides(ax, n_x)
@@ -506,18 +514,25 @@ def assign_bracket_levels(combos):
     return placed
 
 # ── 10. Plot ──────────────────────────────────────────────────────────────────
-def plot_band(ax, band_label, order, pvals_dict, show_xlabel=True, show_ylabel=True):
+def plot_band(ax, band_label, order, pvals_dict, show_xlabel=True, show_ylabel=True,
+              *, title=None, box_width_fn=None, title_pad=4):
     sub = subj_acc[subj_acc["band"] == band_label].copy()
     band_max_pct = 0.0
-    bw = boxplot_width(len(order))
-    strip_jitter = STRIP_JITTER_AT_REF * bw / BOX_WIDTH_AT_REF
+    width_fn = box_width_fn or boxplot_width
+    bw = width_fn(len(order))
+    ref_bw = boxplot_width(BOX_WIDTH_REF_N)
+    strip_jitter = STRIP_JITTER_AT_REF * bw / ref_bw
+    strip_size = STRIP_SIZE
+    fs_tick = FONT_TICK
+    fs_label = FONT_LABEL
+    lw = BOX_LINEWIDTH
+    med_lw = MEDIAN_LINEWIDTH
 
     for xi, pair in enumerate(order):
         pdata_pct = sub.loc[sub["pair_label"] == pair, "accuracy"].values * 100.0
         if len(pdata_pct) == 0:
             print(f"  WARNING: no data for pair '{pair}' in band '{band_label}'")
             continue
-        color = BAND_BOX_COLOR[band_label]
         band_max_pct = max(band_max_pct, float(np.max(pdata_pct)))
 
         bp = ax.boxplot(
@@ -525,40 +540,39 @@ def plot_band(ax, band_label, order, pvals_dict, show_xlabel=True, show_ylabel=T
             patch_artist=True, showfliers=False,
             capwidths=ATD.CAP_WIDTH,
             whiskerprops={
-                "linewidth": BOX_LINEWIDTH, "color": BOX_STROKE,
+                "linewidth": lw, "color": BOX_STROKE,
                 "solid_capstyle": "butt",
             },
             capprops={
-                "linewidth": BOX_LINEWIDTH, "color": BOX_STROKE,
+                "linewidth": lw, "color": BOX_STROKE,
                 "solid_capstyle": "butt",
             },
-            medianprops={"color": ACCENT_RED, "linewidth": MEDIAN_LINEWIDTH},
-            boxprops={"linewidth": BOX_LINEWIDTH, "edgecolor": BOX_STROKE},
+            medianprops={"color": ACCENT_RED, "linewidth": med_lw},
+            boxprops={"linewidth": lw, "edgecolor": BOX_STROKE},
         )
         for patch in bp["boxes"]:
-            patch.set_facecolor(ATD.pale_box_face(color))
+            patch.set_facecolor(BOX_FILL_COLOR)
             patch.set_edgecolor(BOX_STROKE)
-            patch.set_linewidth(BOX_LINEWIDTH)
-            patch.set_alpha(1.0)  # opacity in pale_box_face hex alpha channel
+            patch.set_linewidth(lw)
+            patch.set_alpha(1.0)
             patch.set_zorder(BOX_PATCH_ZORDER)
         for key in ("whiskers", "caps"):
             for line in bp[key]:
                 line.set_color(BOX_STROKE)
-                line.set_linewidth(BOX_LINEWIDTH)
+                line.set_linewidth(lw)
                 line.set_alpha(1.0)
                 line.set_zorder(WHISKER_ZORDER)
         for line in bp["medians"]:
             line.set_color(ACCENT_RED)
-            line.set_linewidth(MEDIAN_LINEWIDTH)
+            line.set_linewidth(med_lw)
             line.set_alpha(1.0)
             line.set_zorder(MEDIAN_ZORDER)
 
         x_strip = np.full(len(pdata_pct), xi) + jitter(len(pdata_pct), width=strip_jitter)
-        strip_rgba = ATD._hsb_scatter_rgba(color, SCATTER_HSB_BRIGHTNESS, STRIP_ALPHA)
         ax.scatter(
             x_strip, pdata_pct,
-            c=[strip_rgba] * len(pdata_pct),
-            s=STRIP_SIZE ** 2,
+            c=[SCATTER_RGBA] * len(pdata_pct),
+            s=strip_size ** 2,
             linewidths=0,
             edgecolors="none",
             alpha=STRIP_ALPHA,
@@ -578,8 +592,10 @@ def plot_band(ax, band_label, order, pvals_dict, show_xlabel=True, show_ylabel=T
     )
 
     ax.set_xticks(range(len(order)))
-    ax.set_xticklabels(order, fontsize=FONT_TICK)
+    ax.set_xticklabels(order, fontsize=fs_tick)
     ax.set_xlim(-0.55, len(order) - 0.45)
+    if title:
+        ax.set_title(title, fontsize=fs_label, pad=title_pad)
     finalize_gee_axes(
         ax, len(order), ylim_top,
         show_ylabel=show_ylabel, show_xlabel=show_xlabel,
@@ -588,11 +604,11 @@ def plot_band(ax, band_label, order, pvals_dict, show_xlabel=True, show_ylabel=T
 
 LEGEND_ELEMENTS = [
     mpatches.Patch(
-        facecolor=ATD.pale_box_face(COLOR_LOW_BAND),
+        facecolor=BOX_FILL_COLOR,
         edgecolor=BOX_STROKE, linewidth=BOX_LINEWIDTH, label="Low band (ref = 1 g)",
     ),
     mpatches.Patch(
-        facecolor=ATD.pale_box_face(COLOR_HIGH_BAND),
+        facecolor=BOX_FILL_COLOR,
         edgecolor=BOX_STROKE, linewidth=BOX_LINEWIDTH, label="High band (ref = 26 g)",
     ),
 ]

@@ -77,8 +77,12 @@ from gee_export_utils import (
     EXPORT_CANVAS,
     EXPORT_WIDTH_2COL,
     EXPORT_HEIGHT_2COL,
+    ON_TOUCH_BLUE,
     XLABEL_FORCE_PAIR,
     horizontal_panel_rects,
+    on_touch_box_color,
+    on_touch_scatter_rgba,
+    POOLED_BOX_REF,
     add_figure_legend,
 )
 
@@ -86,9 +90,7 @@ CHANCE_PCT = 50.0
 JND_PCT    = 75.0
 COMBINED_PANEL_COUNT = 2
 STRIP_JITTER_REF = 0.12
-COLOR_LOW_BAND = "#BAD6EB"
-COLOR_HIGH_BAND = "#5B9BD5"
-BAND_BASE_COLORS = {"Low": COLOR_LOW_BAND, "High": COLOR_HIGH_BAND}
+BAND_BASE_COLORS = {"Low": ON_TOUCH_BLUE, "High": ON_TOUCH_BLUE}
 
 
 def _load_atd_c1():
@@ -109,12 +111,14 @@ ATD_FIG2_REF_N = len(getattr(ATD, "USER_FORCES", [])) or 5
 FIG2_DODGED_BOX_WIDTH = ATD.FIG2_DODGED_BOX_WIDTH  # mpl_boxplot_width(ref_n) on full canvas
 
 
-def band_box_color(band_label):
-    return ATD.pale_box_face(BAND_BASE_COLORS[band_label])
+def band_box_color(band_label=None):
+    del band_label
+    return on_touch_box_color(ATD)
 
 
-def band_scatter_rgba(band_label):
-    return ATD._hsb_scatter_rgba(BAND_BASE_COLORS[band_label])
+def band_scatter_rgba(band_label=None):
+    del band_label
+    return on_touch_scatter_rgba(ATD)
 
 BOX_LINEWIDTH = ATD.BOX_LINEWIDTH
 CAP_WIDTH = ATD.CAP_WIDTH
@@ -129,8 +133,8 @@ BRACKET_BASE_PAD = 3.0
 BRACKET_TIER_STEP = 8.0
 BRACKET_YLIM_CAP = 122.0
 SAVE_DPI_COMBINED = 600
-POOL_ON_NAIL = "#1565C0"
-POOL_OFF_NAIL = "#81D4FA"
+POOL_ON_NAIL = ON_TOUCH_BLUE
+POOL_OFF_NAIL = ON_TOUCH_BLUE
 POOL_GROUP_ORDER = ["On-nail", "Off-nail"]
 POOL_PALETTE = {"On-nail": POOL_ON_NAIL, "Off-nail": POOL_OFF_NAIL}
 POOL_X_LABELS = ["On-nail\n(C+D)", "Off-nail\n(A+F)"]
@@ -162,21 +166,24 @@ def _gee_ax_legend(ax, handles, **kwargs):
 
 
 def _finalize_gee_accuracy_axes(ax, n_x, ylim_top, *, show_ylabel=True, show_xlabel=True):
+    fs_tick = FONT_TICK
+    fs_label = FONT_LABEL
+    labelpad = ATD.FIG_AXIS_LABELPAD
     ax.set_ylim(ATD.ACCURACY_YMIN, min(ATD.FIG2_BRACKET_YLIM_CAP, ylim_top))
     ax.set_yticks(ATD.ACCURACY_YTICKS)
     ax.grid(False)
-    ax.tick_params(axis="both", which="both", length=0, labelsize=FONT_TICK)
+    ax.tick_params(axis="both", which="both", length=0, labelsize=fs_tick)
     if show_ylabel:
         ax.set_ylabel(
             "Discrimination Accuracy (%)",
-            fontsize=FONT_LABEL,
-            labelpad=ATD.FIG_AXIS_LABELPAD,
+            fontsize=fs_label,
+            labelpad=labelpad,
         )
     if show_xlabel:
         ax.set_xlabel(
             XLABEL_FORCE_PAIR,
-            fontsize=FONT_LABEL,
-            labelpad=ATD.FIG_AXIS_LABELPAD,
+            fontsize=fs_label,
+            labelpad=labelpad,
         )
     sns.despine(ax=ax)
     ATD.apply_accuracy_y_spine_bounds(ax)
@@ -196,42 +203,42 @@ def _pooled_star_label(p):
     return "n.s."
 
 
-def _pooled_sig_bracket(ax, x_l, x_r, y_base, text="", tick_h=0.5, text_pad=0.0):
+def _pooled_sig_bracket(ax, x_l, x_r, y_base, text="", tick_h=0.5, text_pad=0.0,
+                        *, fontsize=FONT_BRACKET_STAR, linewidth=BRACKET_LINEWIDTH):
     y_top = y_base + tick_h
     ax.plot(
         [x_l, x_r], [y_top, y_top],
-        color=ACCENT_RED, linewidth=BRACKET_LINEWIDTH, clip_on=False, zorder=25,
+        color=ACCENT_RED, linewidth=linewidth, clip_on=False, zorder=25,
     )
     if text:
         ax.text(
             (x_l + x_r) / 2, y_top + text_pad, text,
-            ha="center", va="bottom", fontsize=FONT_BRACKET_STAR,
+            ha="center", va="bottom", fontsize=fontsize,
             color=ACCENT_RED, fontweight="bold", clip_on=False, zorder=26,
         )
 
 
-def _pooled_panel_title(ax, pair_label):
+def _pooled_panel_title(ax, pair_label, *, y=0.95, clip_on=False, fontsize=FONT_PANEL_TITLE):
     ax.text(
-        0.5, 0.95, f"{pair_label} (g)", transform=ax.transAxes,
-        ha="center", va="bottom", fontsize=FONT_PANEL_TITLE,
-        fontweight="normal", clip_on=False,
+        0.5, y, f"{pair_label} (g)", transform=ax.transAxes,
+        ha="center", va="bottom", fontsize=fontsize,
+        fontweight="normal", clip_on=clip_on,
     )
 
 
-def _pooled_scatter_strip(ax, x_pos, vals, subjects, color, jitter_arr):
-    rgba = ATD._hsb_scatter_rgba(color, ATD.SCATTER_HSB_BRIGHTNESS, ATD.STRIP_ALPHA)
+def _pooled_scatter_strip(ax, x_pos, vals, subjects, rgba, jitter_arr, *, dot_size=SCATTER_DOT_SIZE):
     mask = np.array([s in PARTIAL_SUBJECTS for s in subjects])
     kw = dict(linewidths=0, zorder=3, clip_on=False)
     if (~mask).any():
         ax.scatter(
             x_pos + jitter_arr[~mask], vals[~mask],
-            c=[rgba] * int((~mask).sum()), s=SCATTER_DOT_SIZE ** 2,
+            c=[rgba] * int((~mask).sum()), s=dot_size ** 2,
             marker="o", **kw,
         )
     if mask.any():
         ax.scatter(
             x_pos + jitter_arr[mask], vals[mask],
-            c=[rgba] * int(mask.sum()), s=(SCATTER_DOT_SIZE * 1.3) ** 2,
+            c=[rgba] * int(mask.sum()), s=(dot_size * 1.3) ** 2,
             marker="^", **kw,
         )
 
@@ -251,9 +258,13 @@ def _pooled_inward_ticks(ax, y_ticks):
             ax.plot([0, frac_y], [y, y], transform=y_tr, **kw)
 
 
-def _draw_pooled_pair_panel(ax, pair, subj_acc_reg, region_pval, rng):
+def _draw_pooled_pair_panel(ax, pair, subj_acc_reg, region_pval, rng, *, box_width=0.45,
+                            clip_titles=False):
     """One force-pair panel — On-nail vs Off-nail on x (ATD pooled layout)."""
     tops = {}
+    scatter_rgba = on_touch_scatter_rgba(ATD)
+    box_fill = on_touch_box_color(ATD)
+    jitter_span = STRIP_JITTER_REF * box_width / POOLED_BOX_REF
     for xi, grp in enumerate(POOL_GROUP_ORDER):
         rows = subj_acc_reg[
             (subj_acc_reg["pair_label"] == pair)
@@ -263,33 +274,39 @@ def _draw_pooled_pair_panel(ax, pair, subj_acc_reg, region_pval, rng):
         subjects = rows["Subject"].values
         if len(vals) == 0:
             continue
-        color = POOL_PALETTE[grp]
         bp = ax.boxplot(
-            [vals], positions=[xi], widths=0.45,
+            [vals], positions=[xi], widths=box_width,
             patch_artist=True, showfliers=False, zorder=2,
             whiskerprops=dict(color=BLACK, linewidth=BOX_LINEWIDTH),
             capprops=dict(color=BLACK, linewidth=CAP_LINEWIDTH),
             medianprops=dict(color=ACCENT_RED, linewidth=MEDIAN_LINEWIDTH),
             boxprops=dict(
-                facecolor=ATD.pale_box_face(color),
+                facecolor=box_fill,
                 edgecolor=BLACK, linewidth=BOX_LINEWIDTH,
             ),
         )
         whiskers = [w.get_ydata()[1] for w in bp["whiskers"]]
         tops[grp] = max(whiskers) if whiskers else float(np.max(vals))
-        jitter = rng.uniform(-0.12, 0.12, size=len(vals))
-        _pooled_scatter_strip(ax, xi, vals, subjects, color, jitter)
+        jitter = rng.uniform(-jitter_span, jitter_span, size=len(vals))
+        _pooled_scatter_strip(ax, xi, vals, subjects, scatter_rgba, jitter)
 
     if tops and not np.isnan(region_pval):
         star = _pooled_star_label(region_pval)
-        y_brk = max(max(tops.values()) + 3.0, 103)
+        if clip_titles:
+            y_brk = min(max(max(tops.values()) + 2.0, 82), 88)
+            title_y = 0.62
+        else:
+            y_brk = max(max(tops.values()) + 3.0, 103)
+            title_y = 0.95
         _pooled_sig_bracket(ax, 0, 1, y_brk, text=star)
+    else:
+        title_y = 0.88 if clip_titles else 0.95
 
     ax.axhline(
         JND_PCT, color=CRITERION_COLOR, linestyle="--",
         linewidth=1.0, alpha=0.85, zorder=20,
     )
-    _pooled_panel_title(ax, pair)
+    _pooled_panel_title(ax, pair, y=title_y, clip_on=clip_titles)
     ax.set_xticks([0, 1])
     ax.set_xticklabels(POOL_X_LABELS, fontsize=FONT_XTICK)
     ax.set_yticks(POOLED_Y_TICKS)
@@ -847,8 +864,11 @@ def _draw_pair_accuracy_boxplot(ax, pair_order, values_by_pair, *,
                                 bracket_in_data_space=False, box_color="#dde6f0",
                                 scatter_rgba=None,
                                 box_width=0.42, jitter_width=0.12,
-                                finalize_gee_axes=True, scatter_marker="o"):
+                                finalize_gee_axes=True, scatter_marker="o",
+                                style_scale=1.0):
     """Boxplot + scatter; y-axis 0–100 (brackets may extend ylim when in data space)."""
+    lw = BOX_LINEWIDTH * style_scale
+    med_lw = MEDIAN_LINEWIDTH * style_scale
     band_max = 0.0
     for xi, pair in enumerate(pair_order):
         vals = np.asarray(values_by_pair.get(pair, []), dtype=float) * 100
@@ -858,18 +878,18 @@ def _draw_pair_accuracy_boxplot(ax, pair_order, values_by_pair, *,
         bp = ax.boxplot(
             [vals], positions=[xi], widths=box_width,
             patch_artist=True, showfliers=False, capwidths=CAP_WIDTH,
-            whiskerprops={"linewidth": BOX_LINEWIDTH, "color": BOX_STROKE},
-            capprops={"linewidth": BOX_LINEWIDTH, "color": BOX_STROKE},
-            medianprops={"color": ACCENT_RED, "linewidth": MEDIAN_LINEWIDTH},
-            boxprops={"linewidth": BOX_LINEWIDTH, "edgecolor": BOX_STROKE},
+            whiskerprops={"linewidth": lw, "color": BOX_STROKE},
+            capprops={"linewidth": lw, "color": BOX_STROKE},
+            medianprops={"color": ACCENT_RED, "linewidth": med_lw},
+            boxprops={"linewidth": lw, "edgecolor": BOX_STROKE},
         )
         bp["boxes"][0].set_facecolor(box_color)
         bp["boxes"][0].set_edgecolor(BOX_STROKE)
         bp["medians"][0].set_color(ACCENT_RED)
-        bp["medians"][0].set_linewidth(MEDIAN_LINEWIDTH)
+        bp["medians"][0].set_linewidth(med_lw)
         jx = xi + jitter_x(len(vals), width=jitter_width)
         dot_rgba = scatter_rgba if scatter_rgba is not None else box_color
-        dot_size = 20 if scatter_marker == "o" else round(20 * 1.3 ** 2)
+        dot_size = (20 if scatter_marker == "o" else round(20 * 1.3 ** 2)) * style_scale ** 2
         ax.scatter(jx, vals, c=[dot_rgba] * len(vals), s=dot_size, zorder=3,
                    linewidths=0, edgecolors="none", marker=scatter_marker)
 
@@ -914,8 +934,8 @@ def _draw_pair_accuracy_boxplot(ax, pair_order, values_by_pair, *,
         )
 
     ax.set_xticks(range(len(pair_order)))
-    tick_fs = FONT_TICK if bracket_in_data_space else 11
-    label_fs = FONT_LABEL if bracket_in_data_space else 11
+    tick_fs = (FONT_TICK if bracket_in_data_space else 11) * style_scale
+    label_fs = (FONT_LABEL if bracket_in_data_space else 11) * style_scale
     ax.set_xticklabels(pair_order, fontsize=tick_fs)
     ax.set_xlim(-0.55, len(pair_order) - 0.45)
     if not bracket_in_data_space or not finalize_gee_axes:
@@ -939,6 +959,7 @@ def _draw_pair_accuracy_boxplot(ax, pair_order, values_by_pair, *,
     if bracket_in_data_space and finalize_gee_axes:
         _finalize_gee_accuracy_axes(
             ax, len(pair_order), ylim_top, show_ylabel=show_ylabel,
+            style_scale=style_scale,
         )
     if dot_label:
         ax.text(0.02, 0.98, dot_label, transform=ax.transAxes,
@@ -966,7 +987,7 @@ def _draw_accuracy_panel(ax, subj_acc_df, pair_order, pairwise_pvals_dict, *, sh
                          bracket_in_data_space=False, box_color="#dde6f0",
                          scatter_rgba=None,
                          box_width=0.42, jitter_width=0.12,
-                         finalize_gee_axes=True, scatter_marker="o"):
+                         finalize_gee_axes=True, scatter_marker="o", style_scale=1.0):
     subj_acc_sorted = subj_acc_df[subj_acc_df["pair_label"].isin(pair_order)].copy()
     values_by_pair = {
         pair: subj_acc_sorted.loc[subj_acc_sorted["pair_label"] == pair, "accuracy"].values
@@ -983,7 +1004,36 @@ def _draw_accuracy_panel(ax, subj_acc_df, pair_order, pairwise_pvals_dict, *, sh
         jitter_width=jitter_width,
         finalize_gee_axes=finalize_gee_axes,
         scatter_marker=scatter_marker,
+        style_scale=style_scale,
     )
+
+
+def draw_accuracy_band_on_ax(ax, spec, *, show_brackets=False, show_ylabel=True,
+                             show_xlabel=True, title=None, scatter_marker="o", title_pad=4):
+    """Single-band accuracy-by-pair panel (standalone 2-col figure)."""
+    bl = spec["band_label"]
+    pair_order = spec["pair_order"]
+    box_w = combined_panel_box_width(len(pair_order))
+    jitter_w = STRIP_JITTER_REF * box_w / POOLED_BOX_REF
+    pvals = spec["pairwise_pvals"] if show_brackets else None
+    _, ylim_top = _draw_accuracy_panel(
+        ax, spec["subj_acc"], pair_order, pvals,
+        show_ylabel=show_ylabel,
+        bracket_in_data_space=True,
+        box_color=band_box_color(bl),
+        scatter_rgba=band_scatter_rgba(bl),
+        box_width=box_w,
+        jitter_width=jitter_w,
+        finalize_gee_axes=False,
+        scatter_marker=scatter_marker,
+    )
+    if title:
+        ax.set_title(title, fontsize=FONT_LABEL, pad=title_pad)
+    _finalize_gee_accuracy_axes(
+        ax, len(pair_order), ylim_top,
+        show_ylabel=show_ylabel, show_xlabel=show_xlabel,
+    )
+    return ylim_top
 
 
 def _combined_accuracy_legend_handles(band_specs):
@@ -1013,27 +1063,19 @@ def save_combined_accuracy_by_pair(band_specs, *, show_brackets=True, scatter_ma
         ax = fig.add_axes(rect)
         axes.append(ax)
         panel_n_x.append(len(spec["pair_order"]))
-        box_w = combined_panel_box_width(len(spec["pair_order"]))
-        jitter_w = STRIP_JITTER_REF * box_w / FIG2_DODGED_BOX_WIDTH
-        pvals = spec["pairwise_pvals"] if show_brackets else None
-        bl = spec["band_label"]
-        _, ylim_top = _draw_accuracy_panel(
-            ax, spec["subj_acc"], spec["pair_order"], pvals,
+        ylim_top = draw_accuracy_band_on_ax(
+            ax, spec, show_brackets=show_brackets,
             show_ylabel=(ax is axes[0]),
-            bracket_in_data_space=True,
-            box_color=band_box_color(bl),
-            scatter_rgba=band_scatter_rgba(bl),
-            box_width=box_w,
-            jitter_width=jitter_w,
-            finalize_gee_axes=False,
+            show_xlabel=True,
+            title=band_title_text(
+                spec["band_label"], spec["title_ref"], spec["n_subj"],
+            ),
             scatter_marker=scatter_marker,
         )
         shared_ylim = max(shared_ylim, ylim_top)
 
     for ax, n_x in zip(axes, panel_n_x):
-        _finalize_gee_accuracy_axes(
-            ax, n_x, shared_ylim, show_ylabel=(ax is axes[0]),
-        )
+        ax.set_ylim(ATD.ACCURACY_YMIN, min(ATD.FIG2_BRACKET_YLIM_CAP, shared_ylim))
 
     add_figure_legend(
         fig, _combined_accuracy_legend_handles(band_specs),
@@ -1200,13 +1242,41 @@ def run_subject_analysis(df_band, band_label, pair_order, out_suffix, title_ref)
         pd.DataFrame(summary_rows).to_csv(summary_path, index=False)
 
 
-def run_band_analysis(df_band, band_label, pair_order, out_suffix, title_ref):
-    """Run SDT, GEE, and figures for one force band (Low ref=1g or High ref=26g)."""
+def build_band_spec(df_band, band_label, pair_order, title_ref):
+    """Compute per-band data needed for accuracy / on-nail figures (no file output)."""
     subj_acc = (
         df_band.groupby(["Subject", "pair_label"])["correct"]
         .mean().reset_index()
         .rename(columns={"correct": "accuracy"})
     )
+    pairwise_pvals = run_gee_pairwise(df_band, subj_acc, pair_order)
+    region_pvals = run_gee_region(df_band, pair_order)
+    df_reg = df_band[df_band["region_group"].notna()]
+    subj_acc_reg = (
+        df_reg.groupby(["Subject", "pair_label", "region_group"])["correct"]
+        .mean().reset_index().rename(columns={"correct": "accuracy"})
+    )
+    n_subj = df_band["Subject"].nunique()
+    return {
+        "band_label": band_label,
+        "title_ref": title_ref,
+        "pair_order": pair_order,
+        "subj_acc": subj_acc,
+        "pairwise_pvals": pairwise_pvals,
+        "n_subj": n_subj,
+        "subj_acc_reg": subj_acc_reg,
+        "region_pvals": region_pvals,
+    }
+
+
+def run_band_analysis(df_band, band_label, pair_order, out_suffix, title_ref):
+    """Run SDT, GEE, and figures for one force band (Low ref=1g or High ref=26g)."""
+    spec = build_band_spec(df_band, band_label, pair_order, title_ref)
+    subj_acc = spec["subj_acc"]
+    pairwise_pvals = spec["pairwise_pvals"]
+    region_pvals = spec["region_pvals"]
+    subj_acc_reg = spec["subj_acc_reg"]
+    n_subj = spec["n_subj"]
 
     sdt_rows = []
     for (pair, grp), sub in df_band[df_band["region_group"].notna()].groupby(["pair_label", "region_group"]):
@@ -1230,16 +1300,12 @@ def run_band_analysis(df_band, band_label, pair_order, out_suffix, title_ref):
     df_order = pd.DataFrame(order_rows)
     df_order.to_csv(os.path.join(OUTPUT_DIR, f"order_effect{out_suffix}.csv"), index=False)
 
-    pairwise_pvals = run_gee_pairwise(df_band, subj_acc, pair_order)
-    region_pvals   = run_gee_region(df_band, pair_order)
-
     subj_acc_split = (
         df_band.groupby(["Subject", "pair_label", "GroundTruth"])["correct"]
         .mean().reset_index()
         .rename(columns={"correct": "accuracy"})
     )
 
-    n_subj = df_band["Subject"].nunique()
     band_title = band_title_text(band_label, title_ref, n_subj)
 
     OFFSET = 0.22
@@ -1288,12 +1354,6 @@ def run_band_analysis(df_band, band_label, pair_order, out_suffix, title_ref):
     out_a2 = f"sd_accuracy_split{out_suffix}.png"
     fig.savefig(os.path.join(OUTPUT_DIR, out_a2), dpi=150, bbox_inches="tight")
     plt.close(fig)
-
-    df_reg = df_band[df_band["region_group"].notna()]
-    subj_acc_reg = (
-        df_reg.groupby(["Subject", "pair_label", "region_group"])["correct"]
-        .mean().reset_index().rename(columns={"correct": "accuracy"})
-    )
 
     out_b = f"sd_onnail_vs_offnail{out_suffix}.png"
     save_region_onnail_figure(
@@ -1377,14 +1437,7 @@ def run_band_analysis(df_band, band_label, pair_order, out_suffix, title_ref):
     )
     run_subject_analysis(df_band, band_label, pair_order, out_suffix, title_ref)
 
-    return {
-        "band_label": band_label,
-        "title_ref": title_ref,
-        "pair_order": pair_order,
-        "subj_acc": subj_acc,
-        "pairwise_pvals": pairwise_pvals,
-        "n_subj": n_subj,
-    }
+    return spec
 
 
 if __name__ == "__main__":
