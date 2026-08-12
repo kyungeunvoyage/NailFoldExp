@@ -90,8 +90,8 @@ SCATTER_ZORDER = 5
 ACCENT_RED = ATD.ACCENT_RED
 CRITERION_COLOR = ATD.CRITERION_COLOR
 REF_LINE_ZORDER = ATD.REF_LINE_ZORDER
-FONT_TICK = ATD.FONT_TICK
-FONT_LABEL = ATD.FONT_LABEL
+FONT_TICK = 20
+FONT_LABEL = 20
 FONT_ANNOT = ATD.FONT_ANNOT
 BOX_LINEWIDTH = ATD.BOX_LINEWIDTH
 CAP_LINEWIDTH = ATD.CAP_LINEWIDTH
@@ -448,6 +448,8 @@ def finalize_gee_axes(ax, n_x, ylim_top, *, show_ylabel=True, show_xlabel=True,
     sns.despine(ax=ax)
     ATD.apply_accuracy_y_spine_bounds(ax)
     ATD.add_inward_tick_guides(ax, n_x)
+    # add_inward_tick_guides resets labelsize to ATD.FONT_TICK (16) — restore
+    ax.tick_params(axis="both", which="both", length=0, labelsize=fs_tick)
     ATD.apply_accuracy_y_spine_bounds(ax)
 
 
@@ -515,7 +517,7 @@ def assign_bracket_levels(combos):
 
 # ── 10. Plot ──────────────────────────────────────────────────────────────────
 def plot_band(ax, band_label, order, pvals_dict, show_xlabel=True, show_ylabel=True,
-              *, title=None, box_width_fn=None, title_pad=4):
+              *, title=None, box_width_fn=None, title_pad=4, ylim_top_override=None):
     sub = subj_acc[subj_acc["band"] == band_label].copy()
     band_max_pct = 0.0
     width_fn = box_width_fn or boxplot_width
@@ -586,10 +588,13 @@ def plot_band(ax, band_label, order, pvals_dict, show_xlabel=True, show_ylabel=T
     )
     ax.axhline(CHANCE_PCT, color=BLACK, linestyle=":", linewidth=0.8, alpha=0.5, zorder=1)
 
-    ylim_top = min(
-        ATD.FIG2_BRACKET_YLIM_CAP,
-        max(ATD.ACCURACY_YLIM_TOP, band_max_pct + 8.0),
-    )
+    if ylim_top_override is not None:
+        ylim_top = ylim_top_override
+    else:
+        ylim_top = min(
+            ATD.FIG2_BRACKET_YLIM_CAP,
+            max(ATD.ACCURACY_YLIM_TOP, band_max_pct + 8.0),
+        )
 
     ax.set_xticks(range(len(order)))
     ax.set_xticklabels(order, fontsize=fs_tick)
@@ -635,11 +640,22 @@ def make_pairwise_figure(orientation):
     else:
         raise ValueError(f"Unknown orientation: {orientation!r}")
 
+    all_max_pct = 0.0
+    for band_label, order in [("Low", low_order), ("High", high_order)]:
+        sub = subj_acc[subj_acc["band"] == band_label].copy()
+        for pair in order:
+            pdata = sub.loc[sub["pair_label"] == pair, "accuracy"].values * 100.0
+            if len(pdata):
+                all_max_pct = max(all_max_pct, float(np.max(pdata)))
+    shared_ylim_top = min(ATD.FIG2_BRACKET_YLIM_CAP,
+                          max(ATD.ACCURACY_YLIM_TOP, all_max_pct + 8.0))
+
     plot_band(ax_low, "Low", low_order, low_pvals,
-              show_xlabel=(orientation == "horizontal"), show_ylabel=True)
+              show_xlabel=False, show_ylabel=True,
+              ylim_top_override=shared_ylim_top)
     plot_band(ax_high, "High", high_order, high_pvals,
-              show_xlabel=True, show_ylabel=(orientation == "vertical"))
-    _add_legend(fig)
+              show_xlabel=False, show_ylabel=(orientation == "vertical"),
+              ylim_top_override=shared_ylim_top)
     return fig
 
 

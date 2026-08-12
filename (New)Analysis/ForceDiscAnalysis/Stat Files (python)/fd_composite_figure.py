@@ -19,6 +19,8 @@ from pathlib import Path
 import matplotlib
 
 matplotlib.use("Agg")
+matplotlib.rcParams["font.family"]     = "sans-serif"
+matplotlib.rcParams["font.sans-serif"] = ["Helvetica", "Arial", "DejaVu Sans"]
 import matplotlib.patches as mpatches
 import matplotlib.pyplot as plt
 import numpy as np
@@ -46,8 +48,8 @@ COL2_ROW1_TITLE = "SAME/DIFFERENT"
 ONNAIL_LEGEND_LABELS = ("On-nail (C+D)", "Off-nail (A+F)")
 
 # Horizontal composite: standard 2-col export width + headroom for on-nail legend
-GRID_WIDTH_PX_H = EXPORT_WIDTH_2COL
-GRID_HEIGHT_PX_H = EXPORT_HEIGHT_2COL + ONNAIL_LEGEND_RESERVE_PX
+GRID_WIDTH_PX_H = 3260                                # col2 widened to match col1; col3 unchanged
+GRID_HEIGHT_PX_H = 2400 + ONNAIL_LEGEND_RESERVE_PX   # increased from 1298 → 2400 for wider y-axis tick spacing
 
 MARGIN_LEFT_PX = 88    # y tick digits
 MARGIN_RIGHT_PX = 22
@@ -69,13 +71,14 @@ Y_TICK_FONT_SCALE = FONT_SCALE
 COL12_TICK_FONT_SCALE = Y_TICK_FONT_SCALE
 COL12_Y_TICK_FONT_SCALE = Y_TICK_FONT_SCALE
 COL12_LABEL_FONT_SCALE = 0.28
-PAIR_X_TICK_FONT_SCALE = 0.84   # pair labels on x-axis (both rows)
+PAIR_X_TICK_FONT_SCALE  = 0.84   # pair labels on x-axis — (2,1)/(2,2) High band row
+ROW1_X_TICK_FONT_SCALE  = 0.74   # (1,1)/(1,2) Low band row — slightly smaller pair labels
 DOT_SCALE = 0.72
 LINE_SCALE = 0.90
 
 # Box width — ATD Fig3-like fill per category slot on 2-col sub-panels
 POOLED_BOX_REF = 0.45
-BOX_WIDTH_SCALE = 4.2
+BOX_WIDTH_SCALE = 2.84  # → ~90 px box width at 3260px export (was 4.2 → ~133 px)
 MAX_BOX_FRAC = 0.72
 CRITERION_PCT = 75.0
 
@@ -86,7 +89,7 @@ SCATTER_ROW_SCALE_SD = {0: 1.0, 1: 1.0}
 
 NROWS_H = 2
 NCOLS_H = 3
-COL_FRACS_H = [0.30, 0.28, 0.42]  # GEE | SD | On-nail — wider col 3 for matched boxes
+COL_FRACS_H = [0.27, 0.2595, 0.48]  # GEE | SD | On-nail — col2 exactly sized so plot area matches col1 (col1 cell − LEFT_Y_TICK_RESERVE_PX = col2 cell)
 
 NROWS_V = 3
 NCOLS_V = 2
@@ -966,7 +969,25 @@ def render_composite(stats_mod=None, sd_mod=None, sd_specs=None, *, layout="hori
         )
         onnail_dodge = _onnail_dodge_for_box(onnail_box_w)
         sd_ref_n_pairs = len(low_sd_spec["pair_order"])
-        sd_ref_box_w = _box_width_atd(atd, sd_ref_n_pairs)
+        sd_ref_cell = cells[_cell_coords(spec, band_col=0, plot_kind="sd")]
+        sd_ref_plot_w = _plot_width_frac(
+            sd_ref_cell,
+            height_px=spec["height_px"],
+            width_px=spec["width_px"],
+            left_tick_reserve_px=_left_axis_reserve_px(
+                layout=layout, band_col=0, plot_kind="sd",
+                spec=spec, show_ylabel=False,
+            ),
+        )
+        # Pixel-match SD box width to GEE col-1, correcting for column width difference
+        # and xlim span difference (both panels use xlim −0.55…n−0.45, span = n+0.1)
+        _gee_xlim_span = gee_ref_n_pairs + 0.1
+        _sd_xlim_span = sd_ref_n_pairs + 0.1
+        sd_ref_box_w = (
+            gee_ref_box_w
+            * (gee_plot_w / sd_ref_plot_w)
+            * (_sd_xlim_span / _gee_xlim_span)
+        )
     else:
         sd_ref_n_pairs = None
         sd_ref_box_w = None
@@ -1029,7 +1050,10 @@ def render_composite(stats_mod=None, sd_mod=None, sd_specs=None, *, layout="hori
             box_w=gee_box_w,
             row=band_idx,
             ylim_top=band_ylim,
-            x_tick_scale=_x_tick_scale(plot_row),
+            x_tick_scale=(
+                ROW1_X_TICK_FONT_SCALE if (layout == "horizontal" and band_col == 0)
+                else _x_tick_scale(plot_row)
+            ),
             show_x_pair_labels=show_x_pair_labels,
         )
 
@@ -1068,7 +1092,10 @@ def render_composite(stats_mod=None, sd_mod=None, sd_specs=None, *, layout="hori
                 box_w=sd_box_w,
                 row=band_idx,
                 ylim_top=band_ylim,
-                x_tick_scale=_x_tick_scale(plot_row),
+                x_tick_scale=(
+                    ROW1_X_TICK_FONT_SCALE if (layout == "horizontal" and band_col == 0)
+                    else _x_tick_scale(plot_row)
+                ),
                 show_yticklabels=False,
                 show_x_pair_labels=show_x_pair_labels,
             )
@@ -1147,13 +1174,19 @@ def render_composite(stats_mod=None, sd_mod=None, sd_specs=None, *, layout="hori
 def publish_individual_figures():
     copies = [
         (OUTPUT_STATS / "gee_pairwise_plot_horizontal_2col.png",
-         FINAL_DIR / "gee_pairwise_plot_horizontal_2col(Final).png"),
+         FINAL_DIR / "(Final)gee_pairwise_plot_horizontal_2col.png"),
         (OUTPUT_SD / "sd_accuracy_by_pair_2col_nobracket.png",
          FINAL_DIR / "sd_accuracy_by_pair_2col_nobracket(Final).png"),
+        (OUTPUT_SD / "sd_accuracy_by_pair_2col_nobracket_triangle.png",
+         FINAL_DIR / "sd_accuracy_by_pair_2col_nobracket_triangle(Final).png"),
         (OUTPUT_SD / "sd_onnail_vs_offnail_low.png",
          FINAL_DIR / "sd_onnail_vs_offnail_low(final).png"),
         (OUTPUT_SD / "sd_onnail_vs_offnail_high.png",
          FINAL_DIR / "sd_onnail_vs_offnail_high(final).png"),
+        (OUTPUT_SD / "sd_onnail_vs_offnail_low_4204px.png",
+         FINAL_DIR / "sd_onnail_vs_offnail_low_4204px(final).png"),
+        (OUTPUT_SD / "sd_onnail_vs_offnail_high_4204px.png",
+         FINAL_DIR / "sd_onnail_vs_offnail_high_4204px(final).png"),
     ]
     for src, dst in copies:
         if src.is_file():

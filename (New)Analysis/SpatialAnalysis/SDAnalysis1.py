@@ -28,6 +28,8 @@ import numpy as np
 import pandas as pd
 import matplotlib
 matplotlib.use("Agg")
+matplotlib.rcParams["font.family"]     = "sans-serif"
+matplotlib.rcParams["font.sans-serif"] = ["Helvetica", "Arial", "DejaVu Sans"]
 import matplotlib.pyplot as plt
 import matplotlib.lines as mlines
 import seaborn as sns
@@ -493,8 +495,9 @@ def save_fig_psych(fig, stem):
     print(f"  → {legacy}  ({master.width}×{master.height} px)")
 
 
-def save_fig_2col(fig, stem):
-    """2-col export matching render_final_figures / Fig2 (2102 px wide)."""
+def save_fig_2col(fig, stem, target_h=None):
+    """2-col export matching render_final_figures / Fig2 (2102 px wide).
+    If target_h is given, the image is resized to exactly (2102, target_h) px."""
     import io
     from PIL import Image
     w_in, _ = fig.get_size_inches()
@@ -505,7 +508,7 @@ def save_fig_2col(fig, stem):
                 pad_inches=0.04, facecolor="white")
     buf.seek(0)
     master = Image.open(buf).convert("RGB")
-    h = round(w_px * master.height / master.width)
+    h = target_h if target_h is not None else round(w_px * master.height / master.width)
     master = master.resize((w_px, h), Image.Resampling.LANCZOS)
     out_2col = os.path.join(OUTPUT_DIR, f"{stem}_2col.png")
     legacy   = os.path.join(OUTPUT_DIR, f"{stem}.png")
@@ -992,7 +995,7 @@ def make_signed_boxplot_mm(force):
     ATD.apply_plot_style()
 
     signed_vals = sorted(subj_sym["signed_offset_mm"].unique())
-    bw      = 0.14
+    bw      = 0.134  # → ~90 px box width at 2102px export
     gap_in  = 0.28   # wider spacing so tick labels don't crowd
     rng     = np.random.default_rng(42)
 
@@ -1017,11 +1020,11 @@ def make_signed_boxplot_mm(force):
         bp = ax.boxplot(
             sub, positions=[xp], widths=bw * 0.82,
             patch_artist=True, showfliers=False,
-            medianprops=dict(color="#CC0000", lw=2.0),
-            whiskerprops=dict(color="#000000", lw=1.4),
-            capprops=dict(color="#000000", lw=1.4),
+            medianprops=dict(color="#CC0000", lw=1.5),
+            whiskerprops=dict(color="#000000", lw=1.0),
+            capprops=dict(color="#000000", lw=1.0),
             boxprops=dict(facecolor=box_fill,
-                          edgecolor="#000000", lw=1.8),
+                          edgecolor="#000000", lw=1.0),
         )
         bp["boxes"][0].set_edgecolor("#000000")
         for whisker in bp["whiskers"]:
@@ -1042,23 +1045,23 @@ def make_signed_boxplot_mm(force):
     )
 
     # x-axis: one tick per mm value
+    tick_fs = 22
     ax.set_xticks(list(x_positions.values()))
     ax.set_xticklabels(
         [f"{d:+.1f}" for d in signed_vals],
-        fontsize=FONT_TICK, rotation=0,
+        fontsize=tick_fs, rotation=0,
     )
     ax.set_xlim(min(x_positions.values()) - bw, max(x_positions.values()) + bw)
     ax.set_ylim(ATD.ACCURACY_YMIN, ATD.ACCURACY_YLIM_TOP)
     ax.set_yticks(ATD.ACCURACY_YTICKS)
-    ax.set_yticklabels(["0", "20", "40", "60", "80", "100"], fontsize=FONT_TICK)
+    ax.set_yticklabels(["0", "20", "40", "60", "80", "100"], fontsize=tick_fs)
     y0, y1 = ATD.ACCURACY_YSPINE
     ax.spines["left"].set_bounds(y0, y1)
-    ax.set_xlabel("Offset distance (mm)", fontsize=FONT_LABEL + 4,
-                  labelpad=ATD.FIG_AXIS_LABELPAD)
-    ax.set_ylabel("Spatial accuracy (%)", fontsize=FONT_LABEL + 4,
-                  labelpad=ATD.FIG_AXIS_LABELPAD)
+    ax.set_xlabel("")
+    ax.set_ylabel("")
 
     _despine(ax)
+    ax.tick_params(length=0, labelsize=tick_fs)  # re-apply; _despine resets to FONT_TICK
     fig.subplots_adjust(
         left=0.11, right=0.98,
         top=0.92, bottom=ATD.FIG_LEGEND_BOTTOM,
@@ -1167,12 +1170,12 @@ def render_all_figures(stem_suffix=""):
 
     print("  [Fig 4d] Signed-offset boxplot – 1 g (mm) ...")
     fig = make_signed_boxplot_mm(1.0)
-    save_fig_2col(fig, f"sd_signed_boxplot_1g_mm{tag}")
+    save_fig_2col(fig, f"sd_signed_boxplot_1g_mm{tag}", target_h=1200)
     plt.close(fig)
 
     print("  [Fig 4e] Signed-offset boxplot – 26 g (mm) ...")
     fig = make_signed_boxplot_mm(26.0)
-    save_fig_2col(fig, f"sd_signed_boxplot_26g_mm{tag}")
+    save_fig_2col(fig, f"sd_signed_boxplot_26g_mm{tag}", target_h=1200)
     plt.close(fig)
 
     print("  [Fig 5] Region C vs D paired accuracy ...")

@@ -1325,12 +1325,12 @@ else:
         "A": "Off-nail",
         "F": "Off-nail",
     }
-    POOL_GROUP_ORDER = ["On-nail", "Off-nail"]
+    POOL_GROUP_ORDER = ["Off-nail", "On-nail"]
     POOL_PALETTE = {
         "On-nail":  ON_TOUCH,
         "Off-nail": "#7C94B8",   # same as Off-Nail (A) in NAIL_PALETTE
     }
-    POOL_X_LABELS = ["On-nail\n(C+D)", "Off-nail\n(A+F)"]
+    POOL_X_LABELS = ["Off-nail\n(A+F)", "On-nail\n(C+D)"]
 
     print("\n[Figure 6 — On-nail(C+D) vs Off-nail(A+F) | pooled area means, by force, RE=Subject]")
 

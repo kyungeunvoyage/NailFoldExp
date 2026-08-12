@@ -9,7 +9,7 @@ render_paper_figures.py
 
 공유 스타일
   FONT_TICK  = 16
-  FONT_LABEL = 14
+  FONT_LABEL = 17
   FIG_SIZE   = (8.0, 4.5) inches  →  모든 axes 높이 동일 → y축 간격 동일
   SAVE_DPI   = 600
   TARGET_W   = 2102 px (2col)
@@ -24,12 +24,14 @@ os.environ["PAPER_RENDER"] = "1"   # suppress auto-generation in each module
 
 import matplotlib
 matplotlib.use("Agg")
+matplotlib.rcParams["font.family"]     = "sans-serif"
+matplotlib.rcParams["font.sans-serif"] = ["Helvetica", "Arial", "DejaVu Sans"]
 import matplotlib.pyplot as plt
 from PIL import Image
 
 # ─── Shared style ─────────────────────────────────────────────────────────────
 FONT_TICK  = 16
-FONT_LABEL = 14
+FONT_LABEL = 17
 FIG_SIZE   = (8.0, 4.5)
 SAVE_DPI   = 600
 TARGET_W   = 2102

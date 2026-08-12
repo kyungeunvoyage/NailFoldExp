@@ -20,21 +20,24 @@ from matplotlib.patches import Patch
 # 스타일 설정
 # ----------------------------------------------------------------------
 plt.rcParams.update({
-    "font.family": "DejaVu Sans",
-    "font.size": 11,
-    "axes.linewidth":    1.5,
-    "axes.edgecolor":    "#444444",
+    "font.family":       "sans-serif",
+    "font.sans-serif":   ["Helvetica", "Arial", "DejaVu Sans"],
+    "font.size":         11,
+    "axes.linewidth":    1,
+    "axes.edgecolor":    "#000000",
+    "xtick.color":       "#000000",
+    "ytick.color":       "#000000",
     "xtick.direction":   "in",
     "ytick.direction":   "in",
-    "xtick.major.width": 1.5,
-    "ytick.major.width": 1.5,
-    "axes.grid": False,
+    "xtick.major.width": 1,
+    "ytick.major.width": 1,
+    "axes.grid":         False,
 })
 
 METRICS = [
-    ("Deformation radius (mm)",     "Deformation radius (mm)",     (0, 3),    [0, 1, 2, 3]),
-    ("Penetration depth (mm)",      "Penetration depth (mm)",      (0, 0.20), [0, 0.05, 0.10, 0.15, 0.20]),
-    ("Max compressive strain (%)",  "Max compressive strain (%)",  (0, 16),   [0, 4, 8, 12, 16]),
+    ("Deformation radius (mm)",     "Deformation radius (mm)",     (0, 2.5),    [0, 0.5, 1.0, 1.5, 2.0, 2.5]),
+    ("Penetration depth (mm)",      "Penetration depth (mm)",      (0, 0.15), [0, 0.03, 0.06, 0.09, 0.12, 0.15]),
+    ("Max compressive strain (%)",  "Max compressive strain (%)",  (0, 15),   [0, 3, 6, 9, 12,15]),
 ]
 
 # Region별 대표 색상
@@ -93,7 +96,7 @@ def _draw_group(ax, values_by_trial, pos, fill_color, width=0.5, jitter=0.13):
         ax.scatter(
             x, vals, s=22, marker=TRIAL_MARKERS.get(trial, "o"),
             facecolor=fill_color, edgecolor="none", linewidth=0,
-            alpha=0.85, zorder=3,
+            alpha=0.50, zorder=3,
         )
 
 
@@ -106,31 +109,63 @@ def _despine(ax, *, ylim=None):
     if ylim is not None and ylim[0] == 0:
         yticks = [t for t in ax.get_yticks() if ylim[0] - 1e-9 <= t <= ylim[1] + 1e-9]
         if yticks:
-            ax.spines["left"].set_bounds(yticks[0], yticks[-1])
+            # extend spine down to actual ylim bottom (below 0) so it meets the x-axis
+            ax.spines["left"].set_bounds(ax.get_ylim()[0], yticks[-1])
     ax.grid(False)
 
 
 def _finalize_axis(ax, ylabel, ylim, yticks, xlabel, xticklabels, positions):
-    ax.set_ylabel(ylabel, fontsize=11)
-    ax.set_xlabel(xlabel, fontsize=11)
-    ax.set_ylim(ylim)
+    tick_fs = label_fs = 20
+    ax.set_ylabel(ylabel, fontsize=label_fs)
+    if xlabel:
+        ax.set_xlabel(xlabel, fontsize=label_fs)
+    else:
+        ax.set_xlabel("")
+    # add padding below 0 so the spine starts at 0 with visible gap underneath
+    y_range = ylim[1] - ylim[0]
+    y_pad   = y_range * 0.035  # tighter than before — reclaim vertical plot area
+    ax.set_ylim(ylim[0] - y_pad, ylim[1])
     ax.set_yticks(yticks)
     ax.set_xticks(positions)
-    ax.set_xticklabels(xticklabels)
-    ax.set_xlim(positions[0] - 0.7, positions[-1] + 0.7)
-    ax.tick_params(labelsize=10)
+    ax.set_xticklabels(xticklabels, fontsize=tick_fs)
+    ax.set_yticklabels([f"{t:g}" for t in yticks], fontsize=tick_fs)
+    for t in ax.get_xticklabels():
+        t.set_linespacing(0.95)
+        t.set_multialignment("center")
+    ax.set_xlim(positions[0] - XLIM_PAD, positions[-1] + XLIM_PAD)
+    ax.tick_params(axis="both", labelsize=tick_fs)
     _despine(ax, ylim=ylim)
 
 
-def plot_by_force(df, region, forces=None, title=None, save=None, box_width=0.7):
+# Compact canvas: shorter height, tight vertical margins so axes (boxes) stay large
+FIGSIZE = (12.50, 4.80)   # was (12.50, 6.00)
+LAYOUT  = dict(left=0.07, right=0.995, top=0.98, bottom=0.13, wspace=0.30)
+LAYOUT_LONG_XTICK = dict(left=0.07, right=0.995, top=0.98, bottom=0.14, wspace=0.30)
+# fig1 reference: 4 forces, box_width=0.7, xlim pad=0.7 each side
+FIG1_N_CATS = 4
+FIG1_BOX_WIDTH = 0.7
+XLIM_PAD = 0.7
+
+
+def _box_width_match_fig1(n_cats):
+    """Scale box width so pixel size matches fig1 (same panel width)."""
+    # xlim span = (n-1) + 2*XLIM_PAD  for positions 1..n
+    span_ref = (FIG1_N_CATS - 1) + 2 * XLIM_PAD   # 4.4
+    span_cur = (n_cats - 1) + 2 * XLIM_PAD
+    return FIG1_BOX_WIDTH * span_cur / span_ref
+
+
+def plot_by_force(df, region, forces=None, title=None, save=None, box_width=None):
     """지정한 Region을 여러 Force에 걸쳐 비교 (이미지 1 유형)."""
     sub = df[df["Region"] == region]
     if forces is None:
         forces = sorted(sub["Force"].unique())
     positions = list(range(1, len(forces) + 1))
-    xticklabels = [f"{f:.2f} g" for f in forces]
+    xticklabels = [f"{f:.2f}" for f in forces]
+    if box_width is None:
+        box_width = FIG1_BOX_WIDTH
 
-    fig, axes = plt.subplots(1, 3, figsize=(10.51, 6.49))
+    fig, axes = plt.subplots(1, 3, figsize=FIGSIZE)
     for ax, (col, ylabel, ylim, yticks) in zip(axes, METRICS):
         for pos, f in zip(positions, forces):
             g = sub[sub["Force"] == f]
@@ -138,29 +173,38 @@ def plot_by_force(df, region, forces=None, title=None, save=None, box_width=0.7)
                              for t in sorted(g["Trial"].unique())}
             _draw_group(ax, vals_by_trial, pos, FORCE_SHADES.get(f, REGION_COLORS[region]),
                         width=box_width, jitter=box_width * 0.25)
-        _finalize_axis(ax, ylabel, ylim, yticks, "Force (g)", xticklabels, positions)
+        _finalize_axis(ax, ylabel, ylim, yticks, "", xticklabels, positions)
 
-    fig.tight_layout()
+    fig.subplots_adjust(**LAYOUT)
     if save:
         fig.savefig(save, dpi=200)
     return fig
 
 
-def plot_by_region(df, force, regions, title=None, save=None):
+def plot_by_region(df, force, regions, title=None, save=None, box_width=None,
+                   xtick_labels=None, layout=None):
     """지정한 Force에서 여러 Region을 비교 (이미지 2·3 유형)."""
     sub = df[df["Force"] == force]
     positions = list(range(1, len(regions) + 1))
+    if box_width is None:
+        box_width = _box_width_match_fig1(len(regions))
 
-    fig, axes = plt.subplots(1, 3, figsize=(10.51, 6.49))
+    _label_map = {"Glabrous": "Volar\nfingerpad", "Region A": "LNF", "Region CD": "PNF"}
+    if xtick_labels is None:
+        xticklabels = [_label_map.get(r, r.replace(" ", "\n")) for r in regions]
+    else:
+        xticklabels = list(xtick_labels)
+    fig, axes = plt.subplots(1, 3, figsize=FIGSIZE)
     for ax, (col, ylabel, ylim, yticks) in zip(axes, METRICS):
         for pos, reg in zip(positions, regions):
             g = sub[sub["Region"] == reg]
             vals_by_trial = {t: g[g["Trial"] == t][col].to_numpy()
                              for t in sorted(g["Trial"].unique())}
-            _draw_group(ax, vals_by_trial, pos, REGION_COLORS[reg])
-        _finalize_axis(ax, ylabel, ylim, yticks, "", regions, positions)
+            _draw_group(ax, vals_by_trial, pos, REGION_COLORS[reg],
+                        width=box_width, jitter=box_width * 0.25)
+        _finalize_axis(ax, ylabel, ylim, yticks, "", xticklabels, positions)
 
-    fig.tight_layout()
+    fig.subplots_adjust(**(layout or LAYOUT))
     if save:
         fig.savefig(save, dpi=200)
     return fig
@@ -181,11 +225,31 @@ if __name__ == "__main__":
     # 이미지 2: 0.40 g, Region CD vs Glabrous
     plot_by_region(df, 0.40, ["Region CD", "Glabrous"],
                    title="0.40 g",
-                   save=os.path.join(OUT_DIR, "fig2_0p40g_by_region.png"))
+                   save=os.path.join(OUT_DIR, "fig2_0p40g_by_region.png"),
+                   xtick_labels=["Dorsal\nPNF skin",
+                                 "Volar \nfingerpad"],
+                   layout=LAYOUT_LONG_XTICK)
 
     # 이미지 3: 1.00 g, Region A vs Region CD vs Glabrous
     plot_by_region(df, 1.00, ["Region A", "Region CD", "Glabrous"],
                    title="1.00 g",
                    save=os.path.join(OUT_DIR, "fig3_1p00g_by_region.png"))
+
+    # generate resized versions
+    from PIL import Image
+    base_figs = [
+        "fig1_regionCD_by_force.png",
+        "fig2_0p40g_by_region.png",
+        "fig3_1p00g_by_region.png",
+    ]
+    for target_h in [800, 900, 1000]:
+        for fname in base_figs:
+            src = os.path.join(OUT_DIR, fname)
+            stem = fname.replace(".png", "")
+            dst = os.path.join(OUT_DIR, f"{stem}_{target_h}px.png")
+            img = Image.open(src)
+            w, h = img.size
+            new_w = round(w * target_h / h)
+            img.resize((new_w, target_h), Image.Resampling.LANCZOS).save(dst)
 
     print(f"saved 3 figures to {OUT_DIR}")

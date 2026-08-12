@@ -76,7 +76,7 @@ def export_height_px(width_px):
 
 # Font sizes — change here (applied after sns.set_theme so they are not reset)
 FONT_TICK   = 16   # axis tick numbers (0.02, 0.04, …)
-FONT_LABEL  = 14
+FONT_LABEL  = 17
 FONT_LEGEND = 12
 FONT_ANNOT        = 10
 FONT_BRACKET_STAR = 15  # significance asterisk size (*** / *)

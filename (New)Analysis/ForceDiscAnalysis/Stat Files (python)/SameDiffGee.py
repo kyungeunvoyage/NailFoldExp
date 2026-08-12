@@ -39,6 +39,8 @@ import numpy as np
 import pandas as pd
 import matplotlib
 matplotlib.use("Agg")
+matplotlib.rcParams["font.family"]     = "sans-serif"
+matplotlib.rcParams["font.sans-serif"] = ["Helvetica", "Arial", "DejaVu Sans"]
 import matplotlib.pyplot as plt
 import matplotlib.patches as mpatches
 import matplotlib.colors as mcolors
@@ -135,10 +137,10 @@ BRACKET_YLIM_CAP = 122.0
 SAVE_DPI_COMBINED = 600
 POOL_ON_NAIL = ON_TOUCH_BLUE
 POOL_OFF_NAIL = ON_TOUCH_BLUE
-POOL_GROUP_ORDER = ["On-nail", "Off-nail"]
+POOL_GROUP_ORDER = ["Off-nail", "On-nail"]
 POOL_PALETTE = {"On-nail": POOL_ON_NAIL, "Off-nail": POOL_OFF_NAIL}
-POOL_X_LABELS = ["On-nail\n(C+D)", "Off-nail\n(A+F)"]
-FONT_XTICK = 12
+POOL_X_LABELS = ["LNF\n(a+f)", "PNF\n(c+d)"]
+FONT_XTICK = 17
 FONT_PANEL_TITLE = 14
 FONT_BRACKET_STAR = 15
 POOLED_Y_TICKS = list(ATD.ACCURACY_YTICKS)
@@ -188,6 +190,8 @@ def _finalize_gee_accuracy_axes(ax, n_x, ylim_top, *, show_ylabel=True, show_xla
     sns.despine(ax=ax)
     ATD.apply_accuracy_y_spine_bounds(ax)
     ATD.add_inward_tick_guides(ax, n_x)
+    # add_inward_tick_guides resets labelsize to ATD.FONT_TICK (16) — restore
+    ax.tick_params(axis="both", which="both", length=0, labelsize=fs_tick)
     ATD.apply_accuracy_y_spine_bounds(ax)
 
 
@@ -259,7 +263,7 @@ def _pooled_inward_ticks(ax, y_ticks):
 
 
 def _draw_pooled_pair_panel(ax, pair, subj_acc_reg, region_pval, rng, *, box_width=0.45,
-                            clip_titles=False):
+                            clip_titles=False, show_bracket=True, show_title=True):
     """One force-pair panel — On-nail vs Off-nail on x (ATD pooled layout)."""
     tops = {}
     scatter_rgba = on_touch_scatter_rgba(ATD)
@@ -285,12 +289,27 @@ def _draw_pooled_pair_panel(ax, pair, subj_acc_reg, region_pval, rng, *, box_wid
                 edgecolor=BLACK, linewidth=BOX_LINEWIDTH,
             ),
         )
+        if grp == "Off-nail":
+            for patch in bp["boxes"]:
+                patch.set_hatch("////")
+                patch.set_edgecolor((*mcolors.to_rgb(BLACK), 0.30))
+                # redraw box outline solid on top
+                import matplotlib.patches as _mp
+                verts = patch.get_path().vertices
+                x0 = verts[:, 0].min(); x1 = verts[:, 0].max()
+                y0 = verts[:, 1].min(); y1 = verts[:, 1].max()
+                rect = _mp.Rectangle(
+                    (x0, y0), x1 - x0, y1 - y0,
+                    linewidth=BOX_LINEWIDTH, edgecolor=BLACK,
+                    facecolor="none", zorder=patch.get_zorder() + 0.5,
+                )
+                patch.axes.add_patch(rect)
         whiskers = [w.get_ydata()[1] for w in bp["whiskers"]]
         tops[grp] = max(whiskers) if whiskers else float(np.max(vals))
         jitter = rng.uniform(-jitter_span, jitter_span, size=len(vals))
         _pooled_scatter_strip(ax, xi, vals, subjects, scatter_rgba, jitter)
 
-    if tops and not np.isnan(region_pval):
+    if show_bracket and tops and not np.isnan(region_pval):
         star = _pooled_star_label(region_pval)
         if clip_titles:
             y_brk = min(max(max(tops.values()) + 2.0, 82), 88)
@@ -306,30 +325,52 @@ def _draw_pooled_pair_panel(ax, pair, subj_acc_reg, region_pval, rng, *, box_wid
         JND_PCT, color=CRITERION_COLOR, linestyle="--",
         linewidth=1.0, alpha=0.85, zorder=20,
     )
-    _pooled_panel_title(ax, pair, y=title_y, clip_on=clip_titles)
+    if show_title:
+        _pooled_panel_title(ax, pair, y=title_y, clip_on=clip_titles)
     ax.set_xticks([0, 1])
     ax.set_xticklabels(POOL_X_LABELS, fontsize=FONT_XTICK)
     ax.set_yticks(POOLED_Y_TICKS)
     ax.yaxis.set_major_locator(FixedLocator(POOLED_Y_TICKS))
-    ax.tick_params(axis="y", labelsize=FONT_TICK)
-    ax.tick_params(axis="x", length=0)
+    ax.tick_params(axis="y", labelsize=FONT_XTICK)
+    ax.tick_params(axis="x", length=0, labelsize=FONT_XTICK)
     ax.set_ylim(-5, POOLED_YLIM_TOP)
     ax.spines["left"].set_bounds(-5, POOLED_Y_AXIS_TOP)
     sns.despine(ax=ax)
 
 
-def save_region_onnail_figure(subj_acc_reg, pair_order, region_pvals, out_path):
+def save_region_onnail_figure(subj_acc_reg, pair_order, region_pvals, out_path,
+                              *, box_width=None, show_title=True,
+                              width_px=None, height_px=None, compensate_width=True):
     """Multi-panel On-nail vs Off-nail — matches ATD onnail_vs_offnail_pooled(final)."""
     sns.set_theme(style="white")
     ATD.apply_plot_style()
     n_panels = len(pair_order)
+    export_w = width_px  if width_px  is not None else EXPORT_WIDTH_2COL
+    export_h = height_px if height_px is not None else EXPORT_HEIGHT_2COL
+
+    # Scale box_width so pixel size matches the 4-panel (Low band) reference at 2102px.
+    # Low ref: 4 panels, box_width=0.45. panel_fraction ∝ 1/(n + (n-1)*wspace)
+    if box_width is None:
+        _wspace = 0.18
+        _low_n = 4
+        _low_bw = 0.45
+        _panel_low  = 1.0 / (_low_n + (_low_n - 1) * _wspace)
+        _panel_cur  = 1.0 / (n_panels + (n_panels - 1) * _wspace)
+        box_width = _low_bw * (_panel_low / _panel_cur)
+    # Compensate box_width so pixel size matches what it would be at 2102px.
+    # Set compensate_width=False to skip this (boxes scale naturally with canvas).
+    if compensate_width:
+        box_width = box_width * (EXPORT_WIDTH_2COL / export_w)
+
     fig, axes = plt.subplots(1, n_panels, figsize=EXPORT_CANVAS, facecolor="white")
     if n_panels == 1:
         axes = [axes]
     rng = np.random.default_rng(42)
     for ax, pair in zip(axes, pair_order):
         pval = region_pvals.get(pair, np.nan)
-        _draw_pooled_pair_panel(ax, pair, subj_acc_reg, pval, rng)
+        _draw_pooled_pair_panel(ax, pair, subj_acc_reg, pval, rng,
+                                box_width=box_width, show_bracket=False,
+                                show_title=show_title)
         if ax is axes[0]:
             ax.set_ylabel("Discrimination Accuracy (%)", fontsize=FONT_LABEL)
         else:
@@ -343,8 +384,8 @@ def save_region_onnail_figure(subj_acc_reg, pair_order, region_pvals, out_path):
 
     save_png_at_width(
         fig, out_path,
-        width_px=EXPORT_WIDTH_2COL,
-        height_px=EXPORT_HEIGHT_2COL,
+        width_px=export_w,
+        height_px=export_h,
         dpi=SAVE_DPI_COMBINED,
         pad_inches=0.04,
     )
@@ -1359,6 +1400,17 @@ def run_band_analysis(df_band, band_label, pair_order, out_suffix, title_ref):
     save_region_onnail_figure(
         subj_acc_reg, pair_order, region_pvals,
         os.path.join(OUTPUT_DIR, out_b),
+        show_title=False,
+    )
+    # 4204px version (2102×2): box_width unchanged → boxes are 2× larger in pixels
+    out_b_4col = f"sd_onnail_vs_offnail{out_suffix}_4204px.png"
+    save_region_onnail_figure(
+        subj_acc_reg, pair_order, region_pvals,
+        os.path.join(OUTPUT_DIR, out_b_4col),
+        show_title=False,
+        width_px=4204,
+        height_px=EXPORT_HEIGHT_2COL * 2,
+        compensate_width=False,
     )
 
     df_sdt_plot = df_sdt[df_sdt["pair_label"].isin(pair_order)].copy()

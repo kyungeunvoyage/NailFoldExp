@@ -26,6 +26,8 @@ import pandas as pd
 import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
+matplotlib.rcParams["font.family"]     = "sans-serif"
+matplotlib.rcParams["font.sans-serif"] = ["Helvetica", "Arial", "DejaVu Sans"]
 import matplotlib.patches as mpatches
 from matplotlib.ticker import FixedLocator
 from matplotlib.transforms import blended_transform_factory
@@ -77,7 +79,7 @@ UNIFIED_STYLE = dict(
 
     # ── Font sizes ───────────────────────────────────────────────────────────
     FONT_TICK                 = 16,
-    FONT_LABEL                = 14,
+    FONT_LABEL                = 17,
     FONT_LEGEND               = 12,
     FONT_ANNOT                = 10,
     FONT_BRACKET_STAR         = 15,  # significance asterisk size (*** / *)
@@ -380,9 +382,9 @@ def generate_pooled():
 
     POOL_GROUP_MAP   = {"C": "On-nail", "D": "On-nail",
                         "A": "Off-nail", "F": "Off-nail"}
-    POOL_GROUP_ORDER = ["On-nail", "Off-nail"]
+    POOL_GROUP_ORDER = ["Off-nail", "On-nail"]
     POOL_PALETTE     = {"On-nail": S["POOL_ON_NAIL"], "Off-nail": S["POOL_OFF_NAIL"]}
-    POOL_X_LABELS    = ["On-nail\n(C+D)", "Off-nail\n(A+F)"]
+    POOL_X_LABELS    = ["LNF\n(a+f)", "PNF\n(c+d)"]
     FONT_XTICK       = 12
 
     fig, axes = plt.subplots(1, len(plot_forces),
