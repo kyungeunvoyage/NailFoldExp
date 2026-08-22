@@ -68,6 +68,7 @@ COLOR_LOW  = "#85B1D9"   # 1 g  → light blue (mm boxplot 3 mm ramp)
 COLOR_HIGH = "#3D5F9A"   # 26 g → dark blue (mm boxplot 4.5 mm ramp)
 FORCE_COLORS = {1.0: COLOR_LOW, 26.0: COLOR_HIGH}
 
+
 GRID_SPACING_MM  = 1.5
 THRESHOLD        = 0.75   # 75 % criterion for JND
 PSYCH_EXPORT_HEIGHT_PX = 1200   # 2-col psychometric figure target height
@@ -197,6 +198,7 @@ def _jnd_from_fit(popt, target=THRESHOLD):
 REGION_C, REGION_D = "C", "D"
 REGION_COLORS = {REGION_C: "#10559A", REGION_D: "#85B1D9"}
 SIG_COLOR = ATD.ACCENT_RED
+
 
 
 def _assign_sd_region(frame):

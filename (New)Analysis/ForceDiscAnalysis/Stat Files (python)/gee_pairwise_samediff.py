@@ -63,6 +63,7 @@ ACCENT_RED       = ATD.ACCENT_RED
 CRITERION_COLOR  = ATD.CRITERION_COLOR
 REF_LINE_ZORDER  = ATD.REF_LINE_ZORDER
 FONT_TICK        = 20
+FONT_XTICK       = 14   # force-pair labels; smaller than y ticks (ref screenshot)
 FONT_LABEL       = 20
 FONT_ANNOT       = ATD.FONT_ANNOT
 BOX_LINEWIDTH    = ATD.BOX_LINEWIDTH
@@ -76,7 +77,7 @@ STRIP_SIZE       = 3.8
 BLACK            = ATD.BLACK
 JND_PCT          = 75.0
 CHANCE_PCT       = 50.0
-BOX_FILL_COLOR   = on_touch_box_color(ATD)
+BOX_FILL_COLOR   = "#E3EDF7"
 SCATTER_RGBA     = on_touch_scatter_rgba(ATD)
 
 # ── Box width constants (exact copy from Stats(GEE).py) ───────────────────────
@@ -157,7 +158,8 @@ def finalize_gee_axes(ax, n_x, ylim_top, *, show_ylabel=True, show_xlabel=True):
     ax.set_ylim(ATD.ACCURACY_YMIN, min(ATD.FIG2_BRACKET_YLIM_CAP, ylim_top))
     ax.set_yticks(ATD.ACCURACY_YTICKS)
     ax.grid(False)
-    ax.tick_params(axis="both", which="both", length=0, labelsize=FONT_TICK)
+    ax.tick_params(axis="y", which="both", length=0, labelsize=FONT_TICK)
+    ax.tick_params(axis="x", which="both", length=0, labelsize=FONT_XTICK)
     if show_ylabel:
         ax.set_ylabel("Discrimination Accuracy (%)", fontsize=FONT_LABEL,
                       labelpad=ATD.FIG_AXIS_LABELPAD)
@@ -167,8 +169,9 @@ def finalize_gee_axes(ax, n_x, ylim_top, *, show_ylabel=True, show_xlabel=True):
     sns.despine(ax=ax)
     ATD.apply_accuracy_y_spine_bounds(ax)
     ATD.add_inward_tick_guides(ax, n_x)
-    # add_inward_tick_guides resets labelsize to ATD.FONT_TICK (16) — restore
-    ax.tick_params(axis="both", which="both", length=0, labelsize=FONT_TICK)
+    # add_inward_tick_guides resets labelsize — restore y vs x separately
+    ax.tick_params(axis="y", which="both", length=0, labelsize=FONT_TICK)
+    ax.tick_params(axis="x", which="both", length=0, labelsize=FONT_XTICK)
     ATD.apply_accuracy_y_spine_bounds(ax)
 
 # ── Plot band (same as Stats(GEE).py but marker="^") ─────────────────────────
@@ -239,7 +242,7 @@ def plot_band(ax, band_label, order, show_xlabel=True, show_ylabel=True,
         ylim_top = min(ATD.FIG2_BRACKET_YLIM_CAP,
                        max(ATD.ACCURACY_YLIM_TOP, band_max_pct + 8.0))
     ax.set_xticks(range(len(order)))
-    ax.set_xticklabels(order, fontsize=FONT_TICK)
+    ax.set_xticklabels(order, fontsize=FONT_XTICK)
     ax.set_xlim(-0.55, len(order) - 0.45)
     finalize_gee_axes(ax, len(order), ylim_top,
                       show_ylabel=show_ylabel, show_xlabel=show_xlabel)
@@ -257,7 +260,10 @@ sns.set_theme(style="white")
 ATD.apply_plot_style()
 
 fig = plt.figure(figsize=EXPORT_CANVAS, facecolor="#FFFFFF")
-low_r, high_r = horizontal_panel_rects()
+# Wider panels for 2640×1042: tighter outer margins, keep inter-panel gap
+low_r, high_r = horizontal_panel_rects(
+    left=0.10, right=0.04, bottom=0.12, top=0.90, gap_frac=0.14,
+)
 ax_low  = fig.add_axes(low_r)
 ax_high = fig.add_axes(high_r)
 
@@ -278,13 +284,29 @@ plot_band(ax_high, "High", high_order, show_xlabel=False, show_ylabel=False,
 
 stem = "gee_pairwise_samediff_horizontal"
 save_export_figure(fig, str(OUTPUT_DIR), stem, ATD.EXPORT_WIDTHS_PX)
+
+# Extra wide canvas: 2640 × 1042
+EXPORT_W_2640 = 2640
+EXPORT_H_2640 = 1042
+save_export_figure(
+    fig, str(OUTPUT_DIR), stem, (("2640", EXPORT_W_2640),),
+    letterbox=True,
+    margin_frac_x=0.06,  # tighter outer pad → larger panels on 2640×1042
+    margin_frac_y=0.05,
+    trim_white=True,
+    fixed_height_px=EXPORT_H_2640,
+)
 plt.close(fig)
 
-# Publish 2col version to Final
-src = OUTPUT_DIR / f"{stem}_2col.png"
-dst = FINAL_DIR / f"(Final)gee_pairwise_samediff_horizontal_2col.png"
-if src.is_file():
-    shutil.copy2(src, dst)
-    print(f"Published → {dst}")
-else:
-    print(f"WARNING: source not found: {src}")
+# Publish 2col + 2640 versions to Final
+for tag, dest_name in (
+    ("2col", "(Final)gee_pairwise_samediff_horizontal_2col.png"),
+    ("2640", "(Final)gee_pairwise_samediff_horizontal_2640.png"),
+):
+    src = OUTPUT_DIR / f"{stem}_{tag}.png"
+    dst = FINAL_DIR / dest_name
+    if src.is_file():
+        shutil.copy2(src, dst)
+        print(f"Published → {dst}")
+    else:
+        print(f"WARNING: source not found: {src}")

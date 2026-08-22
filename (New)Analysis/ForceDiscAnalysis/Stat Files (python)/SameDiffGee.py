@@ -88,6 +88,7 @@ from gee_export_utils import (
     add_figure_legend,
 )
 
+
 CHANCE_PCT = 50.0
 JND_PCT    = 75.0
 COMBINED_PANEL_COUNT = 2
@@ -139,12 +140,26 @@ POOL_ON_NAIL = ON_TOUCH_BLUE
 POOL_OFF_NAIL = ON_TOUCH_BLUE
 POOL_GROUP_ORDER = ["Off-nail", "On-nail"]
 POOL_PALETTE = {"On-nail": POOL_ON_NAIL, "Off-nail": POOL_OFF_NAIL}
-POOL_X_LABELS = ["LNF\n(a+f)", "PNF\n(c+d)"]
-FONT_XTICK = 17
-FONT_PANEL_TITLE = 14
-FONT_BRACKET_STAR = 15
+POOL_X_LABELS = ["Lateral\n(a+f)", "Proximal\n(c+d)"]
+# Within-panel box placement (leave room for two-line xticklabels)
+POOL_X_POS = (0.0, 0.68)
+POOL_XLIM = (-0.38, 1.06)
+POOL_WSPACE = 0.05
+POOL_MARGINS = dict(left=0.10, right=0.995, top=0.96, bottom=0.14)
+# Target export canvas
+ONNAIL_EXPORT_WIDTH_PX = 1385
+ONNAIL_EXPORT_HEIGHT_PX = 1042
+ONNAIL_EXPORT_DPI = 200
+# Box width in data coords (kept at half of earlier wide setting;
+# fonts/linewidths below track the 1385×1042 canvas)
+ONNAIL_BOX_WIDTH = 0.275
+# Fonts / markers sized for 1385×1042
+FONT_XTICK = 16
+FONT_XTICK_LOW = 14
+FONT_PANEL_TITLE = 12
+FONT_BRACKET_STAR = 13
 POOLED_Y_TICKS = list(ATD.ACCURACY_YTICKS)
-POOLED_YLIM_TOP = 120
+POOLED_YLIM_TOP = 105
 POOLED_Y_AXIS_TOP = 100
 TICK_LEN_AXES = getattr(ATD, "TICK_LEN_AXES", 0.016)
 CAP_LINEWIDTH = ATD.CAP_LINEWIDTH
@@ -152,6 +167,9 @@ BLACK = ATD.BLACK
 PARTIAL_SUBJECTS = getattr(ATD, "_PARTIAL_SUBJ", set())
 BRACKET_LINEWIDTH = 1.5
 SCATTER_DOT_SIZE = 3.5
+ONNAIL_FONT_LABEL = 14
+ONNAIL_BOX_LINEWIDTH = 1.15
+ONNAIL_MEDIAN_LINEWIDTH = 2.2
 
 GEE_LEGEND_KW = dict(
     frameon=False,
@@ -254,7 +272,7 @@ def _pooled_inward_ticks(ax, y_ticks):
     x_tr = blended_transform_factory(ax.transData, ax.transAxes)
     y_tr = blended_transform_factory(ax.transAxes, ax.transData)
     kw = dict(color=BLACK, linewidth=1.0, solid_capstyle="butt", clip_on=False, zorder=6)
-    for xi in (0, 1):
+    for xi in POOL_X_POS:
         ax.plot([xi, xi], [0, frac_x], transform=x_tr, **kw)
     y_lo, y_hi = ax.get_ylim()
     for y in y_ticks:
@@ -263,13 +281,17 @@ def _pooled_inward_ticks(ax, y_ticks):
 
 
 def _draw_pooled_pair_panel(ax, pair, subj_acc_reg, region_pval, rng, *, box_width=0.45,
-                            clip_titles=False, show_bracket=True, show_title=True):
+                            clip_titles=False, show_bracket=True, show_title=True,
+                            xtick_fs=None):
     """One force-pair panel — On-nail vs Off-nail on x (ATD pooled layout)."""
+    if xtick_fs is None:
+        xtick_fs = FONT_XTICK
     tops = {}
     scatter_rgba = on_touch_scatter_rgba(ATD)
     box_fill = on_touch_box_color(ATD)
     jitter_span = STRIP_JITTER_REF * box_width / POOLED_BOX_REF
     for xi, grp in enumerate(POOL_GROUP_ORDER):
+        x_pos = POOL_X_POS[xi]
         rows = subj_acc_reg[
             (subj_acc_reg["pair_label"] == pair)
             & (subj_acc_reg["region_group"] == grp)
@@ -279,14 +301,14 @@ def _draw_pooled_pair_panel(ax, pair, subj_acc_reg, region_pval, rng, *, box_wid
         if len(vals) == 0:
             continue
         bp = ax.boxplot(
-            [vals], positions=[xi], widths=box_width,
+            [vals], positions=[x_pos], widths=box_width,
             patch_artist=True, showfliers=False, zorder=2,
-            whiskerprops=dict(color=BLACK, linewidth=BOX_LINEWIDTH),
-            capprops=dict(color=BLACK, linewidth=CAP_LINEWIDTH),
-            medianprops=dict(color=ACCENT_RED, linewidth=MEDIAN_LINEWIDTH),
+            whiskerprops=dict(color=BLACK, linewidth=ONNAIL_BOX_LINEWIDTH),
+            capprops=dict(color=BLACK, linewidth=ONNAIL_BOX_LINEWIDTH),
+            medianprops=dict(color=ACCENT_RED, linewidth=ONNAIL_MEDIAN_LINEWIDTH),
             boxprops=dict(
                 facecolor=box_fill,
-                edgecolor=BLACK, linewidth=BOX_LINEWIDTH,
+                edgecolor=BLACK, linewidth=ONNAIL_BOX_LINEWIDTH,
             ),
         )
         if grp == "Off-nail":
@@ -300,14 +322,14 @@ def _draw_pooled_pair_panel(ax, pair, subj_acc_reg, region_pval, rng, *, box_wid
                 y0 = verts[:, 1].min(); y1 = verts[:, 1].max()
                 rect = _mp.Rectangle(
                     (x0, y0), x1 - x0, y1 - y0,
-                    linewidth=BOX_LINEWIDTH, edgecolor=BLACK,
+                    linewidth=ONNAIL_BOX_LINEWIDTH, edgecolor=BLACK,
                     facecolor="none", zorder=patch.get_zorder() + 0.5,
                 )
                 patch.axes.add_patch(rect)
         whiskers = [w.get_ydata()[1] for w in bp["whiskers"]]
         tops[grp] = max(whiskers) if whiskers else float(np.max(vals))
         jitter = rng.uniform(-jitter_span, jitter_span, size=len(vals))
-        _pooled_scatter_strip(ax, xi, vals, subjects, scatter_rgba, jitter)
+        _pooled_scatter_strip(ax, x_pos, vals, subjects, scatter_rgba, jitter)
 
     if show_bracket and tops and not np.isnan(region_pval):
         star = _pooled_star_label(region_pval)
@@ -317,7 +339,7 @@ def _draw_pooled_pair_panel(ax, pair, subj_acc_reg, region_pval, rng, *, box_wid
         else:
             y_brk = max(max(tops.values()) + 3.0, 103)
             title_y = 0.95
-        _pooled_sig_bracket(ax, 0, 1, y_brk, text=star)
+        _pooled_sig_bracket(ax, POOL_X_POS[0], POOL_X_POS[1], y_brk, text=star)
     else:
         title_y = 0.88 if clip_titles else 0.95
 
@@ -327,12 +349,13 @@ def _draw_pooled_pair_panel(ax, pair, subj_acc_reg, region_pval, rng, *, box_wid
     )
     if show_title:
         _pooled_panel_title(ax, pair, y=title_y, clip_on=clip_titles)
-    ax.set_xticks([0, 1])
-    ax.set_xticklabels(POOL_X_LABELS, fontsize=FONT_XTICK)
+    ax.set_xlim(*POOL_XLIM)
+    ax.set_xticks(list(POOL_X_POS))
+    ax.set_xticklabels(POOL_X_LABELS, fontsize=xtick_fs)
     ax.set_yticks(POOLED_Y_TICKS)
     ax.yaxis.set_major_locator(FixedLocator(POOLED_Y_TICKS))
-    ax.tick_params(axis="y", labelsize=FONT_XTICK)
-    ax.tick_params(axis="x", length=0, labelsize=FONT_XTICK)
+    ax.tick_params(axis="y", labelsize=xtick_fs)
+    ax.tick_params(axis="x", length=0, labelsize=xtick_fs)
     ax.set_ylim(-5, POOLED_YLIM_TOP)
     ax.spines["left"].set_bounds(-5, POOLED_Y_AXIS_TOP)
     sns.despine(ax=ax)
@@ -340,29 +363,34 @@ def _draw_pooled_pair_panel(ax, pair, subj_acc_reg, region_pval, rng, *, box_wid
 
 def save_region_onnail_figure(subj_acc_reg, pair_order, region_pvals, out_path,
                               *, box_width=None, show_title=True,
-                              width_px=None, height_px=None, compensate_width=True):
-    """Multi-panel On-nail vs Off-nail — matches ATD onnail_vs_offnail_pooled(final)."""
+                              width_px=None, height_px=None, compensate_width=True,
+                              xtick_fs=None):
+    """Multi-panel On-nail vs Off-nail — layout sized to the export canvas."""
+    if xtick_fs is None:
+        xtick_fs = FONT_XTICK
     sns.set_theme(style="white")
     ATD.apply_plot_style()
     n_panels = len(pair_order)
-    export_w = width_px  if width_px  is not None else EXPORT_WIDTH_2COL
-    export_h = height_px if height_px is not None else EXPORT_HEIGHT_2COL
+    export_w = width_px  if width_px  is not None else ONNAIL_EXPORT_WIDTH_PX
+    export_h = height_px if height_px is not None else ONNAIL_EXPORT_HEIGHT_PX
+    dpi = ONNAIL_EXPORT_DPI
 
-    # Scale box_width so pixel size matches the 4-panel (Low band) reference at 2102px.
-    # Low ref: 4 panels, box_width=0.45. panel_fraction ∝ 1/(n + (n-1)*wspace)
     if box_width is None:
-        _wspace = 0.18
-        _low_n = 4
-        _low_bw = 0.45
-        _panel_low  = 1.0 / (_low_n + (_low_n - 1) * _wspace)
-        _panel_cur  = 1.0 / (n_panels + (n_panels - 1) * _wspace)
-        box_width = _low_bw * (_panel_low / _panel_cur)
-    # Compensate box_width so pixel size matches what it would be at 2102px.
-    # Set compensate_width=False to skip this (boxes scale naturally with canvas).
+        # Target ~58 px box width on the export canvas
+        usable_px = export_w * (POOL_MARGINS["right"] - POOL_MARGINS["left"])
+        panel_px = usable_px / (n_panels + (n_panels - 1) * POOL_WSPACE)
+        data_span = POOL_XLIM[1] - POOL_XLIM[0]
+        target_box_px = 58.0 * (export_h / 1042.0)  # track canvas height a bit
+        box_width = (target_box_px / max(panel_px, 1.0)) * data_span
+        box_width = float(np.clip(box_width, 0.18, 0.40))
     if compensate_width:
-        box_width = box_width * (EXPORT_WIDTH_2COL / export_w)
+        box_width = box_width * (ONNAIL_EXPORT_WIDTH_PX / export_w)
 
-    fig, axes = plt.subplots(1, n_panels, figsize=EXPORT_CANVAS, facecolor="white")
+    # Exact inch size so savefig(dpi=…) lands on export_w × export_h (no stretch)
+    fig_w = export_w / dpi
+    fig_h = export_h / dpi
+    fig, axes = plt.subplots(1, n_panels, figsize=(fig_w, fig_h), dpi=dpi,
+                             facecolor="white")
     if n_panels == 1:
         axes = [axes]
     rng = np.random.default_rng(42)
@@ -370,24 +398,22 @@ def save_region_onnail_figure(subj_acc_reg, pair_order, region_pvals, out_path,
         pval = region_pvals.get(pair, np.nan)
         _draw_pooled_pair_panel(ax, pair, subj_acc_reg, pval, rng,
                                 box_width=box_width, show_bracket=False,
-                                show_title=show_title)
+                                show_title=show_title, xtick_fs=xtick_fs)
         if ax is axes[0]:
-            ax.set_ylabel("Discrimination Accuracy (%)", fontsize=FONT_LABEL)
+            ax.set_ylabel("Discrimination Accuracy (%)", fontsize=ONNAIL_FONT_LABEL)
         else:
             ax.set_ylabel("")
             ax.tick_params(axis="y", labelleft=False)
 
-    fig.subplots_adjust(left=0.08, right=0.97, top=0.96, bottom=0.12, wspace=0.18)
+    fig.subplots_adjust(wspace=POOL_WSPACE, **POOL_MARGINS)
     fig.canvas.draw()
     for ax in axes:
         _pooled_inward_ticks(ax, POOLED_Y_TICKS)
 
-    save_png_at_width(
-        fig, out_path,
-        width_px=export_w,
-        height_px=export_h,
-        dpi=SAVE_DPI_COMBINED,
-        pad_inches=0.04,
+    # Exact canvas — do not use bbox_inches='tight' (it breaks size adaptation)
+    fig.savefig(
+        out_path, dpi=dpi, facecolor="white", edgecolor="none",
+        bbox_inches=None, pad_inches=0,
     )
     plt.close(fig)
 
@@ -610,6 +636,7 @@ C_OFF = "#D3E9F5"
 RED   = ACCENT_RED
 C_SAME = "#5B9BD5"
 C_DIFF = "#E07B39"
+
 
 
 def pval_label(p):
@@ -1397,20 +1424,26 @@ def run_band_analysis(df_band, band_label, pair_order, out_suffix, title_ref):
     plt.close(fig)
 
     out_b = f"sd_onnail_vs_offnail{out_suffix}.png"
+    xtick_fs = FONT_XTICK_LOW if out_suffix == "_low" else FONT_XTICK
     save_region_onnail_figure(
         subj_acc_reg, pair_order, region_pvals,
         os.path.join(OUTPUT_DIR, out_b),
         show_title=False,
+        width_px=ONNAIL_EXPORT_WIDTH_PX,
+        height_px=ONNAIL_EXPORT_HEIGHT_PX,
+        compensate_width=False,
+        xtick_fs=xtick_fs,
     )
-    # 4204px version (2102×2): box_width unchanged → boxes are 2× larger in pixels
+    # Legacy *_4204px filename — now also exported at 1385×H
     out_b_4col = f"sd_onnail_vs_offnail{out_suffix}_4204px.png"
     save_region_onnail_figure(
         subj_acc_reg, pair_order, region_pvals,
         os.path.join(OUTPUT_DIR, out_b_4col),
         show_title=False,
-        width_px=4204,
-        height_px=EXPORT_HEIGHT_2COL * 2,
+        width_px=ONNAIL_EXPORT_WIDTH_PX,
+        height_px=ONNAIL_EXPORT_HEIGHT_PX,
         compensate_width=False,
+        xtick_fs=xtick_fs,
     )
 
     df_sdt_plot = df_sdt[df_sdt["pair_label"].isin(pair_order)].copy()

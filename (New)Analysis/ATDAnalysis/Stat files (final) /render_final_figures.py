@@ -63,9 +63,11 @@ UNIFIED_STYLE = dict(
     BLACK                     = "#1A1A1A",
     KAO_COLOR                 = "#5A5A5A",   # Fingerpad (gray)
 
+
     # ── Scatter ──────────────────────────────────────────────────────────────
     STRIP_ALPHA               = 0.50,
     SCATTER_HSB_BRIGHTNESS    = 0.60,
+    SCATTER_TRIANGLE_HSB_BRIGHTNESS = 0.45,  # slightly darker ▲ (partial n=15)
 
     # ── Box fill ─────────────────────────────────────────────────────────────
     COND_BOX_BRIGHTNESS       = 0.88,
@@ -343,6 +345,14 @@ def _scatter_strip(ax, x_pos, vals, subjects, partial_set, color, jitter_arr):
         brightness=S["SCATTER_HSB_BRIGHTNESS"],
         alpha=S["STRIP_ALPHA"],
     )
+    rgba_tri = atd_c1._hsb_scatter_rgba(
+        color,
+        brightness=S.get(
+            "SCATTER_TRIANGLE_HSB_BRIGHTNESS",
+            atd_c1.SCATTER_TRIANGLE_HSB_BRIGHTNESS,
+        ),
+        alpha=S["STRIP_ALPHA"],
+    )
     mask = np.array([s in partial_set for s in subjects])
     kw   = dict(linewidths=0, zorder=3, clip_on=False)
     if (~mask).any():
@@ -350,7 +360,7 @@ def _scatter_strip(ax, x_pos, vals, subjects, partial_set, color, jitter_arr):
                    c=[rgba] * int((~mask).sum()), s=3.5 ** 2, marker="o", **kw)
     if mask.any():
         ax.scatter(x_pos + jitter_arr[mask], vals[mask],
-                   c=[rgba] * int(mask.sum()), s=(3.5 * 1.3) ** 2, marker="^", **kw)
+                   c=[rgba_tri] * int(mask.sum()), s=(3.5 * 1.3) ** 2, marker="^", **kw)
 
 
 def _inward_ticks(ax, x_positions, y_ticks):
@@ -384,7 +394,7 @@ def generate_pooled():
                         "A": "Off-nail", "F": "Off-nail"}
     POOL_GROUP_ORDER = ["Off-nail", "On-nail"]
     POOL_PALETTE     = {"On-nail": S["POOL_ON_NAIL"], "Off-nail": S["POOL_OFF_NAIL"]}
-    POOL_X_LABELS    = ["LNF\n(a+f)", "PNF\n(c+d)"]
+    POOL_X_LABELS    = ["Lateral\n(a+f)", "Proximal\n(c+d)"]
     FONT_XTICK       = 12
 
     fig, axes = plt.subplots(1, len(plot_forces),

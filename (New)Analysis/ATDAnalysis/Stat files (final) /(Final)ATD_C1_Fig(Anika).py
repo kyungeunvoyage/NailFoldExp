@@ -45,8 +45,10 @@ BLACK      = "#1A1A1A"
 CRITERION_COLOR = BLACK  # 80% reference line & label
 KAO_COLOR  = "#5A5A5A"   # Anika Paint — dark gray (matches original paper)
 
+
 STRIP_ALPHA   = 0.50
 SCATTER_HSB_BRIGHTNESS = 0.60  # HSB brightness (HSV V) for scatter points
+SCATTER_TRIANGLE_HSB_BRIGHTNESS = 0.45  # slightly darker ▲ (partial); keep near circle tone
 # Shared pale box fill for periungual conditions (In-air & On-touch)
 COND_BOX_BRIGHTNESS = 0.88
 COND_BOX_SATURATION_SCALE = 0.40
@@ -332,6 +334,9 @@ def draw_fig3_stripplot(
                 grp_cols = ["Participant", "Plot_X", "Force_Val"]
             sub = sub.groupby(grp_cols, as_index=False)["Score"].median()
         rgba = _hsb_scatter_rgba(source_colors[src], brightness)
+        rgba_tri = _hsb_scatter_rgba(
+            source_colors[src], SCATTER_TRIANGLE_HSB_BRIGHTNESS, alpha=alpha,
+        )
         xs_circ, ys_circ = [], []
         xs_tri,  ys_tri  = [], []
         for _, grp in sub.groupby("Plot_X", sort=False):
@@ -365,7 +370,7 @@ def draw_fig3_stripplot(
             ax.scatter(xc, yc, c=[rgba]*len(xc), s=size**2, marker="o", **scatter_kw)
         if xs_tri:
             xt = np.concatenate(xs_tri);  yt = np.concatenate(ys_tri)
-            ax.scatter(xt, yt, c=[rgba]*len(xt), s=(size*1.3)**2, marker="^", **scatter_kw)
+            ax.scatter(xt, yt, c=[rgba_tri]*len(xt), s=(size*1.3)**2, marker="^", **scatter_kw)
 
 
 def sns_boxplot_width(n_x_categories, reference_n=None):
@@ -420,7 +425,7 @@ def add_legend_outside(
     ]
     multiline = any("\n" in (lab or "") for lab in labels)
     if legend_fontsize is None and multiline:
-        fs = FONT_TICK   # slightly larger so inline ● / △ symbols read clearly
+        fs = FONT_TICK   # slightly larger so inline ● / ▲ (mathtext) symbols read clearly
     axes_top = FIG_LEGEND_TOP_MULTILINE if multiline else top
     labelspacing = 0.55 if multiline else 0.2
     handleheight = 1.0
@@ -1212,7 +1217,7 @@ KAO_FORCE_PLOT_MAX = 0.4   # omit Kao forces >= 0.4 g from Fig1/3
 # =============================================================================
 # Kao vs Periungual comparison (shared plotting)
 # =============================================================================
-KAO_LABEL = f"Fingerpad \n(Kao et al. 2022, n={KAO_N})"
+KAO_LABEL = f"Volar finger pad \n(Kao et al. 2022, n={KAO_N})"
 
 df_kao_plot = df_kao[df_kao["Force_Val"] < KAO_FORCE_PLOT_MAX].copy()
 df_kao_plot["Source"] = KAO_LABEL
@@ -1438,7 +1443,7 @@ FIG2_COND_LABELS = {
 }
 
 INAIR_LABEL = f"Periungual — In-air\n(this study, n={n_subjects})"
-ONTouch_LABEL = "Periungual: On-touch\n(this study, \u25cf n=30, $\\triangle$ n=15)"
+ONTouch_LABEL = "Dorsal nail fold: On-touch\n(this study, \u25cf n=30, $\\blacktriangle$ n=15)"
 
 
 def plot_ontouch_vs_inair(df, cond_list, cond_colors, save_stem,
