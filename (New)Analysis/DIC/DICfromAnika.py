@@ -30,15 +30,19 @@ METRICS = [
     ("Max compressive strain (%)",  "Max compressive strain (%)",  (0, 15),   [0, 3, 6, 9, 12,15]),
 ]
 
-# Region별 대표 색상
+# Region별 대표 색상 (fig1 force blue = proximal; lateral slightly lighter)
+# Glabrous (volar) is drawn hollow like ATD Kao — color unused for fill
+_NAIL_FOLD_BLUE = mcolors.to_hex(plt.cm.Blues(0.85))      # Proximal (+ fig1)
+_LATERAL_BLUE   = mcolors.to_hex(plt.cm.Blues(0.65))      # Lateral — slightly lighter
+_VOLAR_SCATTER  = "#C0C0C0"                               # light gray (ATD Kao-like)
 REGION_COLORS = {
-    "Region A":  "#A9577E",   # 로즈/플럼
-    "Region CD": "#5CA894",   # 틸/씨그린
-    "Glabrous":  "#7C6BB0",   # 퍼플/바이올렛
+    "Region A":  _LATERAL_BLUE,    # Lateral nail fold
+    "Region CD": _NAIL_FOLD_BLUE,  # Proximal nail fold
+    "Glabrous":  _VOLAR_SCATTER,   # Volar finger pad (hollow box + gray scatter)
 }
 
-# Region CD × force (fig1): all forces use the 0.16 g shade
-_FORCE_FILL = "#42425d"  # was bone(0.30) at 0.16 g; also was "#7E938C" in teal palette
+# Region CD × force (fig1): all forces use the same Blues shade as 1.0 g
+_FORCE_FILL = _NAIL_FOLD_BLUE
 FORCE_SHADES = {
     0.16: _FORCE_FILL,
     0.40: _FORCE_FILL,
@@ -58,19 +62,24 @@ def _darken(hex_color, factor=0.6):
     return f"#{r:02x}{g:02x}{b:02x}"
 
 
-def _draw_group(ax, values_by_trial, pos, fill_color, width=0.5, jitter=0.13):
-    """한 그룹(하나의 x위치)에 박스 + 지터 스캐터를 그린다."""
+def _draw_group(ax, values_by_trial, pos, fill_color, width=0.5, jitter=0.13,
+                *, hollow=False):
+    """한 그룹(하나의 x위치)에 박스 + 지터 스캐터를 그린다.
+
+    hollow=True → ATD Kao / volar style: outline-only box + light-gray scatter.
+    """
     all_vals = np.concatenate(list(values_by_trial.values()))
-    edge = _darken(fill_color, 0.55)
 
     # --- 박스플롯 ---
     bp = ax.boxplot(
         all_vals, positions=[pos], widths=width, patch_artist=True,
         showfliers=False, whis=1.5, zorder=1,
     )
-    face_rgba = (*mcolors.to_rgb(fill_color), 0.55)  # alpha only on face
     for box in bp["boxes"]:
-        box.set_facecolor(face_rgba)
+        if hollow:
+            box.set_facecolor("none")
+        else:
+            box.set_facecolor((*mcolors.to_rgb(fill_color), 0.55))
         box.set_edgecolor("#000000")
         box.set_linewidth(1.2)
     for med in bp["medians"]:
@@ -82,13 +91,15 @@ def _draw_group(ax, values_by_trial, pos, fill_color, width=0.5, jitter=0.13):
         cap.set(color="#000000", linewidth=1.0, clip_on=False)
 
     # --- 지터 스캐터 (Trial별 마커) ---
+    scatter_fc = _VOLAR_SCATTER if hollow else fill_color
+    scatter_alpha = 0.55 if hollow else 0.50
     rng = np.random.default_rng(42)
     for trial, vals in values_by_trial.items():
         x = pos + rng.uniform(-jitter, jitter, size=len(vals))
         ax.scatter(
             x, vals, s=22, marker=TRIAL_MARKERS.get(trial, "o"),
-            facecolor=fill_color, edgecolor="none", linewidth=0,
-            alpha=0.50, zorder=3,
+            facecolor=scatter_fc, edgecolor="none", linewidth=0,
+            alpha=scatter_alpha, zorder=3,
         )
 
 
@@ -143,7 +154,7 @@ def _finalize_axis(ax, ylabel, ylim, yticks, xlabel, xticklabels, positions,
 
 # Wider canvas + more panel gap for multi-line y-axis titles
 FIGSIZE = (14.80, 5.60)
-LAYOUT  = dict(left=0.12, right=0.995, top=0.97, bottom=0.18, wspace=0.52)
+LAYOUT  = dict(left=0.12, right=0.995, top=0.97, bottom=0.22, wspace=0.52)
 LAYOUT_REGION = dict(left=0.12, right=0.995, top=0.93, bottom=0.20, wspace=0.52)
 LAYOUT_LONG_XTICK = dict(left=0.12, right=0.995, top=0.93, bottom=0.22, wspace=0.52)
 SAVE_DPI = 200
@@ -218,7 +229,9 @@ def plot_by_force(df, region, forces=None, title=None, save=None, box_width=None
                              for t in sorted(g["Trial"].unique())}
             _draw_group(ax, vals_by_trial, pos, FORCE_SHADES.get(f, REGION_COLORS[region]),
                         width=box_width, jitter=box_width * 0.25)
-        _finalize_axis(ax, ylabel, ylim, yticks, "", xticklabels, positions)
+        _finalize_axis(
+            ax, ylabel, ylim, yticks, "Stimulus Force (g)", xticklabels, positions,
+        )
 
     fig.subplots_adjust(**LAYOUT)
     if save:
@@ -249,7 +262,8 @@ def plot_by_region(df, force, regions, title=None, save=None, box_width=None,
             vals_by_trial = {t: g[g["Trial"] == t][col].to_numpy()
                              for t in sorted(g["Trial"].unique())}
             _draw_group(ax, vals_by_trial, pos, REGION_COLORS[reg],
-                        width=box_width, jitter=box_width * 0.25)
+                        width=box_width, jitter=box_width * 0.25,
+                        hollow=(reg == "Glabrous"))
         _finalize_axis(ax, ylabel, ylim, yticks, "", xticklabels, positions,
                        xtick_fs=16, xlim_pad=XLIM_PAD_REGION)
 
@@ -300,6 +314,7 @@ def plot_fig5_1p0_plus_0p4(df, save=None):
             _draw_group(
                 ax, vals_by_trial, pos, REGION_COLORS[reg],
                 width=box_width, jitter=box_width * 0.25,
+                hollow=(reg == "Glabrous"),
             )
         _finalize_axis(
             ax, ylabel, ylim, yticks, "", xticklabels, positions,

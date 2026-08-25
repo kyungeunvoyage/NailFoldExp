@@ -21,6 +21,97 @@ PANEL_GAP_FRAC = 0.06       # ~wspace 0.18 for two equal panels
 LEGEND_ANCHOR_Y = 0.975
 XLABEL_FORCE_PAIR = "Stimulus force pair (g)"
 
+# Shared Low|High pairwise format — Stats(GEE) + SameDiff must stay identical
+PAIRWISE_PANEL = dict(
+    left=0.15, right=0.02, bottom=0.08, top=0.94, gap_frac=0.08,
+)
+# Wide short canvas (2640×1072): each panel x-axis = AXIS_W_2640_PX
+EXPORT_W_2640 = 2640
+EXPORT_H_2640 = 1072
+AXIS_W_2640_PX = 1124
+
+
+def pairwise_panel_2640(
+    *,
+    axis_w_px=AXIS_W_2640_PX,
+    canvas_w=EXPORT_W_2640,
+    left=0.095,
+    right=0.018,
+    bottom=0.08,   # xticklabels only — flush to canvas edges
+    top=1.0,
+):
+    """Layout so each panel axes width is ``axis_w_px`` on a ``canvas_w`` export."""
+    panel = float(axis_w_px) / float(canvas_w)
+    gap = 1.0 - left - right - 2.0 * panel
+    if gap < 0.01:
+        raise ValueError(
+            f"axis_w_px={axis_w_px} too wide for canvas {canvas_w} "
+            f"with left={left}, right={right} (gap={gap:.4f})"
+        )
+    return dict(left=left, right=right, bottom=bottom, top=top, gap_frac=gap)
+
+
+PAIRWISE_PANEL_2640 = pairwise_panel_2640()
+PAIRWISE_FONT_TICK = 20       # y-axis numbers
+PAIRWISE_FONT_XTICK = 14      # force-pair x labels
+PAIRWISE_FONT_LABEL = 20
+PAIRWISE_BOX_WIDTH_AT_REF = 0.55
+PAIRWISE_X_SPACING = 1.35     # data units between adjacent x ticks
+PAIRWISE_XLIM_PAD = 0.55      # pad beyond first/last tick
+
+
+def pairwise_x_positions(n_pairs):
+    """X centers for n force-pair boxes."""
+    return [i * PAIRWISE_X_SPACING for i in range(int(n_pairs))]
+
+
+def pairwise_xlim(n_pairs):
+    """X limits with equal pad beyond first/last tick."""
+    n = int(n_pairs)
+    return (
+        -PAIRWISE_XLIM_PAD,
+        (n - 1) * PAIRWISE_X_SPACING + PAIRWISE_XLIM_PAD,
+    )
+
+
+def pairwise_box_width(n_pairs, ref_n):
+    """Same *pixel* box width in Low/High panels (scales with axis span)."""
+    n = int(n_pairs)
+    r = int(ref_n)
+    span = (n - 1) * PAIRWISE_X_SPACING + 2.0 * PAIRWISE_XLIM_PAD
+    span_ref = (r - 1) * PAIRWISE_X_SPACING + 2.0 * PAIRWISE_XLIM_PAD
+    return PAIRWISE_BOX_WIDTH_AT_REF * span / span_ref
+
+
+def add_pairwise_inward_ticks(ax, x_positions, atd):
+    """Inward tick guides at custom x positions (ATD helper assumes unit spacing)."""
+    from matplotlib.transforms import blended_transform_factory
+
+    x_positions = list(x_positions)
+    ax.set_xticks(x_positions)
+    ax.grid(False)
+    ax.tick_params(axis="both", which="both", length=0, labelsize=atd.FONT_TICK)
+
+    x_trans = blended_transform_factory(ax.transData, ax.transAxes)
+    y_trans = blended_transform_factory(ax.transAxes, ax.transData)
+    y_lo, y_hi = ax.get_ylim()
+    y_vals = [t for t in ax.get_yticks() if y_lo - 1e-9 <= t <= y_hi + 1e-9]
+    frac_x = atd.TICK_LEN_AXES
+    frac_y = atd.y_tick_frac_match_x(ax, frac_x)
+
+    for xi in x_positions:
+        ax.plot(
+            [xi, xi], [0, frac_x],
+            color=atd.BLACK, linewidth=1.0, solid_capstyle="butt",
+            transform=x_trans, clip_on=False, zorder=6,
+        )
+    for y in y_vals:
+        ax.plot(
+            [0, frac_y], [y, y],
+            color=atd.BLACK, linewidth=1.0, solid_capstyle="butt",
+            transform=y_trans, clip_on=False, zorder=6,
+        )
+
 # ATD Fig2 On-touch — unified box/scatter base color across FD Final figures
 # Optional override: FD_PAIRWISE_BLUE=#RRGGBB (used for Blues sat variants)
 ON_TOUCH_BLUE = os.environ.get("FD_PAIRWISE_BLUE", "#10559A")
@@ -161,11 +252,13 @@ def fit_export_canvas_letterbox(img, target_w, target_h, content_scale=0.82,
                                 margin_frac=None, margin_frac_x=None,
                                 margin_frac_y=None, equal_px_frac=None,
                                 trim_white=False, white_thresh=252,
-                                match_canvas_aspect=False):
+                                match_canvas_aspect=False,
+                                fill_height=False):
     """Uniform scale + white margins (no stretch).
 
     ``trim_white`` — crop near-white borders to the ink bbox first.
     ``match_canvas_aspect`` — center-crop ink to target W/H (can clip labels).
+    ``fill_height`` — scale so content height == target_h (no T/B pad).
     ``margin_frac`` — same fraction of each canvas dimension on all sides.
     """
     from PIL import Image
@@ -197,6 +290,19 @@ def fit_export_canvas_letterbox(img, target_w, target_h, content_scale=0.82,
             top = max(0, (ih - new_h) // 2)
             img = img.crop((0, top, iw, top + new_h))
         iw, ih = img.size
+
+    if fill_height:
+        # Fill canvas height exactly; pad only left/right (or crop width).
+        scale = target_h / float(ih)
+        nw = max(1, round(iw * scale))
+        nh = int(target_h)
+        scaled = img.resize((nw, nh), Image.Resampling.LANCZOS)
+        if nw > target_w:
+            left = max(0, (nw - target_w) // 2)
+            return scaled.crop((left, 0, left + target_w, nh))
+        canvas = Image.new("RGB", (target_w, target_h), "white")
+        canvas.paste(scaled, ((target_w - nw) // 2, 0))
+        return canvas
 
     if equal_px_frac is not None:
         m = max(0, round(min(target_w, target_h) * float(equal_px_frac)))
@@ -233,12 +339,14 @@ def save_export_figure(fig, out_dir, stem, export_widths_px, *, letterbox=False,
                        equal_px_frac=None, trim_white=False,
                        match_canvas_aspect=False,
                        height_from_content=False,
-                       fixed_height_px=None):
+                       fixed_height_px=None,
+                       fill_height=False):
     """Save PNGs at column widths; 2-col uses fixed canvas without stretch.
 
     ``height_from_content`` — after optional white-trim, set canvas height from
     ink aspect (width fixed).
     ``fixed_height_px`` — force canvas height (overrides default aspect / content).
+    ``fill_height`` — letterbox mode: content fills canvas height (no T/B pad).
     """
     from PIL import Image
     import numpy as np
@@ -285,6 +393,7 @@ def save_export_figure(fig, out_dir, stem, export_widths_px, *, letterbox=False,
                     equal_px_frac=equal_px_frac,
                     trim_white=trim_white,
                     match_canvas_aspect=match_canvas_aspect,
+                    fill_height=fill_height,
                 )
             else:
                 img = fit_export_canvas(img, width_px, height_px)

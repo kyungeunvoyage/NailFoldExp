@@ -65,12 +65,27 @@ ATD = _load_atd_c1()
 
 from gee_export_utils import (
     EXPORT_CANVAS,
+    EXPORT_W_2640,
+    EXPORT_H_2640,
+    AXIS_W_2640_PX,
     ON_TOUCH_BLUE,
+    PAIRWISE_BOX_WIDTH_AT_REF,
+    PAIRWISE_FONT_LABEL,
+    PAIRWISE_FONT_TICK,
+    PAIRWISE_FONT_XTICK,
+    PAIRWISE_PANEL,
+    PAIRWISE_PANEL_2640,
+    PAIRWISE_X_SPACING,
+    PAIRWISE_XLIM_PAD,
     XLABEL_FORCE_PAIR,
     add_figure_legend,
+    add_pairwise_inward_ticks,
     horizontal_panel_rects,
     on_touch_box_color,
     on_touch_scatter_rgba,
+    pairwise_box_width,
+    pairwise_x_positions,
+    pairwise_xlim,
     save_export_figure,
     vertical_panel_rects,
 )
@@ -91,8 +106,9 @@ SCATTER_ZORDER = 5
 ACCENT_RED = ATD.ACCENT_RED
 CRITERION_COLOR = ATD.CRITERION_COLOR
 REF_LINE_ZORDER = ATD.REF_LINE_ZORDER
-FONT_TICK = 20
-FONT_LABEL = 20
+FONT_TICK = PAIRWISE_FONT_TICK
+FONT_XTICK = PAIRWISE_FONT_XTICK
+FONT_LABEL = PAIRWISE_FONT_LABEL
 FONT_ANNOT = ATD.FONT_ANNOT
 BOX_LINEWIDTH = ATD.BOX_LINEWIDTH
 CAP_LINEWIDTH = ATD.CAP_LINEWIDTH
@@ -283,13 +299,15 @@ high_pvals = run_gee_pairwise("High", high_order)
 
 # Box width in data coords: scale so Low/High panels match pixel width (High = ref).
 BOX_WIDTH_REF_N = len(high_order)
-BOX_WIDTH_AT_REF = 0.42
+BOX_WIDTH_AT_REF = PAIRWISE_BOX_WIDTH_AT_REF
 STRIP_JITTER_AT_REF = 0.14
 
 
 def boxplot_width(n_pairs):
     """Same visual box width in both panels (fewer x categories → wider axis span)."""
-    return BOX_WIDTH_AT_REF * n_pairs / BOX_WIDTH_REF_N
+    span = (n_pairs - 1) * PAIRWISE_X_SPACING + 2.0 * PAIRWISE_XLIM_PAD
+    span_ref = (BOX_WIDTH_REF_N - 1) * PAIRWISE_X_SPACING + 2.0 * PAIRWISE_XLIM_PAD
+    return BOX_WIDTH_AT_REF * span / span_ref
 
 
 # ── helper: jittered strip ────────────────────────────────────────────────────
@@ -432,15 +450,17 @@ def save_gee_figure(fig, stem, export_widths=None):
 
 
 def finalize_gee_axes(ax, n_x, ylim_top, *, show_ylabel=True, show_xlabel=True,
-                      xlabel=XLABEL_FORCE_PAIR):
+                      xlabel=XLABEL_FORCE_PAIR, x_positions=None):
     """ATD C1 axes: 0–100% y, inward ticks, floating 0%, no grid."""
     fs_tick = FONT_TICK
+    fs_xtick = FONT_XTICK
     fs_label = FONT_LABEL
     labelpad = ATD.FIG_AXIS_LABELPAD
     ax.set_ylim(ATD.ACCURACY_YMIN, min(ATD.FIG2_BRACKET_YLIM_CAP, ylim_top))
     ax.set_yticks(ATD.ACCURACY_YTICKS)
     ax.grid(False)
-    ax.tick_params(axis="both", which="both", length=0, labelsize=fs_tick)
+    ax.tick_params(axis="y", which="both", length=0, labelsize=fs_tick)
+    ax.tick_params(axis="x", which="both", length=0, labelsize=fs_xtick)
     if show_ylabel:
         ax.set_ylabel("Discrimination Accuracy (%)", fontsize=fs_label,
                       labelpad=labelpad)
@@ -448,9 +468,11 @@ def finalize_gee_axes(ax, n_x, ylim_top, *, show_ylabel=True, show_xlabel=True,
         ax.set_xlabel(xlabel, fontsize=fs_label, labelpad=labelpad)
     sns.despine(ax=ax)
     ATD.apply_accuracy_y_spine_bounds(ax)
-    ATD.add_inward_tick_guides(ax, n_x)
-    # add_inward_tick_guides resets labelsize to ATD.FONT_TICK (16) — restore
-    ax.tick_params(axis="both", which="both", length=0, labelsize=fs_tick)
+    xs = list(x_positions) if x_positions is not None else pairwise_x_positions(n_x)
+    add_pairwise_inward_ticks(ax, xs, ATD)
+    # add_pairwise_inward_ticks resets labelsize — restore y vs x separately
+    ax.tick_params(axis="y", which="both", length=0, labelsize=fs_tick)
+    ax.tick_params(axis="x", which="both", length=0, labelsize=fs_xtick)
     ATD.apply_accuracy_y_spine_bounds(ax)
 
 
@@ -527,19 +549,22 @@ def plot_band(ax, band_label, order, pvals_dict, show_xlabel=True, show_ylabel=T
     strip_jitter = STRIP_JITTER_AT_REF * bw / ref_bw
     strip_size = STRIP_SIZE
     fs_tick = FONT_TICK
+    fs_xtick = FONT_XTICK
     fs_label = FONT_LABEL
     lw = BOX_LINEWIDTH
     med_lw = MEDIAN_LINEWIDTH
 
+    xs = pairwise_x_positions(len(order))
     for xi, pair in enumerate(order):
         pdata_pct = sub.loc[sub["pair_label"] == pair, "accuracy"].values * 100.0
         if len(pdata_pct) == 0:
             print(f"  WARNING: no data for pair '{pair}' in band '{band_label}'")
             continue
         band_max_pct = max(band_max_pct, float(np.max(pdata_pct)))
+        x_pos = xs[xi]
 
         bp = ax.boxplot(
-            [pdata_pct], positions=[xi], widths=bw,
+            [pdata_pct], positions=[x_pos], widths=bw,
             patch_artist=True, showfliers=False,
             capwidths=ATD.CAP_WIDTH,
             whiskerprops={
@@ -571,7 +596,7 @@ def plot_band(ax, band_label, order, pvals_dict, show_xlabel=True, show_ylabel=T
             line.set_alpha(1.0)
             line.set_zorder(MEDIAN_ZORDER)
 
-        x_strip = np.full(len(pdata_pct), xi) + jitter(len(pdata_pct), width=strip_jitter)
+        x_strip = np.full(len(pdata_pct), x_pos) + jitter(len(pdata_pct), width=strip_jitter)
         ax.scatter(
             x_strip, pdata_pct,
             c=[SCATTER_RGBA] * len(pdata_pct),
@@ -597,14 +622,15 @@ def plot_band(ax, band_label, order, pvals_dict, show_xlabel=True, show_ylabel=T
             max(ATD.ACCURACY_YLIM_TOP, band_max_pct + 8.0),
         )
 
-    ax.set_xticks(range(len(order)))
-    ax.set_xticklabels(order, fontsize=fs_tick)
-    ax.set_xlim(-0.55, len(order) - 0.45)
+    ax.set_xticks(xs)
+    ax.set_xticklabels(order, fontsize=fs_xtick)
+    ax.set_xlim(*pairwise_xlim(len(order)))
     if title:
         ax.set_title(title, fontsize=fs_label, pad=title_pad)
     finalize_gee_axes(
         ax, len(order), ylim_top,
         show_ylabel=show_ylabel, show_xlabel=show_xlabel,
+        x_positions=xs,
     )
 
 
@@ -624,14 +650,14 @@ def _add_legend(fig):
     add_figure_legend(fig, LEGEND_ELEMENTS, ncol=2, fontsize=FONT_LABEL)
 
 
-def make_pairwise_figure(orientation):
+def make_pairwise_figure(orientation, *, figsize=None, panel_kw=None):
     """Build GEE pairwise plot. orientation: 'horizontal' (1×2) or 'vertical' (2×1)."""
     sns.set_theme(style="white")
     ATD.apply_plot_style()
-    fig = plt.figure(figsize=EXPORT_CANVAS, facecolor="#FFFFFF")
+    fig = plt.figure(figsize=figsize or EXPORT_CANVAS, facecolor="#FFFFFF")
 
     if orientation == "horizontal":
-        low_r, high_r = horizontal_panel_rects()
+        low_r, high_r = horizontal_panel_rects(**(panel_kw or PAIRWISE_PANEL))
         ax_low = fig.add_axes(low_r)
         ax_high = fig.add_axes(high_r)
     elif orientation == "vertical":
@@ -668,6 +694,63 @@ for orientation, stem in (
     fig = make_pairwise_figure(orientation)
     save_gee_figure(fig, stem)
     plt.close(fig)
+
+# 2640×1072 horizontal (match SameDiff 2640 styling)
+_stem_h = "gee_pairwise_plot_horizontal"
+_fig_w_in = 12.0
+_fig_h_in = _fig_w_in * EXPORT_H_2640 / EXPORT_W_2640
+_span_ref = (BOX_WIDTH_REF_N - 1) * PAIRWISE_X_SPACING + 2.0 * PAIRWISE_XLIM_PAD
+_bw_2640 = 150.0 * _span_ref / float(AXIS_W_2640_PX) * (150.0 / 152.0)
+_lw_2640 = 1.4  # box / whisker outline (2col keeps ATD.BOX_LINEWIDTH = 0.8)
+_old_bw, _old_fs_x, _old_fs_y, _old_fs_l, _old_lw = (
+    BOX_WIDTH_AT_REF, FONT_XTICK, FONT_TICK, FONT_LABEL, BOX_LINEWIDTH,
+)
+BOX_WIDTH_AT_REF = _bw_2640
+FONT_XTICK = 22
+FONT_TICK = 24
+FONT_LABEL = 26  # y-axis title
+BOX_LINEWIDTH = _lw_2640
+_fig2640 = make_pairwise_figure(
+    "horizontal",
+    figsize=(_fig_w_in, _fig_h_in),
+    panel_kw=PAIRWISE_PANEL_2640,
+)
+BOX_WIDTH_AT_REF, FONT_XTICK, FONT_TICK, FONT_LABEL, BOX_LINEWIDTH = (
+    _old_bw, _old_fs_x, _old_fs_y, _old_fs_l, _old_lw,
+)
+save_export_figure(
+    _fig2640, OUTPUT_DIR, _stem_h, (("2640", EXPORT_W_2640),),
+    letterbox=True,
+    margin_frac=0.0,
+    trim_white=False,
+    fixed_height_px=EXPORT_H_2640,
+)
+plt.close(_fig2640)
+
+from PIL import Image as _Image
+import numpy as _np
+_p2640 = Path(OUTPUT_DIR) / f"{_stem_h}_2640.png"
+_im = _Image.open(_p2640).convert("RGB")
+_arr = _np.asarray(_im)
+_ink = _arr.mean(axis=2) < 252
+_rows = _np.any(_ink, axis=1)
+_r0 = int(_np.argmax(_rows))
+_r1 = int(len(_rows) - _np.argmax(_rows[::-1]))
+_im = _im.crop((0, _r0, _im.width, _r1))
+_im = _im.resize((_im.width, EXPORT_H_2640), _Image.Resampling.LANCZOS)
+_im.save(_p2640)
+print(f"Stripped T/B white → {_p2640}  ({_im.width}×{_im.height} px)")
+
+_FINAL_DIR = Path("/Users/kyungeunjung/NailFoldExp/(New)Analysis/ForceDiscAnalysis/Final")
+for tag, dest_name in (
+    ("2col", "(Final)gee_pairwise_plot_horizontal_2col.png"),
+    ("2640", "(Final)gee_pairwise_plot_horizontal_2640.png"),
+):
+    src = Path(OUTPUT_DIR) / f"{_stem_h}_{tag}.png"
+    dst = _FINAL_DIR / dest_name
+    if src.is_file():
+        shutil.copy2(src, dst)
+        print(f"Published → {dst}")
 
 # Legacy path used in repo root / IDE
 _root_alias = _SCRIPT_DIR / "gee_pairwise_plot.png"

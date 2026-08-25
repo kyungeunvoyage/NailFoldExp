@@ -48,12 +48,27 @@ from gee_export_utils import (
     EXPORT_CANVAS,
     EXPORT_WIDTH_2COL,
     EXPORT_HEIGHT_2COL,
+    EXPORT_W_2640,
+    EXPORT_H_2640,
+    AXIS_W_2640_PX,
     ON_TOUCH_BLUE,
+    PAIRWISE_BOX_WIDTH_AT_REF,
+    PAIRWISE_FONT_LABEL,
+    PAIRWISE_FONT_TICK,
+    PAIRWISE_FONT_XTICK,
+    PAIRWISE_PANEL,
+    PAIRWISE_PANEL_2640,
+    PAIRWISE_X_SPACING,
+    PAIRWISE_XLIM_PAD,
     XLABEL_FORCE_PAIR,
     add_figure_legend,
+    add_pairwise_inward_ticks,
     horizontal_panel_rects,
     on_touch_box_color,
     on_touch_scatter_rgba,
+    pairwise_box_width,
+    pairwise_x_positions,
+    pairwise_xlim,
     save_export_figure,
 )
 
@@ -62,9 +77,9 @@ BOX_STROKE       = "#000000"
 ACCENT_RED       = ATD.ACCENT_RED
 CRITERION_COLOR  = ATD.CRITERION_COLOR
 REF_LINE_ZORDER  = ATD.REF_LINE_ZORDER
-FONT_TICK        = 20
-FONT_XTICK       = 14   # force-pair labels; smaller than y ticks (ref screenshot)
-FONT_LABEL       = 20
+FONT_TICK        = PAIRWISE_FONT_TICK
+FONT_XTICK       = PAIRWISE_FONT_XTICK
+FONT_LABEL       = PAIRWISE_FONT_LABEL
 FONT_ANNOT       = ATD.FONT_ANNOT
 BOX_LINEWIDTH    = ATD.BOX_LINEWIDTH
 MEDIAN_LINEWIDTH = 2.0
@@ -80,13 +95,15 @@ CHANCE_PCT       = 50.0
 BOX_FILL_COLOR   = "#E3EDF7"
 SCATTER_RGBA     = on_touch_scatter_rgba(ATD)
 
-# ── Box width constants (exact copy from Stats(GEE).py) ───────────────────────
+# ── Box width constants (shared with Stats(GEE).py via gee_export_utils) ───────
 BOX_WIDTH_REF_N    = 3          # len(high_order) = 3
-BOX_WIDTH_AT_REF   = 0.42
+BOX_WIDTH_AT_REF   = PAIRWISE_BOX_WIDTH_AT_REF
 STRIP_JITTER_AT_REF = 0.14
 
 def boxplot_width(n_pairs):
-    return BOX_WIDTH_AT_REF * n_pairs / BOX_WIDTH_REF_N
+    span = (n_pairs - 1) * PAIRWISE_X_SPACING + 2.0 * PAIRWISE_XLIM_PAD
+    span_ref = (BOX_WIDTH_REF_N - 1) * PAIRWISE_X_SPACING + 2.0 * PAIRWISE_XLIM_PAD
+    return BOX_WIDTH_AT_REF * span / span_ref
 
 def jitter(n, width=0.1, seed=42):
     rng = np.random.default_rng(seed)
@@ -154,7 +171,8 @@ print("Low band pairs:", low_order)
 print("High band pairs:", high_order)
 
 # ── Axes finalize (exact copy from Stats(GEE).py) ─────────────────────────────
-def finalize_gee_axes(ax, n_x, ylim_top, *, show_ylabel=True, show_xlabel=True):
+def finalize_gee_axes(ax, n_x, ylim_top, *, show_ylabel=True, show_xlabel=True,
+                      x_positions=None):
     ax.set_ylim(ATD.ACCURACY_YMIN, min(ATD.FIG2_BRACKET_YLIM_CAP, ylim_top))
     ax.set_yticks(ATD.ACCURACY_YTICKS)
     ax.grid(False)
@@ -168,8 +186,9 @@ def finalize_gee_axes(ax, n_x, ylim_top, *, show_ylabel=True, show_xlabel=True):
                       labelpad=ATD.FIG_AXIS_LABELPAD)
     sns.despine(ax=ax)
     ATD.apply_accuracy_y_spine_bounds(ax)
-    ATD.add_inward_tick_guides(ax, n_x)
-    # add_inward_tick_guides resets labelsize — restore y vs x separately
+    xs = list(x_positions) if x_positions is not None else pairwise_x_positions(n_x)
+    add_pairwise_inward_ticks(ax, xs, ATD)
+    # add_pairwise_inward_ticks resets labelsize — restore y vs x separately
     ax.tick_params(axis="y", which="both", length=0, labelsize=FONT_TICK)
     ax.tick_params(axis="x", which="both", length=0, labelsize=FONT_XTICK)
     ATD.apply_accuracy_y_spine_bounds(ax)
@@ -184,15 +203,17 @@ def plot_band(ax, band_label, order, show_xlabel=True, show_ylabel=True,
     lw   = BOX_LINEWIDTH
     band_max_pct = 0.0
 
+    xs = pairwise_x_positions(len(order))
     for xi, pair in enumerate(order):
         pdata_pct = sub.loc[sub["pair_label"] == pair, "accuracy"].values * 100.0
         if len(pdata_pct) == 0:
             print(f"  WARNING: no data for pair '{pair}' in band '{band_label}'")
             continue
         band_max_pct = max(band_max_pct, float(np.max(pdata_pct)))
+        x_pos = xs[xi]
 
         bp = ax.boxplot(
-            [pdata_pct], positions=[xi], widths=bw,
+            [pdata_pct], positions=[x_pos], widths=bw,
             patch_artist=True, showfliers=False,
             capwidths=ATD.CAP_WIDTH,
             whiskerprops={"linewidth": lw, "color": BOX_STROKE, "solid_capstyle": "butt"},
@@ -218,7 +239,7 @@ def plot_band(ax, band_label, order, show_xlabel=True, show_ylabel=True,
             line.set_alpha(1.0)
             line.set_zorder(MEDIAN_ZORDER)
 
-        x_strip = np.full(len(pdata_pct), xi) + jitter(len(pdata_pct), width=strip_jitter)
+        x_strip = np.full(len(pdata_pct), x_pos) + jitter(len(pdata_pct), width=strip_jitter)
         ax.scatter(
             x_strip, pdata_pct,
             c=[SCATTER_RGBA] * len(pdata_pct),
@@ -241,11 +262,12 @@ def plot_band(ax, band_label, order, show_xlabel=True, show_ylabel=True,
     else:
         ylim_top = min(ATD.FIG2_BRACKET_YLIM_CAP,
                        max(ATD.ACCURACY_YLIM_TOP, band_max_pct + 8.0))
-    ax.set_xticks(range(len(order)))
+    ax.set_xticks(xs)
     ax.set_xticklabels(order, fontsize=FONT_XTICK)
-    ax.set_xlim(-0.55, len(order) - 0.45)
+    ax.set_xlim(*pairwise_xlim(len(order)))
     finalize_gee_axes(ax, len(order), ylim_top,
-                      show_ylabel=show_ylabel, show_xlabel=show_xlabel)
+                      show_ylabel=show_ylabel, show_xlabel=show_xlabel,
+                      x_positions=xs)
 
 # ── Legend (same as Stats(GEE).py) ────────────────────────────────────────────
 LEGEND_ELEMENTS = [
@@ -259,44 +281,82 @@ LEGEND_ELEMENTS = [
 sns.set_theme(style="white")
 ATD.apply_plot_style()
 
-fig = plt.figure(figsize=EXPORT_CANVAS, facecolor="#FFFFFF")
-# Wider panels for 2640×1042: tighter outer margins, keep inter-panel gap
-low_r, high_r = horizontal_panel_rects(
-    left=0.10, right=0.04, bottom=0.12, top=0.90, gap_frac=0.14,
-)
-ax_low  = fig.add_axes(low_r)
-ax_high = fig.add_axes(high_r)
+def _shared_ylim_top():
+    all_max_pct = 0.0
+    for band_label, order in [("Low", low_order), ("High", high_order)]:
+        sub = subj_acc[subj_acc["band"] == band_label]
+        for pair in order:
+            pdata = sub.loc[sub["pair_label"] == pair, "accuracy"].values * 100.0
+            if len(pdata):
+                all_max_pct = max(all_max_pct, float(np.max(pdata)))
+    return min(ATD.FIG2_BRACKET_YLIM_CAP,
+               max(ATD.ACCURACY_YLIM_TOP, all_max_pct + 8.0))
 
-all_max_pct = 0.0
-for band_label, order in [("Low", low_order), ("High", high_order)]:
-    sub = subj_acc[subj_acc["band"] == band_label]
-    for pair in order:
-        pdata = sub.loc[sub["pair_label"] == pair, "accuracy"].values * 100.0
-        if len(pdata):
-            all_max_pct = max(all_max_pct, float(np.max(pdata)))
-shared_ylim_top = min(ATD.FIG2_BRACKET_YLIM_CAP,
-                      max(ATD.ACCURACY_YLIM_TOP, all_max_pct + 8.0))
 
-plot_band(ax_low,  "Low",  low_order,  show_xlabel=False, show_ylabel=True,
-          ylim_top_override=shared_ylim_top)
-plot_band(ax_high, "High", high_order, show_xlabel=False, show_ylabel=False,
-          ylim_top_override=shared_ylim_top)
+def build_pairwise_figure(figsize, panel_kw):
+    fig = plt.figure(figsize=figsize, facecolor="#FFFFFF")
+    low_r, high_r = horizontal_panel_rects(**panel_kw)
+    ax_low = fig.add_axes(low_r)
+    ax_high = fig.add_axes(high_r)
+    ylim_top = _shared_ylim_top()
+    plot_band(ax_low, "Low", low_order, show_xlabel=False, show_ylabel=True,
+              ylim_top_override=ylim_top)
+    plot_band(ax_high, "High", high_order, show_xlabel=False, show_ylabel=False,
+              ylim_top_override=ylim_top)
+    return fig
+
 
 stem = "gee_pairwise_samediff_horizontal"
-save_export_figure(fig, str(OUTPUT_DIR), stem, ATD.EXPORT_WIDTHS_PX)
 
-# Extra wide canvas: 2640 × 1042
-EXPORT_W_2640 = 2640
-EXPORT_H_2640 = 1042
+# 2col / paper widths (shared layout with Stats GEE)
+fig = build_pairwise_figure(EXPORT_CANVAS, PAIRWISE_PANEL)
+save_export_figure(fig, str(OUTPUT_DIR), stem, ATD.EXPORT_WIDTHS_PX)
+plt.close(fig)
+
+# 2640×1072: larger tick + y-label; box width ≈ 150 px on 1124-px axes
+fig_w_in = 12.0
+fig_h_in = fig_w_in * EXPORT_H_2640 / EXPORT_W_2640
+_span_ref = (BOX_WIDTH_REF_N - 1) * PAIRWISE_X_SPACING + 2.0 * PAIRWISE_XLIM_PAD
+_bw_2640 = 150.0 * _span_ref / float(AXIS_W_2640_PX) * (150.0 / 152.0)  # → ~150 px
+_fs_xtick_2640 = 22
+_fs_ytick_2640 = 24
+_fs_ylabel_2640 = 26
+_lw_2640 = 1.4  # box / whisker outline (2col keeps ATD.BOX_LINEWIDTH = 0.8)
+_old_bw, _old_fs_x, _old_fs_y, _old_fs_l, _old_lw = (
+    BOX_WIDTH_AT_REF, FONT_XTICK, FONT_TICK, FONT_LABEL, BOX_LINEWIDTH,
+)
+BOX_WIDTH_AT_REF = _bw_2640
+FONT_XTICK = _fs_xtick_2640
+FONT_TICK = _fs_ytick_2640
+FONT_LABEL = _fs_ylabel_2640
+BOX_LINEWIDTH = _lw_2640
+fig2640 = build_pairwise_figure((fig_w_in, fig_h_in), PAIRWISE_PANEL_2640)
+BOX_WIDTH_AT_REF, FONT_XTICK, FONT_TICK, FONT_LABEL, BOX_LINEWIDTH = (
+    _old_bw, _old_fs_x, _old_fs_y, _old_fs_l, _old_lw,
+)
 save_export_figure(
-    fig, str(OUTPUT_DIR), stem, (("2640", EXPORT_W_2640),),
+    fig2640, str(OUTPUT_DIR), stem, (("2640", EXPORT_W_2640),),
     letterbox=True,
-    margin_frac_x=0.06,  # tighter outer pad → larger panels on 2640×1042
-    margin_frac_y=0.05,
-    trim_white=True,
+    margin_frac=0.0,
+    trim_white=False,
     fixed_height_px=EXPORT_H_2640,
 )
-plt.close(fig)
+plt.close(fig2640)
+
+# Remove leftover pure-white top/bottom rows; keep width & x-axis px
+from PIL import Image as _Image
+import numpy as _np
+_p2640 = OUTPUT_DIR / f"{stem}_2640.png"
+_im = _Image.open(_p2640).convert("RGB")
+_arr = _np.asarray(_im)
+_ink = _arr.mean(axis=2) < 252
+_rows = _np.any(_ink, axis=1)
+_r0 = int(_np.argmax(_rows))
+_r1 = int(len(_rows) - _np.argmax(_rows[::-1]))
+_im = _im.crop((0, _r0, _im.width, _r1))
+_im = _im.resize((_im.width, EXPORT_H_2640), _Image.Resampling.LANCZOS)
+_im.save(_p2640)
+print(f"Stripped T/B white → {_p2640}  ({_im.width}×{_im.height} px)")
 
 # Publish 2col + 2640 versions to Final
 for tag, dest_name in (
