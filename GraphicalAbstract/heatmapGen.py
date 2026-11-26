@@ -1,108 +1,136 @@
-import os
-import numpy as np
+"""Overlay On-touch ATD detection accuracy on baseImg a–f sites."""
+from pathlib import Path
+import subprocess
+import sys
+
+# Non-interactive backend — Cursor/VS Code Run 버튼에서 GUI hang 방지
+import matplotlib
+matplotlib.use("Agg")
+
 import pandas as pd
 import matplotlib.pyplot as plt
-from scipy.interpolate import Rbf
-from PIL import Image
+from matplotlib.cm import ScalarMappable
 
-# ==========================================
-# 1. 경로 설정 및 사용자 데이터 디렉토리
-# ==========================================
-data_dir = '/Users/kyungeunjung/NailFoldExp/Data/(ATD)CurData'
-base_image_path = '/Users/kyungeunjung/NailFoldExp/GraphicalAbstract/baseImg.png' # 베이스가 될 손톱 이미지 파일명 지정
+from periungual_heatmap import COORDS, HEAT_CMAP, load_base_img, rbf_belt_rgba
 
-# ==========================================
-# 2. Region 좌표 설정 (a, b, c, d, e, f)
-# ==========================================
-# 실제 사용하는 'Group 29365.jpg' 이미지의 해상도에 맞춰 각 점의 (x, y) 픽셀 좌표를 입력해야 합니다.
-# Mac의 미리보기(Preview) 등에서 마우스 커서를 올리면 픽셀 좌표를 확인할 수 있습니다.
-# (아래는 임의로 설정한 예시 좌표입니다)
-regions = ['a', 'b', 'c', 'd', 'e', 'f']
-coords = {
-    'a': (120, 250), # 좌측 상단
-    'b': (100, 420), # 좌측 중단
-    'c': (280, 520), # 좌측 하단
-    'd': (480, 520), # 우측 하단
-    'e': (660, 420), # 우측 중단
-    'f': (640, 250)  # 우측 상단
-}
+HERE = Path(__file__).resolve().parent
+REPO = HERE.parent
+DATA_DIR = REPO / "Data" / "(ATD)CurData"
+OUT_DIR = HERE
 
-def generate_overlay_heatmap(metric_name, data_values, output_filename):
-    try:
-        # 베이스 이미지 로드
-        img = Image.open(base_image_path)
-        img_width, img_height = img.size
-    except FileNotFoundError:
-        print(f"Error: {base_image_path} 파일을 찾을 수 없습니다. 경로를 확인해주세요.")
-        return
+FORCE_G = 0.6
+CONDITION = "On-touch (Mid)"
+regions = ["a", "b", "c", "d", "e", "f"]
+coords = COORDS
 
-    # 좌표와 데이터 분리
-    x_coords = [coords[region][0] for region in regions]
-    y_coords = [coords[region][1] for region in regions]
-    z_values = [data_values[region] for region in regions]
 
-    # Rbf (Radial Basis Function)를 사용한 부드러운 보간(Interpolation)
-    # 손가락 모양처럼 비정형적인 포인트 배열에서 부드러운 히트맵을 만들 때 유리합니다.
-    rbf = Rbf(x_coords, y_coords, z_values, function='thin_plate')
+def calc_score(row):
+    if row["Target"] == 0:
+        return 100.0 if row["Response"] == 0 else 0.0
+    return max(0.0, (1 - abs(row["Target"] - row["Response"]) / row["Target"]) * 100.0)
 
-    # 이미지 전체 픽셀에 대한 그리드 생성
-    xi = np.linspace(0, img_width, img_width)
-    yi = np.linspace(0, img_height, img_height)
-    XI, YI = np.meshgrid(xi, yi)
 
-    # 그리드에 보간된 데이터 적용
-    ZI = rbf(XI, YI)
-    
-    # 히트맵이 손가락 바깥으로 너무 퍼지지 않게 제한 (선택적 마스킹)
-    # ZI 값이 특정 범위를 넘어가면 투명 처리하는 등의 후처리를 넣을 수 있습니다.
-    
-    # 시각화 설정
-    fig, ax = plt.subplots(figsize=(img_width/100, img_height/100), dpi=100)
-    
-    # 1. 배경 이미지 출력
+def load_ontouch_accuracy_by_area(force_g=FORCE_G):
+    """Subject-mean Score per Area, then grand mean. force_g=None → all forces."""
+    files = sorted(DATA_DIR.glob("P*_AbsoluteThresholdDetection.csv"))
+    if not files:
+        raise FileNotFoundError(f"No ATD CSVs in {DATA_DIR}")
+    df = pd.concat([pd.read_csv(p) for p in files], ignore_index=True)
+    df["Condition"] = df["Condition"].astype(str).str.strip()
+    df["Force_Val"] = df["Force"].astype(str).str.extract(r"(\d+\.?\d*)").astype(float)
+    df["Area"] = df["Area"].astype(str).str.strip().str.upper()
+    df = df[df["Area"].isin(list("ABCDEF"))].copy()
+    df["Score"] = df.apply(calc_score, axis=1)
+
+    sub = df[df["Condition"] == CONDITION].copy()
+    if force_g is not None:
+        sub = sub[sub["Force_Val"] == force_g]
+    if sub.empty:
+        raise ValueError(f"No rows for {CONDITION}" + (f" @ {force_g} g" if force_g else ""))
+
+    by_sa = sub.groupby(["SubjectID", "Area"], as_index=False)["Score"].mean()
+    by_area = by_sa.groupby("Area")["Score"].mean()
+    forces = sorted(sub["Force_Val"].unique())
+    return (
+        {k.lower(): float(by_area[k]) for k in "ABCDEF"},
+        by_sa["SubjectID"].nunique(),
+        forces,
+    )
+
+
+def generate_overlay_heatmap(metric_name, data_values, output_filename,
+                             *, n_subjects=None, forces=None, open_preview=False):
+    img = load_base_img()
+    img_w, img_h = img.size
+    site_xy = [coords[r] for r in regions]
+    site_z = [data_values[r] for r in regions]
+
+    rgba, norm, vmin, vmax = rbf_belt_rgba(img, site_xy, site_z, alpha=0.62)
+
+    fig, ax = plt.subplots(figsize=(img_w / 100, img_h / 100), dpi=100)
     ax.imshow(img)
-    
-    # 2. 히트맵 오버레이 (alpha 값으로 투명도 조절, cmap으로 색상 맵 설정)
-    # cmap 추천: detection/accuracy는 보통 'RdYlGn' (Red-Yellow-Green) 혹은 'jet' 사용
-    heatmap = ax.imshow(ZI, extent=(0, img_width, img_height, 0), 
-                        alpha=0.5, cmap='RdYlGn', vmin=min(z_values), vmax=max(z_values))
-    
-    # 각 포인트 마커 표시 (검은색 점)
-    ax.scatter(x_coords, y_coords, color='black', s=100, zorder=5)
-    
-    # 포인트 레이블(a,b,c...) 표시
-    for region in regions:
-        ax.text(coords[region][0]-30, coords[region][1]+10, region, 
-                color='black', fontsize=16, fontweight='bold', zorder=6)
+    ax.imshow(rgba, extent=(0, img_w, img_h, 0), interpolation="bilinear")
+    # No numeric callout panels — baseImg already has a–f region labels
+    ax.axis("off")
 
-    # 축 숨기기
-    ax.axis('off')
-    
-    # 컬러바 추가
-    cbar = fig.colorbar(heatmap, ax=ax, shrink=0.7)
-    cbar.set_label(f'{metric_name}', fontsize=12)
+    sm = ScalarMappable(norm=norm, cmap=HEAT_CMAP)
+    sm.set_array([])
+    cbar = fig.colorbar(sm, ax=ax, shrink=0.65, pad=0.02)
+    cbar.set_label(metric_name, fontsize=11)
 
-    # 결과 저장
-    save_path = os.path.join(data_dir, output_filename)
-    plt.savefig(save_path, bbox_inches='tight', pad_inches=0)
-    plt.close()
-    
-    print(f"[{metric_name}] 히트맵이 성공적으로 저장되었습니다: {save_path}")
+    out_path = OUT_DIR / output_filename
+    fig.savefig(out_path, bbox_inches="tight", pad_inches=0.05, facecolor="white")
+    plt.close(fig)
+    print(f"[{metric_name}] saved → {out_path}")
 
-# ==========================================
-# 3. 데이터 로드 및 실행
-# ==========================================
+    # Exact site values mapped into this figure
+    force_str = (
+        "all"
+        if forces is None
+        else ";".join(f"{float(f):g}" for f in forces)
+    )
+    rows = []
+    for r, (x, y), z in zip(regions, site_xy, site_z):
+        rows.append({
+            "figure": output_filename,
+            "metric": metric_name,
+            "condition": CONDITION,
+            "forces_g": force_str,
+            "n_subjects": n_subjects,
+            "site": r,
+            "area": r.upper(),
+            "x_px": x,
+            "y_px": y,
+            "mapped_value": z,
+            "colorbar_vmin": vmin,
+            "colorbar_vmax": vmax,
+        })
+    csv_path = out_path.with_suffix(".csv")
+    pd.DataFrame(rows).to_csv(csv_path, index=False)
+    print(f"  mapped values → {csv_path}")
+
+    if open_preview and sys.platform == "darwin":
+        subprocess.run(["open", str(out_path)], check=False)
+
+
 if __name__ == "__main__":
-    # TODO: 실제 환경에서는 pd.read_csv() 등을 이용하여 데이터를 로드하세요.
-    # 예시: df = pd.read_csv(os.path.join(data_dir, 'accuracy_data.csv'))
-    
-    # 임시 테스트용 데이터 (0 ~ 100% 범위 가정)
-    dummy_detection_data = {'a': 80.5, 'b': 92.0, 'c': 65.0, 'd': 70.0, 'e': 95.0, 'f': 82.0}
-    dummy_discrimination_data = {'a': 75.0, 'b': 85.0, 'c': 60.0, 'd': 62.0, 'e': 88.0, 'f': 78.0}
-    dummy_spatial_data = {'a': 3.5, 'b': 2.1, 'c': 5.0, 'd': 4.8, 'e': 1.5, 'f': 3.2} # 단위: mm 등
+    acc, n_subj, forces = load_ontouch_accuracy_by_area(FORCE_G)
+    print(f"On-touch @ {FORCE_G:g} g — n={n_subj}")
+    for r in regions:
+        print(f"  {r.upper()}: {acc[r]:5.1f}%")
+    generate_overlay_heatmap(
+        f"Detection accuracy (%)  |  On-touch  {FORCE_G:g} g",
+        acc, "Heatmap_Detection_OnTouch_0p6g.png",
+        n_subjects=n_subj, forces=forces,
+    )
 
-    # 히트맵 생성 실행
-    print("히트맵 생성을 시작합니다...")
-    generate_overlay_heatmap("Detection Accuracy (%)", dummy_detection_data, "Heatmap_Detection.png")
-    generate_overlay_heatmap("Discrimination Accuracy (%)", dummy_discrimination_data, "Heatmap_Discrimination.png")
-    generate_overlay_heatmap("Spatial Accuracy (mm)", dummy_spatial_data, "Heatmap_Spatial.png")
+    acc_all, n_all, forces_all = load_ontouch_accuracy_by_area(force_g=None)
+    print(f"On-touch ALL — n={n_all} forces={[float(f) for f in forces_all]}")
+    for r in regions:
+        print(f"  {r.upper()}: {acc_all[r]:5.1f}%")
+    generate_overlay_heatmap(
+        "Detection accuracy (%)  |  On-touch  (all forces)",
+        acc_all, "Heatmap_Detection_OnTouch_allForces.png",
+        n_subjects=n_all, forces=forces_all,
+        open_preview=True,
+    )

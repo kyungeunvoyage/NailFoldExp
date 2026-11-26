@@ -1,0 +1,7 @@
+figure,metric,condition,forces_g,n_subjects,site,area,x_px,y_px,mapped_value,colorbar_vmin,colorbar_vmax
+Heatmap_Detection_OnTouch_0p6g.png,Detection accuracy (%)  |  On-touch  0.6 g,On-touch (Mid),0.6,45,a,A,118,247,67.71428571428572,56.29398148148148,95.97189153439153
+Heatmap_Detection_OnTouch_0p6g.png,Detection accuracy (%)  |  On-touch  0.6 g,On-touch (Mid),0.6,45,b,B,132,405,87.80291005291005,56.29398148148148,95.97189153439153
+Heatmap_Detection_OnTouch_0p6g.png,Detection accuracy (%)  |  On-touch  0.6 g,On-touch (Mid),0.6,45,c,C,239,486,82.60317460317461,56.29398148148148,95.97189153439153
+Heatmap_Detection_OnTouch_0p6g.png,Detection accuracy (%)  |  On-touch  0.6 g,On-touch (Mid),0.6,45,d,D,384,485,79.07539682539684,56.29398148148148,95.97189153439153
+Heatmap_Detection_OnTouch_0p6g.png,Detection accuracy (%)  |  On-touch  0.6 g,On-touch (Mid),0.6,45,e,E,485,401,73.02910052910053,56.29398148148148,95.97189153439153
+Heatmap_Detection_OnTouch_0p6g.png,Detection accuracy (%)  |  On-touch  0.6 g,On-touch (Mid),0.6,45,f,F,522,248,64.46296296296296,56.29398148148148,95.97189153439153

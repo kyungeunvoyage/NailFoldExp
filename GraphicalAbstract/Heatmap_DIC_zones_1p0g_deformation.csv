@@ -1,0 +1,7 @@
+figure,metric,metric_label,force_g,site,source_region,region_A_value,region_CD_value,x_px,y_px,mapped_value,colorbar_vmin,colorbar_vmax
+Heatmap_DIC_zones_1p0g_deformation.png,Deformation radius (mm),Deformation radius (mm),1.0,a,Region A,0.8330441002171717,1.1741364699065657,118,247,0.8330441002171717,0.7136617708258838,1.2935187992978536
+Heatmap_DIC_zones_1p0g_deformation.png,Deformation radius (mm),Deformation radius (mm),1.0,b,"mean(A,CD)",0.8330441002171717,1.1741364699065657,132,405,1.0035902850618688,0.7136617708258838,1.2935187992978536
+Heatmap_DIC_zones_1p0g_deformation.png,Deformation radius (mm),Deformation radius (mm),1.0,c,Region CD,0.8330441002171717,1.1741364699065657,239,486,1.1741364699065657,0.7136617708258838,1.2935187992978536
+Heatmap_DIC_zones_1p0g_deformation.png,Deformation radius (mm),Deformation radius (mm),1.0,d,Region CD,0.8330441002171717,1.1741364699065657,384,485,1.1741364699065657,0.7136617708258838,1.2935187992978536
+Heatmap_DIC_zones_1p0g_deformation.png,Deformation radius (mm),Deformation radius (mm),1.0,e,"mean(A,CD)",0.8330441002171717,1.1741364699065657,485,401,1.0035902850618688,0.7136617708258838,1.2935187992978536
+Heatmap_DIC_zones_1p0g_deformation.png,Deformation radius (mm),Deformation radius (mm),1.0,f,Region A,0.8330441002171717,1.1741364699065657,522,248,0.8330441002171717,0.7136617708258838,1.2935187992978536

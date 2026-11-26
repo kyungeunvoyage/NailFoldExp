@@ -18,6 +18,7 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import matplotlib.patches as mpatches
 import matplotlib.colors as mcolors
+from matplotlib.lines import Line2D
 from matplotlib.path import Path
 import colorsys
 import seaborn as sns
@@ -315,15 +316,22 @@ def draw_fig3_stripplot(
     participant_median=False,
     triangle_keys=None,
     partial_subjects=None,
+    square_subjects=None,
+    square_source=None,
 ):
     """Strip points at ``Plot_X``; narrow centered jitter inside each box.
 
     triangle_keys:    set of (source_name, force_val) tuples → entire group uses '^'.
     partial_subjects: set of participant IDs → those specific points use '^' regardless
                       of force/source; overrides triangle_keys when both are supplied.
+    square_subjects:  set of participant IDs → those points use 's' (this-study pad).
+                      Takes priority over partial_subjects / triangle_keys.
+    square_source:    if set, squares apply only to this Source (fingerpad / Kao),
+                      so periungual rows with the same participant ID stay triangles.
     """
     rng = np.random.default_rng(seed)
     half_span = (box_width / 2) * jitter_frac
+    sq_ids = set(square_subjects) if square_subjects is not None else set()
     for src in source_order:
         sub = df_plot[df_plot["Source"] == src]
         if sub.empty:
@@ -339,12 +347,24 @@ def draw_fig3_stripplot(
         )
         xs_circ, ys_circ = [], []
         xs_tri,  ys_tri  = [], []
+        xs_sq,   ys_sq   = [], []
         for _, grp in sub.groupby("Plot_X", sort=False):
             x0   = float(grp["Plot_X"].iloc[0])
             fval = float(grp["Force_Val"].iloc[0]) if "Force_Val" in grp.columns else None
+            has_pid = "Participant" in grp.columns
+            use_sq = bool(sq_ids) and (square_source is None or src == square_source)
+            mask_sq = grp["Participant"].isin(sq_ids) if has_pid and use_sq else None
 
-            if partial_subjects is not None and "Participant" in grp.columns:
-                # Split within each (source, force) group by participant ID
+            if mask_sq is not None and mask_sq.any():
+                y_sq = grp.loc[mask_sq, "Score"].to_numpy(dtype=float)
+                xs_sq.append(x0 + _centered_strip_offsets(len(y_sq), half_span, rng))
+                ys_sq.append(y_sq)
+                grp = grp.loc[~mask_sq]
+
+            if grp.empty:
+                continue
+
+            if partial_subjects is not None and has_pid:
                 mask_par = grp["Participant"].isin(partial_subjects)
                 for rows, is_tri in [(grp[~mask_par], False), (grp[mask_par], True)]:
                     if rows.empty:
@@ -371,6 +391,73 @@ def draw_fig3_stripplot(
         if xs_tri:
             xt = np.concatenate(xs_tri);  yt = np.concatenate(ys_tri)
             ax.scatter(xt, yt, c=[rgba_tri]*len(xt), s=(size*1.3)**2, marker="^", **scatter_kw)
+        if xs_sq:
+            xs = np.concatenate(xs_sq); ys = np.concatenate(ys_sq)
+            ax.scatter(
+                xs, ys, c=[rgba]*len(xs), s=(size * 1.25) ** 2, marker="s",
+                linewidths=0.45, edgecolors=BLACK, alpha=alpha,
+                zorder=4, clip_on=False,
+            )
+
+
+def _draw_fig3_square_overlay(
+    ax,
+    extra_square_df,
+    df_plot,
+    kao_label,
+    force_to_idx,
+    n_forces,
+    box_width,
+    brightness=SCATTER_HSB_BRIGHTNESS,
+    alpha=STRIP_ALPHA,
+    size=3.8,
+    jitter_frac=FIG3_STRIP_JITTER_FRAC,
+    seed=7,
+    participant_median=True,
+):
+    """Overlay this-study fingerpad points as squares on the Kao dodge x."""
+    df_sq = extra_square_df.copy()
+    if SUBJECT_COL in df_sq.columns and "Participant" not in df_sq.columns:
+        df_sq["Participant"] = df_sq[SUBJECT_COL]
+    if participant_median and "Participant" in df_sq.columns:
+        df_sq = df_sq.groupby(["Participant", "Force_Val"], as_index=False)["Score"].median()
+    n_subj = int(df_sq["Participant"].nunique()) if "Participant" in df_sq.columns else 0
+
+    half = fig3_hue_dodge_half(n_forces)
+    kao_x_by_force = (
+        df_plot[df_plot["Source"] == kao_label]
+        .drop_duplicates("Force_Val")
+        .set_index("Force_Val")["Plot_X"]
+        .to_dict()
+        if kao_label in df_plot["Source"].values else {}
+    )
+    rng = np.random.default_rng(seed)
+    half_span = (box_width / 2) * jitter_frac
+    rgba = _hsb_scatter_rgba(KAO_COLOR, brightness, alpha=alpha)
+    xs, ys = [], []
+    for _, grp in df_sq.groupby("Force_Val", sort=False):
+        fval = float(grp["Force_Val"].iloc[0])
+        if fval not in force_to_idx:
+            continue
+        x0 = kao_x_by_force.get(fval, float(force_to_idx[fval]) - half)
+        y = grp["Score"].to_numpy(dtype=float)
+        xs.append(x0 + _centered_strip_offsets(len(y), half_span, rng))
+        ys.append(y)
+    if xs:
+        xc = np.concatenate(xs)
+        yc = np.concatenate(ys)
+        ax.scatter(
+            xc, yc,
+            c=[rgba] * len(xc),
+            s=(size * 1.25) ** 2,
+            marker="s",
+            linewidths=0.45,
+            edgecolors=BLACK,
+            alpha=alpha,
+            zorder=4,
+            clip_on=False,
+        )
+    return n_subj
 
 
 def sns_boxplot_width(n_x_categories, reference_n=None):
@@ -395,6 +482,9 @@ SCRIPT_DIR   = os.path.dirname(os.path.abspath(__file__))
 REPO_ROOT    = os.path.normpath(os.path.join(SCRIPT_DIR, "../../../"))
 FILE_PATTERN = os.path.join(
     REPO_ROOT, "Data", "(ATD)CurData", "P*_AbsoluteThresholdDetection.csv"
+)
+PAD_FILE_PATTERN = os.path.join(
+    REPO_ROOT, "Data", "(ATD)PadData", "P*_AbsoluteThresholdDetection*.csv"
 )
 OUT_DIR = os.path.join(SCRIPT_DIR, "atd_c1_outputs")
 os.makedirs(OUT_DIR, exist_ok=True)
@@ -455,7 +545,7 @@ def add_legend_outside(
     ax.legend(**leg_kw)
 
 
-def save_figure(fig, stem, export_widths=None):
+def save_figure(fig, stem, export_widths=None, preserve_aspect=False):
     """Save PNG at publication column widths (px)."""
     from PIL import Image
 
@@ -470,8 +560,15 @@ def save_figure(fig, stem, export_widths=None):
     buf.seek(0)
     master = Image.open(buf).convert("RGB")
 
-    for tag, width_px in export_widths:
-        height_px = export_height_px(width_px)
+    for spec in export_widths:
+        if len(spec) == 3:
+            tag, width_px, height_px = spec
+        else:
+            tag, width_px = spec
+            if preserve_aspect:
+                height_px = max(1, round(width_px * master.height / master.width))
+            else:
+                height_px = export_height_px(width_px)
         out = master.resize((width_px, height_px), Image.Resampling.LANCZOS)
         png_path = os.path.join(OUT_DIR, f"{stem}_{tag}.png")
         out.save(png_path)
@@ -1196,7 +1293,12 @@ _subj_nums    = df_raw[_subj_col_raw].str.extract(r"(\d+)")[0].astype(int)
 _PARTIAL_SUBJ = set(df_raw.loc[_subj_nums >= 61, _subj_col_raw].unique())
 _is_partial   = df_raw[_subj_col_raw].isin(_PARTIAL_SUBJ)
 df_raw = df_raw[~_is_partial | (df_raw["Force_Val"].isin([0.16, 0.4, 0.6]))].copy()
+# P91–P93: periungual add-on at 0.4 g only (drop their 0.16 / 0.6 g)
+_P04_ONLY_SUBJ = {"P91", "P92", "P93"}
+_is_p04_only = df_raw[_subj_col_raw].isin(_P04_ONLY_SUBJ)
+df_raw = df_raw[~_is_p04_only | np.isclose(df_raw["Force_Val"], 0.4)].copy()
 print(f"Partial-protocol subjects (n={len(_PARTIAL_SUBJ)}): {sorted(_PARTIAL_SUBJ)}")
+print(f"0.4 g-only subjects (n={len(_P04_ONLY_SUBJ)}): {sorted(_P04_ONLY_SUBJ)}")
 print(f"After partial-subject filter: {len(df_raw)} rows")
 
 SUBJECT_COL = "SubjectID" if "SubjectID" in df_raw.columns else "Subject"
@@ -1210,6 +1312,23 @@ def calc_score(row):
 
 
 df_raw["Score"] = df_raw.apply(calc_score, axis=1)
+
+# Fingerpad ATD (this study) — scored with the same relative-accuracy rule
+pad_files = sorted(glob.glob(PAD_FILE_PATTERN))
+if pad_files:
+    df_pad = pd.concat(
+        [pd.read_csv(f) for f in pad_files],
+        ignore_index=True,
+    )
+    df_pad["Condition"] = df_pad["Condition"].str.strip()
+    df_pad["Force_Val"] = df_pad["Force"].str.extract(r"(\d+\.?\d*)").astype(float)
+    df_pad["Score"] = df_pad.apply(calc_score, axis=1)
+    df_pad["Participant"] = df_pad[SUBJECT_COL]
+    n_pad_subjects = df_pad[SUBJECT_COL].nunique()
+    print(f"Loaded {len(pad_files)} fingerpad file(s), n={n_pad_subjects} subjects.")
+else:
+    df_pad = pd.DataFrame()
+    n_pad_subjects = 0
 
 USER_FORCES   = sorted(df_raw["Force_Val"].unique())   # [0.07, 0.16, 0.6, 1.0, 1.4]
 KAO_FORCE_PLOT_MAX = 0.4   # omit Kao forces >= 0.4 g from Fig1/3
@@ -1323,12 +1442,25 @@ def plot_kao_vs_periungual(df_periungual, peri_label, peri_color, save_stem,
                            participant_median=False,
                            kao_df_override=None,
                            triangle_keys=None,
-                           extra_leg_handles=None):
+                           extra_leg_handles=None,
+                           extra_square_df=None,
+                           square_label=None,
+                           square_subjects=None,
+                           kao_legend_label=None,
+                           figsize=None,
+                           preserve_aspect=False):
     """Box/strip plot: Kao fingerpad No-paint vs one periungual condition.
 
     kao_df_override: replace module-level df_kao_plot with a custom Kao DataFrame.
     triangle_keys:   set of (source_name, force_val) → triangle scatter marker.
     extra_leg_handles: additional legend patches appended after the default two.
+    extra_square_df: extra subject points overlaid as squares on the Kao x positions
+                     (used when those rows are not already in kao_df_override).
+    square_label:    legend label for extra squares; auto-built when omitted.
+    square_subjects: participant IDs in kao_df_override plotted as squares, not circles.
+    kao_legend_label: override the hollow-box legend text (default KAO_LABEL).
+    figsize:         override FIG_SIZE (inches).
+    preserve_aspect: keep the drawn aspect on export instead of the 2-col canvas.
     """
     df_peri = df_periungual.copy()
     df_peri["Source"] = peri_label
@@ -1349,6 +1481,10 @@ def plot_kao_vs_periungual(df_periungual, peri_label, peri_color, save_stem,
     kao_forces_local  = sorted(df_kao_local["Force_Val"].unique())
     peri_forces_local = sorted(df_peri["Force_Val"].unique())
     combined_forces   = sorted(set(kao_forces_local) | set(peri_forces_local))
+    if extra_square_df is not None and not extra_square_df.empty:
+        combined_forces = sorted(
+            set(combined_forces) | set(extra_square_df["Force_Val"].unique())
+        )
 
     n_forces = len(combined_forces)
     force_to_idx = {f: i for i, f in enumerate(combined_forces)}
@@ -1370,7 +1506,7 @@ def plot_kao_vs_periungual(df_periungual, peri_label, peri_color, save_stem,
     peri_only = [f for f in peri_forces_local if f not in kao_forces_local]
 
     apply_plot_style()
-    fig, ax = plt.subplots(figsize=FIG_SIZE)
+    fig, ax = plt.subplots(figsize=figsize if figsize is not None else FIG_SIZE)
 
     bp, box_positions, flat_flags, box_sources, box_forces = draw_fig3_boxplot(
         ax, df_plot, combined_forces, source_order, box_palette, box_w,
@@ -1385,8 +1521,19 @@ def plot_kao_vs_periungual(df_periungual, peri_label, peri_color, save_stem,
         participant_median=participant_median,
         triangle_keys=triangle_keys,
         partial_subjects=partial_subjects,
+        square_subjects=square_subjects,
+        square_source=KAO_LABEL if square_subjects else None,
     )
     lower_stripplot_zorder(ax)
+    n_square = 0
+    if square_subjects:
+        n_square = len(set(square_subjects))
+    if extra_square_df is not None and not extra_square_df.empty:
+        n_square = _draw_fig3_square_overlay(
+            ax, extra_square_df, df_plot, KAO_LABEL, force_to_idx, n_forces, box_w,
+            brightness=scatter_brightness,
+            participant_median=participant_median,
+        )
     finalize_boxplot_lines(ax, median_color=ACCENT_RED, median_lw=2.0)
     finish_boxplot_styling(
         bp, flat_flags, box_sources, source_order, hollow_source=KAO_LABEL,
@@ -1420,20 +1567,42 @@ def plot_kao_vs_periungual(df_periungual, peri_label, peri_color, save_stem,
                     ha="center", va="top", fontsize=FONT_ANNOT, color=peri_vis_color,
                     fontweight="bold")
 
-    kao_patch  = mpatches.Patch(facecolor="none", edgecolor=KAO_COLOR,
-                                linewidth=KAO_BOX_LINEWIDTH, label=KAO_LABEL)
+    kao_patch  = mpatches.Patch(
+        facecolor="none", edgecolor=KAO_COLOR,
+        linewidth=KAO_BOX_LINEWIDTH,
+        label=kao_legend_label if kao_legend_label else KAO_LABEL,
+    )
     peri_patch = mpatches.Patch(facecolor=peri_box_face,
                                 edgecolor=BLACK, linewidth=BOX_LINEWIDTH,
                                 label=peri_label)
 
     leg_handles = [kao_patch, peri_patch]
+    if n_square:
+        sq_lab = square_label
+        if not sq_lab:
+            sq_lab = f"Volar finger pad\n(this study, n={n_square})"
+        rgba_sq = _hsb_scatter_rgba(KAO_COLOR, scatter_brightness)
+        leg_handles.append(
+            Line2D(
+                [0], [0],
+                marker="s",
+                linestyle="none",
+                markerfacecolor=rgba_sq,
+                markeredgecolor=BLACK,
+                markeredgewidth=0.4,
+                markersize=8,
+                label=sq_lab,
+            )
+        )
     if extra_leg_handles:
         leg_handles.extend(extra_leg_handles)
     finalize_accuracy_axes(
         fig, ax, n_forces, force_idx_order,
         [str(f) for f in combined_forces], leg_handles,
     )
-    save_figure(fig, save_stem, export_widths=export_widths)
+    save_figure(
+        fig, save_stem, export_widths=export_widths, preserve_aspect=preserve_aspect,
+    )
     plt.close(fig)
 
 
@@ -1443,7 +1612,20 @@ FIG2_COND_LABELS = {
 }
 
 INAIR_LABEL = f"Periungual — In-air\n(this study, n={n_subjects})"
-ONTouch_LABEL = "Dorsal nail fold: On-touch\n(this study, \u25cf n=30, $\\blacktriangle$ n=15)"
+_n_full_ontouch = (
+    df_raw.loc[
+        (df_raw["Condition"] == "On-touch (Mid)")
+        & ~df_raw[SUBJECT_COL].isin(_PARTIAL_SUBJ),
+        SUBJECT_COL,
+    ].nunique()
+)
+_n_tri_base = len(_PARTIAL_SUBJ - _P04_ONLY_SUBJ)
+_n_p04 = len(_P04_ONLY_SUBJ & _PARTIAL_SUBJ)
+ONTouch_LABEL = (
+    f"Dorsal nail fold: On-touch\n"
+    f"(this study, \u25cf n={_n_full_ontouch}, "
+    f"$\\blacktriangle$ n={_n_tri_base}+{_n_p04} at 0.4 g)"
+)
 
 
 def plot_ontouch_vs_inair(df, cond_list, cond_colors, save_stem,

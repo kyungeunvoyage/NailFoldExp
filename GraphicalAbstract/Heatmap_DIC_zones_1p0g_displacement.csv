@@ -1,0 +1,7 @@
+figure,metric,metric_label,force_g,site,source_region,region_A_value,region_CD_value,x_px,y_px,mapped_value,colorbar_vmin,colorbar_vmax
+Heatmap_DIC_zones_1p0g_displacement.png,Penetration depth (mm),Max normal surface displacement (mm),1.0,a,Region A,0.06791434014393939,0.09303192353030303,118,247,0.06791434014393939,0.05912318595871212,0.1018230777155303
+Heatmap_DIC_zones_1p0g_displacement.png,Penetration depth (mm),Max normal surface displacement (mm),1.0,b,"mean(A,CD)",0.06791434014393939,0.09303192353030303,132,405,0.08047313183712121,0.05912318595871212,0.1018230777155303
+Heatmap_DIC_zones_1p0g_displacement.png,Penetration depth (mm),Max normal surface displacement (mm),1.0,c,Region CD,0.06791434014393939,0.09303192353030303,239,486,0.09303192353030303,0.05912318595871212,0.1018230777155303
+Heatmap_DIC_zones_1p0g_displacement.png,Penetration depth (mm),Max normal surface displacement (mm),1.0,d,Region CD,0.06791434014393939,0.09303192353030303,384,485,0.09303192353030303,0.05912318595871212,0.1018230777155303
+Heatmap_DIC_zones_1p0g_displacement.png,Penetration depth (mm),Max normal surface displacement (mm),1.0,e,"mean(A,CD)",0.06791434014393939,0.09303192353030303,485,401,0.08047313183712121,0.05912318595871212,0.1018230777155303
+Heatmap_DIC_zones_1p0g_displacement.png,Penetration depth (mm),Max normal surface displacement (mm),1.0,f,Region A,0.06791434014393939,0.09303192353030303,522,248,0.06791434014393939,0.05912318595871212,0.1018230777155303

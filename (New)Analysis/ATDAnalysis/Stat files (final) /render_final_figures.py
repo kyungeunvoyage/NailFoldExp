@@ -275,6 +275,121 @@ def generate_fig3_full_kao():
 
 
 # =============================================================================
+# 6c. Fig3ver2 — full Kao + this-study fingerpad (PadData) as squares
+# =============================================================================
+def generate_fig3ver2():
+    print("\n[Fig3ver2] Kao fingerpad + this-study PadData (combined boxes) …")
+    if atd_c1.df_pad.empty:
+        raise FileNotFoundError(
+            f"No PadData CSVs found:\n  {atd_c1.PAD_FILE_PATTERN}"
+        )
+    n_pad = atd_c1.n_pad_subjects
+    sub_col = atd_c1.SUBJECT_COL
+
+    # Trial-level relative accuracy: max(0, 1 - |Target-Response|/Target) * 100
+    pad_trial = atd_c1.df_pad.copy()
+    pad_med = (
+        pad_trial
+        .groupby([sub_col, "Force_Val"], as_index=False)["Score"]
+        .median()
+    )
+    print("\nPad subject medians (%):")
+    print(pad_med.pivot(index=sub_col, columns="Force_Val", values="Score")
+          .round(1).to_string())
+
+    kao_rows_all = []
+    for force, vals in atd_c1.KAO_PAINT_RAW.items():
+        for pid, v in enumerate(vals):
+            kao_rows_all.append({
+                "Force_Val":   float(force),
+                "Score":       float(v),
+                "Source":      atd_c1.KAO_LABEL,
+                "Participant": f"KP{pid + 1}",
+                "Dataset":     "Kao et al. 2022",
+            })
+    df_kao_all = pd.DataFrame(kao_rows_all)
+
+    pad_for_box = pad_med.rename(columns={sub_col: "Participant"}).copy()
+    pad_for_box["Source"] = atd_c1.KAO_LABEL
+    pad_for_box["Dataset"] = "this study"
+    df_finger = pd.concat(
+        [
+            df_kao_all[["Force_Val", "Score", "Source", "Participant", "Dataset"]],
+            pad_for_box[["Force_Val", "Score", "Source", "Participant", "Dataset"]],
+        ],
+        ignore_index=True,
+    )
+    box_stats = (
+        df_finger.groupby("Force_Val")["Score"]
+        .agg(n="count", median="median", q1=lambda s: s.quantile(0.25),
+             q3=lambda s: s.quantile(0.75), mean="mean")
+        .round(2)
+        .reset_index()
+    )
+    print("\nCombined fingerpad box stats (Kao n=5 + pad n=3):")
+    print(box_stats.to_string(index=False))
+
+    trial_csv = os.path.join(OUT_C1, "Fig3ver2_pad_trial_scores.csv")
+    med_csv   = os.path.join(OUT_C1, "Fig3ver2_pad_subject_medians.csv")
+    pts_csv   = os.path.join(OUT_C1, "Fig3ver2_fingerpad_combined_points.csv")
+    box_csv   = os.path.join(OUT_C1, "Fig3ver2_fingerpad_box_stats.csv")
+    pad_trial[[sub_col, "Force", "Force_Val", "Target", "Response", "Score"]].to_csv(
+        trial_csv, index=False
+    )
+    pad_med.to_csv(med_csv, index=False)
+    df_finger.to_csv(pts_csv, index=False)
+    box_stats.to_csv(box_csv, index=False)
+    print(f"  Wrote {trial_csv}")
+    print(f"  Wrote {med_csv}")
+    print(f"  Wrote {pts_csv}")
+    print(f"  Wrote {box_csv}")
+
+    df_peri    = atd_c1.df_raw[atd_c1.df_raw["Condition"] == "On-touch (Mid)"].copy()
+    square_ids = set(pad_for_box["Participant"].unique())
+
+    pale_kw = dict(
+        peri_box_brightness       = S["COND_BOX_BRIGHTNESS"],
+        peri_box_alpha_hex        = S["COND_BOX_ALPHA_HEX"],
+        peri_box_saturation_scale = S["COND_BOX_SATURATION_SCALE"],
+    )
+    # Original Fig3 is 2102×1298. Keep the taller axes (6.8 in / 2013 px)
+    # and scale width by the same factor so the canvas is landscape like Fig3.
+    fig3_w, fig3_h = EXPORT_WIDTH, EXPORT_HEIGHT
+    ver2_h = 2013
+    ver2_w = round(fig3_w * ver2_h / fig3_h)
+    figsize_h = 6.8
+    figsize_w = 8.0 * ver2_w / fig3_w
+    atd_c1.plot_kao_vs_periungual(
+        df_peri,
+        atd_c1.ONTouch_LABEL,
+        S["ON_TOUCH"],
+        "Fig3ver2",
+        export_widths=((EXPORT_TAG, ver2_w, ver2_h),),
+        region_background=False,
+        region_labels=False,
+        highlight_forces=[0.07, 0.4, 1.0, 1.4],
+        highlight_force_edge_pad={
+            1.0: (0.06, 0.01),
+            1.4: (0.01, 0.04),
+        },
+        highlight_force_min_gap=0.05,
+        scatter_brightness=S["SCATTER_HSB_BRIGHTNESS"],
+        kao_df_override=df_finger,
+        partial_subjects=atd_c1._PARTIAL_SUBJ,
+        participant_median=True,
+        square_subjects=square_ids,
+        square_label=f"Volar finger pad\n(this study, n={n_pad})",
+        kao_legend_label=(
+            f"Volar finger pad \n"
+            f"(Kao et al. 2022, n=5 + this study, n={n_pad})"
+        ),
+        figsize=(figsize_w, figsize_h),
+        preserve_aspect=False,
+        **pale_kw,
+    )
+
+
+# =============================================================================
 # 7. Fig C — On-nail (C+D) vs Off-nail (A+F) pooled
 #    (atd_c1.df_raw 재사용 — 별도 데이터 로딩 불필요)
 # =============================================================================
@@ -478,6 +593,10 @@ def publish_final_figures():
         "Fig3_future_full_kao(final)_2col.png",
     )
     publish_to_final(
+        os.path.join(OUT_C1, "Fig3ver2_2col.png"),
+        "Fig3ver2_2col.png",
+    )
+    publish_to_final(
         os.path.join(OUT_AGG, "onnail_vs_offnail_pooled(final).png"),
         "onnail_vs_offnail_pooled(final).png",
     )
@@ -497,6 +616,7 @@ if __name__ == "__main__":
     generate_fig2()
     generate_fig3()
     generate_fig3_full_kao()
+    generate_fig3ver2()
     generate_pooled()
     publish_final_figures()
     print("\nDone.")

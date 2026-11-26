@@ -1,0 +1,7 @@
+figure,metric,metric_label,force_g,site,source_region,region_A_value,region_CD_value,x_px,y_px,mapped_value,colorbar_vmin,colorbar_vmax
+Heatmap_DIC_zones_1p0g_strain.png,Max compressive strain (%),Max compressive strain (%),1.0,a,Region A,9.00731837958586,9.311505382535353,118,247,9.00731837958586,8.541743110459091,9.777080651662121
+Heatmap_DIC_zones_1p0g_strain.png,Max compressive strain (%),Max compressive strain (%),1.0,b,"mean(A,CD)",9.00731837958586,9.311505382535353,132,405,9.159411881060606,8.541743110459091,9.777080651662121
+Heatmap_DIC_zones_1p0g_strain.png,Max compressive strain (%),Max compressive strain (%),1.0,c,Region CD,9.00731837958586,9.311505382535353,239,486,9.311505382535353,8.541743110459091,9.777080651662121
+Heatmap_DIC_zones_1p0g_strain.png,Max compressive strain (%),Max compressive strain (%),1.0,d,Region CD,9.00731837958586,9.311505382535353,384,485,9.311505382535353,8.541743110459091,9.777080651662121
+Heatmap_DIC_zones_1p0g_strain.png,Max compressive strain (%),Max compressive strain (%),1.0,e,"mean(A,CD)",9.00731837958586,9.311505382535353,485,401,9.159411881060606,8.541743110459091,9.777080651662121
+Heatmap_DIC_zones_1p0g_strain.png,Max compressive strain (%),Max compressive strain (%),1.0,f,Region A,9.00731837958586,9.311505382535353,522,248,9.00731837958586,8.541743110459091,9.777080651662121

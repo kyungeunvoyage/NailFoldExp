@@ -1,0 +1,7 @@
+figure,metric,condition,forces_g,n_subjects,site,area,x_px,y_px,mapped_value,colorbar_vmin,colorbar_vmax
+Heatmap_Detection_OnTouch_allForces.png,Detection accuracy (%)  |  On-touch  (all forces),On-touch (Mid),0.07;0.16;0.4;0.6;1;1.4,45,a,A,118,247,50.23924162257496,42.05804232804233,72.56329805996471
+Heatmap_Detection_OnTouch_allForces.png,Detection accuracy (%)  |  On-touch  (all forces),On-touch (Mid),0.07;0.16;0.4;0.6;1;1.4,45,b,B,132,405,66.28280423280422,42.05804232804233,72.56329805996471
+Heatmap_Detection_OnTouch_allForces.png,Detection accuracy (%)  |  On-touch  (all forces),On-touch (Mid),0.07;0.16;0.4;0.6;1;1.4,45,c,C,239,486,63.546913580246915,42.05804232804233,72.56329805996471
+Heatmap_Detection_OnTouch_allForces.png,Detection accuracy (%)  |  On-touch  (all forces),On-touch (Mid),0.07;0.16;0.4;0.6;1;1.4,45,d,D,384,485,63.113227513227514,42.05804232804233,72.56329805996471
+Heatmap_Detection_OnTouch_allForces.png,Detection accuracy (%)  |  On-touch  (all forces),On-touch (Mid),0.07;0.16;0.4;0.6;1;1.4,45,e,E,485,401,59.217901234567904,42.05804232804233,72.56329805996471
+Heatmap_Detection_OnTouch_allForces.png,Detection accuracy (%)  |  On-touch  (all forces),On-touch (Mid),0.07;0.16;0.4;0.6;1;1.4,45,f,F,522,248,48.338536155202824,42.05804232804233,72.56329805996471
