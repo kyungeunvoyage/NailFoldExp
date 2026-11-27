@@ -326,7 +326,7 @@ def generate_fig3ver2():
         .round(2)
         .reset_index()
     )
-    print("\nCombined fingerpad box stats (Kao n=5 + pad n=3):")
+    print(f"\nCombined fingerpad box stats (Kao n=5 + pad n={n_pad}):")
     print(box_stats.to_string(index=False))
 
     trial_csv = os.path.join(OUT_C1, "Fig3ver2_pad_trial_scores.csv")

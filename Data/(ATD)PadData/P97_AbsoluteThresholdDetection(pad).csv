@@ -1,0 +1,25 @@
+﻿SubjectID,Session,Condition,Area,Force,Target,Response,IsCorrect
+P97,S01,On-touch (Mid),Center of finger pad,0.07g,8,6,0
+P97,S01,On-touch (Mid),Center of finger pad,0.02g,5,4,0
+P97,S01,On-touch (Mid),Center of finger pad,0.16g,7,7,1
+P97,S01,On-touch (Mid),Center of finger pad,0.02g,6,5,0
+P97,S01,On-touch (Mid),Center of finger pad,0.02g,5,6,0
+P97,S01,On-touch (Mid),Center of finger pad,0.4g,5,8,0
+P97,S01,On-touch (Mid),Center of finger pad,0.16g,8,7,0
+P97,S01,On-touch (Mid),Center of finger pad,0.6g,8,9,0
+P97,S01,On-touch (Mid),Center of finger pad,1.4g,7,7,1
+P97,S01,On-touch (Mid),Center of finger pad,0.04g,5,4,0
+P97,S01,On-touch (Mid),Center of finger pad,1.4g,7,7,1
+P97,S01,On-touch (Mid),Center of finger pad,0.16g,7,5,0
+P97,S01,On-touch (Mid),Center of finger pad,0.4g,8,8,1
+P97,S01,On-touch (Mid),Center of finger pad,0.4g,5,5,1
+P97,S01,On-touch (Mid),Center of finger pad,0.07g,7,2,0
+P97,S01,On-touch (Mid),Center of finger pad,0.6g,8,8,1
+P97,S01,On-touch (Mid),Center of finger pad,1.0g,6,6,1
+P97,S01,On-touch (Mid),Center of finger pad,1.0g,6,6,1
+P97,S01,On-touch (Mid),Center of finger pad,0.04g,8,1,0
+P97,S01,On-touch (Mid),Center of finger pad,0.04g,5,0,0
+P97,S01,On-touch (Mid),Center of finger pad,0.6g,7,7,1
+P97,S01,On-touch (Mid),Center of finger pad,1.4g,8,8,1
+P97,S01,On-touch (Mid),Center of finger pad,1.0g,8,8,1
+P97,S01,On-touch (Mid),Center of finger pad,0.07g,5,5,1
